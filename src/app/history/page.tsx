@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
-import { signOutAction } from "../actions";
+import { HeaderNav } from "@/components/HeaderNav";
+import { isAdminEmail } from "@/lib/admin";
 import { HistoryList, type Snapshot } from "./HistoryList";
 
 export default async function HistoryPage() {
@@ -11,6 +12,7 @@ export default async function HistoryPage() {
   } = await supabase.auth.getUser();
 
   let snapshots: Snapshot[] = [];
+  const email = user?.email ?? "";
   if (user) {
     const { data } = await supabase
       .from("cost_profile_snapshots")
@@ -25,30 +27,13 @@ export default async function HistoryPage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <Wordmark size="md" />
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
-            >
-              ← Calculator
-            </Link>
-            <Link
-              href="/profile"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
-            >
-              Profile
-            </Link>
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="text-sm text-muted hover:text-foreground"
-              >
-                Sign Out
-              </button>
-            </form>
-          </div>
+          <HeaderNav
+            variant="history"
+            email={email}
+            isAdmin={isAdminEmail(email)}
+          />
         </div>
       </header>
       <div className="max-w-2xl mx-auto px-4 py-4">

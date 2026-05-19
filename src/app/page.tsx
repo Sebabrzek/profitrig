@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Calculator } from "./Calculator";
 import { Wordmark } from "@/components/Wordmark";
-import { signOutAction, type CostProfile } from "./actions";
+import { HeaderNav } from "@/components/HeaderNav";
+import { isAdminEmail } from "@/lib/admin";
+import { type CostProfile } from "./actions";
 import { isProfileComplete, type DriverProfile } from "@/lib/profile";
 
 const DEFAULTS: CostProfile = {
@@ -86,31 +87,13 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <Wordmark size="md" />
-          <div className="flex items-center gap-4">
-            <Link
-              href="/profile"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
-            >
-              Profile
-            </Link>
-            <Link
-              href="/history"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
-            >
-              History
-            </Link>
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="text-sm text-muted hover:text-foreground"
-                title={email}
-              >
-                Sign Out
-              </button>
-            </form>
-          </div>
+          <HeaderNav
+            variant="calculator"
+            email={email}
+            isAdmin={isAdminEmail(email)}
+          />
         </div>
       </header>
       <Calculator initial={initial} profileComplete={profileComplete} />

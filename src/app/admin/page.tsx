@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
 import { isAdminEmail, adminEmails } from "@/lib/admin";
 import { signOutAction } from "../actions";
+import { HeaderNav } from "@/components/HeaderNav";
 
 export const dynamic = "force-dynamic";
 
@@ -215,28 +216,9 @@ ADMIN_EMAILS = ${user.email}`}
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <Wordmark size="md" />
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-bold uppercase tracking-wider bg-brand-soft text-brand-dark px-2 py-1 rounded-full">
-              Admin
-            </span>
-            <Link
-              href="/"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
-            >
-              ← App
-            </Link>
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="text-sm text-muted hover:text-foreground"
-                title={user.email ?? ""}
-              >
-                Sign Out
-              </button>
-            </form>
-          </div>
+          <HeaderNav variant="calculator" email={user.email ?? ""} isAdmin />
         </div>
       </header>
 
