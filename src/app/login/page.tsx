@@ -1,0 +1,20 @@
+import { LoginForm } from "./LoginForm";
+import { Wordmark } from "@/components/Wordmark";
+
+export default function LoginPage() {
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-brand-soft to-white">
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <Wordmark size="lg" />
+          <p className="text-muted text-center text-sm leading-snug">
+            Know your real cost per mile.
+            <br />
+            Stop hauling cheap freight.
+          </p>
+        </div>
+        <LoginForm />
+      </div>
+    </main>
+  );
+}

@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ProfitRig
 
-## Getting Started
+Owner-Operator Cost Per Mile calculator. Mobile-first PWA. Built for drivers who aren't tech savvy: big inputs, big numbers, plain English.
 
-First, run the development server:
+**Stage 1 (this repo):** Each driver creates an account and gets a saved cost profile. The app calculates true cost per mile (CPM), the minimum target rate, break-even monthly revenue, and projected monthly profit — live, as they type.
+
+**Stage 2 (next):** Weekly load tracker that uses the saved CPM to flag profitable vs. losing loads.
+
+---
+
+## One-time setup
+
+### 1. Supabase — create the database table
+
+1. Open your Supabase project: <https://qgwzxvqrpuodvuovxkcn.supabase.co>
+2. Left sidebar → **SQL Editor** → **New query**
+3. Open the file `supabase-setup.sql` in this repo, copy the whole contents into the editor, click **Run**.
+4. (Optional but recommended for testing) Left sidebar → **Authentication** → **Sign In / Up** → toggle **off** "Confirm email" so you can sign up and use the app immediately without checking email. Turn it back on for production.
+
+### 2. Vercel — deploy
+
+1. Go to <https://vercel.com/new> and import `Sebabrzek/profitrig`.
+2. On the **Configure Project** screen, expand **Environment Variables** and add:
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://qgwzxvqrpuodvuovxkcn.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your publishable key (`sb_publishable_...`)
+3. Click **Deploy**. Vercel will give you a free `*.vercel.app` URL — that's your live app.
+4. Later: add a custom domain (`profitrig.com`) in **Project → Settings → Domains**.
+
+### 3. Supabase — add the Vercel URL to allowed redirect URLs
+
+1. Supabase → **Authentication** → **URL Configuration**
+2. Set **Site URL** to your Vercel URL (e.g. `https://profitrig.vercel.app`)
+3. Add the same URL to **Redirect URLs**.
+
+---
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000>. Sign up with any email/password (must be 6+ chars), then you'll land on the calculator.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`.env.local` already contains your Supabase URL + key.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## What's in the box
 
-To learn more about Next.js, take a look at the following resources:
+- `src/app/page.tsx` — main calculator screen (server component, auth-gated, loads saved profile)
+- `src/app/Calculator.tsx` — interactive form + live results
+- `src/app/login/` — sign in / sign up
+- `src/app/actions.ts` — server actions (sign in, sign up, sign out, save profile)
+- `src/lib/supabase/` — Supabase clients (browser, server, middleware)
+- `src/middleware.ts` — refreshes the user session on every request, redirects to /login if not signed in
+- `supabase-setup.sql` — the database schema + row-level-security policies (run this once in Supabase)
+- `public/manifest.webmanifest` + `public/icons/` — PWA config, "Add to Home Screen" works
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Stage 2 plan (load tracker)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add `loads` table keyed by `user_id` with: date, broker, miles, rate paid, optional fuel cost, profit/loss vs. saved CPM, week aggregates. Same auth, same shadcn-style UI. Will reuse the saved `cost_profiles` row.
