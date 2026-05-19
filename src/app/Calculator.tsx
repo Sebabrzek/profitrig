@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { saveProfileAction, type CostProfile } from "./actions";
 
 const money = (n: number) =>
@@ -13,12 +14,25 @@ const cpm = (n: number) =>
 
 type NumKey = keyof CostProfile;
 
+function textForValue(value: number) {
+  return value === 0 ? "" : String(value);
+}
+
+function cleanInput(raw: string) {
+  const onlyAllowed = raw.replace(/[^0-9.]/g, "");
+  const firstDot = onlyAllowed.indexOf(".");
+  if (firstDot === -1) return onlyAllowed;
+  return (
+    onlyAllowed.slice(0, firstDot + 1) +
+    onlyAllowed.slice(firstDot + 1).replace(/\./g, "")
+  );
+}
+
 function MoneyInput({
   label,
   hint,
   value,
   onChange,
-  step = "0.01",
   prefix = "$",
   suffix,
 }: {
@@ -26,10 +40,22 @@ function MoneyInput({
   hint?: string;
   value: number;
   onChange: (n: number) => void;
-  step?: string;
   prefix?: string;
   suffix?: string;
 }) {
+  const [text, setText] = useState(() => textForValue(value));
+  const lastExternalValueRef = useRef(value);
+
+  // Resync only when parent value changes externally (e.g., snapshot load),
+  // not while the user is typing intermediate states like "." or "0.4".
+  useEffect(() => {
+    if (value !== lastExternalValueRef.current) {
+      const ours = text === "" || text === "." ? 0 : parseFloat(text);
+      if (value !== ours) setText(textForValue(value));
+      lastExternalValueRef.current = value;
+    }
+  }, [value, text]);
+
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-semibold text-foreground">{label}</span>
@@ -44,22 +70,25 @@ function MoneyInput({
           type="text"
           inputMode="decimal"
           autoComplete="off"
-          value={value === 0 ? "" : String(value)}
+          value={text}
           onFocus={(e) => e.currentTarget.select()}
           onChange={(e) => {
-            const cleaned = e.target.value.replace(/[^0-9.]/g, "");
-            const firstDot = cleaned.indexOf(".");
-            const normalized =
-              firstDot === -1
-                ? cleaned
-                : cleaned.slice(0, firstDot + 1) +
-                  cleaned.slice(firstDot + 1).replace(/\./g, "");
-            if (normalized === "" || normalized === ".") {
-              onChange(0);
+            const next = cleanInput(e.target.value);
+            setText(next);
+            const parsed = next === "" || next === "." ? 0 : parseFloat(next);
+            const v = Number.isFinite(parsed) ? parsed : 0;
+            lastExternalValueRef.current = v;
+            onChange(v);
+          }}
+          onBlur={() => {
+            // Tidy up trailing dot or empty on blur: "0." -> "0", "." -> "0"
+            if (text === "." || text === "") {
+              setText("");
               return;
             }
-            const v = parseFloat(normalized);
-            onChange(Number.isFinite(v) ? v : 0);
+            if (text.endsWith(".")) {
+              setText(text.slice(0, -1));
+            }
           }}
           className={`w-full h-12 ${
             prefix ? "pl-8" : "pl-4"
@@ -99,6 +128,7 @@ function Section({
 
 export function Calculator({ initial }: { initial: CostProfile }) {
   const [p, setP] = useState<CostProfile>(initial);
+  const [label, setLabel] = useState("");
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<null | "ok" | string>(null);
 
@@ -119,7 +149,7 @@ export function Calculator({ initial }: { initial: CostProfile }) {
       p.maintenance_per_mile +
       p.tires_per_mile +
       p.def_per_mile +
-      p.owner_operator_rate_per_mile +
+      p.driver_pay_per_mile +
       p.tolls_misc_per_mile;
 
     const fixedPerMile = p.monthly_miles > 0 ? fixed / p.monthly_miles : 0;
@@ -143,9 +173,10 @@ export function Calculator({ initial }: { initial: CostProfile }) {
   function save() {
     setSaved(null);
     startTransition(async () => {
-      const r = await saveProfileAction(p);
+      const r = await saveProfileAction(p, label.trim() || null);
       if (r.ok) {
         setSaved("ok");
+        setLabel("");
         setTimeout(() => setSaved(null), 2500);
       } else {
         setSaved(r.error);
@@ -242,7 +273,6 @@ export function Calculator({ initial }: { initial: CostProfile }) {
             label="Monthly Miles Driven"
             value={p.monthly_miles}
             onChange={set("monthly_miles")}
-            step="100"
             prefix=""
             suffix="mi"
           />
@@ -258,7 +288,6 @@ export function Calculator({ initial }: { initial: CostProfile }) {
           hint="e.g. 6.5"
           value={p.mpg}
           onChange={set("mpg")}
-          step="0.1"
           prefix=""
           suffix="mpg"
         />
@@ -301,10 +330,10 @@ export function Calculator({ initial }: { initial: CostProfile }) {
         />
         <div className="sm:col-span-2">
           <MoneyInput
-            label="Owner Operator Rate Per Mile"
-            hint="What you pay yourself per mile. Yes — pay yourself."
-            value={p.owner_operator_rate_per_mile}
-            onChange={set("owner_operator_rate_per_mile")}
+            label="Driver Pay"
+            hint="What you pay yourself per mile. Typically $0.40–$0.99."
+            value={p.driver_pay_per_mile}
+            onChange={set("driver_pay_per_mile")}
           />
         </div>
         <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
@@ -327,6 +356,32 @@ export function Calculator({ initial }: { initial: CostProfile }) {
         </div>
       </Section>
 
+      <div className="bg-white border border-border rounded-2xl p-5 mb-4">
+        <label className="block text-sm font-semibold mb-1.5">
+          Label this save (optional)
+        </label>
+        <p className="text-xs text-muted mb-2">
+          e.g. &quot;Carrier XYZ&quot; or &quot;After paying off trailer&quot;. Every
+          save is dated so you can look back later.
+        </p>
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Optional label"
+          maxLength={80}
+          className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
+        />
+        <div className="mt-3 text-right">
+          <Link
+            href="/history"
+            className="text-sm font-semibold text-brand hover:text-brand-dark"
+          >
+            View save history →
+          </Link>
+        </div>
+      </div>
+
       {/* Save bar */}
       <div className="fixed bottom-0 inset-x-0 bg-white border-t border-border px-4 py-3 z-10">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
@@ -335,7 +390,7 @@ export function Calculator({ initial }: { initial: CostProfile }) {
               ? "✓ Saved"
               : saved && saved !== "ok"
               ? `Error: ${saved}`
-              : "Your numbers save to your account."}
+              : "Saves your current numbers and adds a dated snapshot."}
           </div>
           <button
             onClick={save}

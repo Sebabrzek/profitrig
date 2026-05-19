@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Calculator } from "./Calculator";
 import { Wordmark } from "@/components/Wordmark";
@@ -16,7 +17,7 @@ const DEFAULTS: CostProfile = {
   maintenance_per_mile: 0.2,
   tires_per_mile: 0.05,
   def_per_mile: 0.03,
-  owner_operator_rate_per_mile: 0,
+  driver_pay_per_mile: 0,
   tolls_misc_per_mile: 0.05,
   desired_profit_per_mile: 0.5,
 };
@@ -50,8 +51,7 @@ export default async function HomePage() {
         maintenance_per_mile: Number(data.maintenance_per_mile) || 0,
         tires_per_mile: Number(data.tires_per_mile) || 0,
         def_per_mile: Number(data.def_per_mile) || 0,
-        owner_operator_rate_per_mile:
-          Number(data.owner_operator_rate_per_mile) || 0,
+        driver_pay_per_mile: Number(data.driver_pay_per_mile) || 0,
         tolls_misc_per_mile: Number(data.tolls_misc_per_mile) || 0,
         desired_profit_per_mile: Number(data.desired_profit_per_mile) || 0,
       };
@@ -61,17 +61,25 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <Wordmark size="md" />
-          <form action={signOutAction}>
-            <button
-              type="submit"
-              className="text-sm text-muted hover:text-foreground"
-              title={email}
+          <div className="flex items-center gap-4">
+            <Link
+              href="/history"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
             >
-              Sign Out
-            </button>
-          </form>
+              History
+            </Link>
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="text-sm text-muted hover:text-foreground"
+                title={email}
+              >
+                Sign Out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <Calculator initial={initial} />
