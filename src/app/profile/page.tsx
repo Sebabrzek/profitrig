@@ -2,24 +2,38 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { signOutAction } from "../actions";
-import { HistoryList, type Snapshot } from "./HistoryList";
+import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
+import { ProfileForm } from "./ProfileForm";
 
-export default async function HistoryPage() {
+export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let snapshots: Snapshot[] = [];
+  let initial: DriverProfile = EMPTY_DRIVER_PROFILE;
+  let email = "";
   if (user) {
+    email = user.email ?? "";
     const { data } = await supabase
-      .from("cost_profile_snapshots")
-      .select(
-        "id,label,total_cpm,required_rate,monthly_miles,desired_profit_per_mile,created_at"
-      )
+      .from("driver_profiles")
+      .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (data) snapshots = data as Snapshot[];
+      .maybeSingle();
+    if (data) {
+      initial = {
+        first_name: data.first_name ?? "",
+        last_name: data.last_name ?? "",
+        phone: data.phone ?? "",
+        company_name: data.company_name ?? "",
+        domicile_city: data.domicile_city ?? "",
+        domicile_state: data.domicile_state ?? "",
+        carrier_name: data.carrier_name ?? "",
+        authority_type: data.authority_type ?? "",
+        trailer_type: data.trailer_type ?? "",
+        marketing_opt_in: Boolean(data.marketing_opt_in),
+      };
+    }
   }
 
   return (
@@ -34,12 +48,6 @@ export default async function HistoryPage() {
             >
               ← Calculator
             </Link>
-            <Link
-              href="/profile"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
-            >
-              Profile
-            </Link>
             <form action={signOutAction}>
               <button
                 type="submit"
@@ -51,24 +59,13 @@ export default async function HistoryPage() {
           </div>
         </div>
       </header>
-      <div className="max-w-2xl mx-auto px-4 py-4">
-        <h1 className="text-2xl font-black mb-1">Save History</h1>
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-32">
+        <h1 className="text-2xl font-black mb-1">Your Profile</h1>
         <p className="text-sm text-muted mb-5">
-          Every save is dated. Tap one to load it back into the calculator.
+          Quick info about you and your operation. All optional. Helps us send
+          tips that actually match what you haul.
         </p>
-        {snapshots.length === 0 ? (
-          <div className="bg-white border border-border rounded-2xl p-8 text-center">
-            <p className="text-muted">
-              You haven&apos;t saved a snapshot yet. Hit{" "}
-              <Link href="/" className="text-brand font-semibold">
-                Save
-              </Link>{" "}
-              on the calculator to record your first one.
-            </p>
-          </div>
-        ) : (
-          <HistoryList snapshots={snapshots} />
-        )}
+        <ProfileForm initial={initial} email={email} />
       </div>
     </main>
   );

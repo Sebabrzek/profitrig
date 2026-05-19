@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Calculator } from "./Calculator";
 import { Wordmark } from "@/components/Wordmark";
 import { signOutAction, type CostProfile } from "./actions";
+import { isProfileComplete, type DriverProfile } from "@/lib/profile";
 
 const DEFAULTS: CostProfile = {
   truck_payment: 0,
@@ -30,13 +31,22 @@ export default async function HomePage() {
 
   let initial: CostProfile = DEFAULTS;
   let email = "";
+  let driverProfile: DriverProfile | null = null;
   if (user) {
     email = user.email ?? "";
-    const { data } = await supabase
-      .from("cost_profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const [costRes, driverRes] = await Promise.all([
+      supabase
+        .from("cost_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("driver_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+    const data = costRes.data;
     if (data) {
       initial = {
         truck_payment: Number(data.truck_payment) || 0,
@@ -56,7 +66,22 @@ export default async function HomePage() {
         desired_profit_per_mile: Number(data.desired_profit_per_mile) || 0,
       };
     }
+    if (driverRes.data) {
+      driverProfile = {
+        first_name: driverRes.data.first_name ?? "",
+        last_name: driverRes.data.last_name ?? "",
+        phone: driverRes.data.phone ?? "",
+        company_name: driverRes.data.company_name ?? "",
+        domicile_city: driverRes.data.domicile_city ?? "",
+        domicile_state: driverRes.data.domicile_state ?? "",
+        carrier_name: driverRes.data.carrier_name ?? "",
+        authority_type: driverRes.data.authority_type ?? "",
+        trailer_type: driverRes.data.trailer_type ?? "",
+        marketing_opt_in: Boolean(driverRes.data.marketing_opt_in),
+      };
+    }
   }
+  const profileComplete = isProfileComplete(driverProfile);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -64,6 +89,12 @@ export default async function HomePage() {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <Wordmark size="md" />
           <div className="flex items-center gap-4">
+            <Link
+              href="/profile"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              Profile
+            </Link>
             <Link
               href="/history"
               className="text-sm font-semibold text-brand hover:text-brand-dark"
@@ -82,7 +113,7 @@ export default async function HomePage() {
           </div>
         </div>
       </header>
-      <Calculator initial={initial} />
+      <Calculator initial={initial} profileComplete={profileComplete} />
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { saveProfileAction, type CostProfile } from "./actions";
+import { ProfileBanner } from "@/components/ProfileBanner";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -126,7 +127,13 @@ function Section({
   );
 }
 
-export function Calculator({ initial }: { initial: CostProfile }) {
+export function Calculator({
+  initial,
+  profileComplete,
+}: {
+  initial: CostProfile;
+  profileComplete: boolean;
+}) {
   const [p, setP] = useState<CostProfile>(initial);
   const [label, setLabel] = useState("");
   const [pending, startTransition] = useTransition();
@@ -186,6 +193,7 @@ export function Calculator({ initial }: { initial: CostProfile }) {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 pb-32">
+      <ProfileBanner profileComplete={profileComplete} />
       {/* Big result card */}
       <div className="bg-gradient-to-br from-brand to-brand-dark text-white rounded-2xl p-5 mb-4 shadow-sm">
         <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">

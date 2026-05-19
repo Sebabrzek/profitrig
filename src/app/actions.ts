@@ -186,6 +186,40 @@ export async function loadSnapshotAction(
   return { ok: true };
 }
 
+import type { DriverProfile } from "@/lib/profile";
+
+export async function saveDriverProfileAction(
+  profile: DriverProfile
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase.from("driver_profiles").upsert(
+    {
+      user_id: user.id,
+      first_name: profile.first_name.trim() || null,
+      last_name: profile.last_name.trim() || null,
+      phone: profile.phone.trim() || null,
+      company_name: profile.company_name.trim() || null,
+      domicile_city: profile.domicile_city.trim() || null,
+      domicile_state: profile.domicile_state.trim() || null,
+      carrier_name: profile.carrier_name.trim() || null,
+      authority_type: profile.authority_type.trim() || null,
+      trailer_type: profile.trailer_type.trim() || null,
+      marketing_opt_in: profile.marketing_opt_in,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function deleteSnapshotAction(
   snapshotId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
