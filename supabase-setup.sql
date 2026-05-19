@@ -140,3 +140,23 @@ create policy "Owners can update own driver profile"
   on public.driver_profiles for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- In-app feedback inbox. Signed-in drivers can submit messages; admins read
+-- them in the Supabase dashboard (or via service_role). Users cannot read
+-- their own past feedback, which keeps the policy and UI dead simple.
+create table if not exists public.feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users (id) on delete set null,
+  message text not null check (length(trim(message)) > 0 and length(message) <= 5000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists feedback_created_at_idx
+  on public.feedback (created_at desc);
+
+alter table public.feedback enable row level security;
+
+drop policy if exists "Signed-in users can submit feedback" on public.feedback;
+create policy "Signed-in users can submit feedback"
+  on public.feedback for insert
+  with check (auth.uid() = user_id);

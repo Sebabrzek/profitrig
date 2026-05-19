@@ -220,6 +220,28 @@ export async function saveDriverProfileAction(
   return { ok: true };
 }
 
+export async function submitFeedbackAction(
+  message: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = message.trim();
+  if (!trimmed) return { ok: false, error: "Type a message before sending." };
+  if (trimmed.length > 5000) {
+    return { ok: false, error: "Message is too long (5000 character max)." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("feedback")
+    .insert({ user_id: user.id, message: trimmed });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function deleteSnapshotAction(
   snapshotId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

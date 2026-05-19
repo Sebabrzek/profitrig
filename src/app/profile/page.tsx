@@ -4,6 +4,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { signOutAction } from "../actions";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm } from "./ProfileForm";
+import { FeedbackCard } from "./FeedbackCard";
 
 export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
@@ -66,6 +67,9 @@ export default async function ProfilePage() {
           tips that actually match what you haul.
         </p>
         <ProfileForm initial={initial} email={email} />
+        <div className="mt-4">
+          <FeedbackCard />
+        </div>
       </div>
     </main>
   );
