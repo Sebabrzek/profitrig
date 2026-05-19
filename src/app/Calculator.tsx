@@ -41,19 +41,31 @@ function MoneyInput({
           </span>
         )}
         <input
-          type="number"
+          type="text"
           inputMode="decimal"
-          step={step}
-          min="0"
-          value={Number.isFinite(value) ? value : 0}
+          autoComplete="off"
+          value={value === 0 ? "" : String(value)}
           onFocus={(e) => e.currentTarget.select()}
           onChange={(e) => {
-            const v = parseFloat(e.target.value);
+            const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+            const firstDot = cleaned.indexOf(".");
+            const normalized =
+              firstDot === -1
+                ? cleaned
+                : cleaned.slice(0, firstDot + 1) +
+                  cleaned.slice(firstDot + 1).replace(/\./g, "");
+            if (normalized === "" || normalized === ".") {
+              onChange(0);
+              return;
+            }
+            const v = parseFloat(normalized);
             onChange(Number.isFinite(v) ? v : 0);
           }}
           className={`w-full h-12 ${
             prefix ? "pl-8" : "pl-4"
-          } pr-4 rounded-xl border border-border bg-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-brand`}
+          } ${
+            suffix ? "pr-12" : "pr-4"
+          } rounded-xl border border-border bg-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-brand`}
         />
         {suffix && (
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
