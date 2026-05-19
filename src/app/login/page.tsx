@@ -7,6 +7,9 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center gap-3 mb-8">
           <Wordmark size="lg" />
+          <span className="inline-flex items-center gap-1.5 bg-brand text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+            Free for Owner Operators
+          </span>
           <p className="text-muted text-center text-sm leading-snug">
             Know your real cost per mile.
             <br />
