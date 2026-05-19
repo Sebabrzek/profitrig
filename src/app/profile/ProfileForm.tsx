@@ -247,7 +247,7 @@ export function ProfileForm({
             }
           />
           <span className="text-sm">
-            <span className="font-semibold">Send me HelloTrucker emails</span>
+            <span className="font-semibold">Send me ProfitRig emails</span>
             <br />
             <span className="text-muted">
               Tips, rate updates, and occasional offers. Unsubscribe anytime.

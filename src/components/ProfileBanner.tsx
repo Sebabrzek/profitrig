@@ -34,7 +34,7 @@ export function ProfileBanner({ profileComplete }: { profileComplete: boolean })
             Finish your profile in 30 seconds
           </p>
           <p className="text-xs text-foreground/80 mt-0.5">
-            Add your name, phone, and what you haul so HelloTrucker can send
+            Add your name, phone, and what you haul so ProfitRig can send
             tips matched to your operation.
           </p>
         </div>

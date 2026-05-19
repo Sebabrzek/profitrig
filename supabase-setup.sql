@@ -106,7 +106,7 @@ create policy "Owners can delete own snapshots"
   using (auth.uid() = user_id);
 
 -- Driver contact + segmentation profile (used for personalization and, with
--- explicit opt-in, HelloTrucker email campaigns).
+-- explicit opt-in, ProfitRig email campaigns).
 create table if not exists public.driver_profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
   first_name text,
