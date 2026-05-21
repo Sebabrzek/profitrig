@@ -245,6 +245,39 @@ export default async function LoadsPage({
           + Add a Load
         </Link>
 
+        {/* Export to Sheets/Excel */}
+        {isConfigured && (
+          <section className="bg-white border border-border rounded-2xl p-4 mb-4">
+            <h3 className="text-sm font-bold mb-1">
+              Export to Sheets / Excel
+            </h3>
+            <p className="text-xs text-muted mb-3">
+              Download a CSV with every load + auto-totals. Opens in Google
+              Sheets, Excel, or Numbers.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/loads/export?range=week&date=${isoDate(targetDate)}`}
+                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+              >
+                This Week
+              </a>
+              <a
+                href={`/api/loads/export?range=month&date=${isoDate(targetDate)}`}
+                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+              >
+                This Month
+              </a>
+              <a
+                href={`/api/loads/export?range=all`}
+                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+              >
+                All Time
+              </a>
+            </div>
+          </section>
+        )}
+
         {/* Load list */}
         {loads.length === 0 ? (
           <div className="bg-white border border-border rounded-2xl p-8 text-center">
