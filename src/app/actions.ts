@@ -261,3 +261,83 @@ export async function deleteSnapshotAction(
   revalidatePath("/history");
   return { ok: true };
 }
+
+import type { Load } from "@/lib/loads";
+
+function nullableNum(v: number | null): number | null {
+  if (v == null) return null;
+  return Number.isFinite(v) ? v : null;
+}
+
+export async function saveLoadAction(
+  load: Load
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  if (!load.load_date) return { ok: false, error: "Pick a date." };
+  if (load.loaded_miles < 0 || load.deadhead_miles < 0) {
+    return { ok: false, error: "Miles can't be negative." };
+  }
+
+  const row = {
+    user_id: user.id,
+    load_date: load.load_date,
+    broker: load.broker.trim() || null,
+    origin: load.origin.trim() || null,
+    destination: load.destination.trim() || null,
+    loaded_miles: load.loaded_miles,
+    deadhead_miles: load.deadhead_miles,
+    linehaul_pay: load.linehaul_pay,
+    fuel_surcharge: load.fuel_surcharge,
+    accessorials: load.accessorials,
+    fuel_actual: nullableNum(load.fuel_actual),
+    tolls_actual: nullableNum(load.tolls_actual),
+    lumpers_actual: nullableNum(load.lumpers_actual),
+    notes: load.notes.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (load.id) {
+    const { error } = await supabase
+      .from("loads")
+      .update(row)
+      .eq("id", load.id)
+      .eq("user_id", user.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/loads");
+    return { ok: true, id: load.id };
+  }
+
+  const { data, error } = await supabase
+    .from("loads")
+    .insert(row)
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/loads");
+  return { ok: true, id: data.id };
+}
+
+export async function deleteLoadAction(
+  loadId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("loads")
+    .delete()
+    .eq("id", loadId)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/loads");
+  return { ok: true };
+}

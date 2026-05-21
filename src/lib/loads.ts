@@ -1,0 +1,234 @@
+import type { CostProfile } from "@/app/actions";
+
+export type Load = {
+  id?: string;
+  load_date: string; // YYYY-MM-DD
+  broker: string;
+  origin: string;
+  destination: string;
+  loaded_miles: number;
+  deadhead_miles: number;
+  linehaul_pay: number;
+  fuel_surcharge: number;
+  accessorials: number;
+  fuel_actual: number | null;
+  tolls_actual: number | null;
+  lumpers_actual: number | null;
+  notes: string;
+};
+
+export const EMPTY_LOAD: Load = {
+  load_date: todayIso(),
+  broker: "",
+  origin: "",
+  destination: "",
+  loaded_miles: 0,
+  deadhead_miles: 0,
+  linehaul_pay: 0,
+  fuel_surcharge: 0,
+  accessorials: 0,
+  fuel_actual: null,
+  tolls_actual: null,
+  lumpers_actual: null,
+  notes: "",
+};
+
+export function todayIso(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export type LoadEconomics = {
+  totalMiles: number;
+  deadheadPct: number;
+  revenue: number;
+  fuelCost: number;
+  fuelIsEstimated: boolean;
+  maintenanceCost: number;
+  tiresCost: number;
+  defCost: number;
+  driverPayCost: number;
+  allocatedFixedCost: number;
+  tollsCost: number;
+  lumpersCost: number;
+  totalCost: number;
+  profit: number;
+  rpm: number;
+  cpm: number;
+  profitPerMile: number;
+};
+
+export function computeLoadEconomics(
+  load: Load,
+  p: CostProfile
+): LoadEconomics {
+  const totalMiles =
+    Number(load.loaded_miles || 0) + Number(load.deadhead_miles || 0);
+  const deadheadPct =
+    totalMiles > 0 ? (Number(load.deadhead_miles || 0) / totalMiles) * 100 : 0;
+
+  const revenue =
+    Number(load.linehaul_pay || 0) +
+    Number(load.fuel_surcharge || 0) +
+    Number(load.accessorials || 0);
+
+  const computedFuel =
+    p.mpg > 0 ? (totalMiles / p.mpg) * p.fuel_price_per_gallon : 0;
+  const fuelIsEstimated = load.fuel_actual == null;
+  const fuelCost = fuelIsEstimated ? computedFuel : Number(load.fuel_actual);
+
+  const maintenanceCost = totalMiles * p.maintenance_per_mile;
+  const tiresCost = totalMiles * p.tires_per_mile;
+  const defCost = totalMiles * p.def_per_mile;
+  const driverPayCost = totalMiles * p.driver_pay_per_mile;
+
+  const totalFixed =
+    p.truck_payment +
+    p.trailer_payment +
+    p.insurance +
+    p.eld_subscriptions +
+    p.permits_irp_ifta +
+    p.office_misc;
+  const allocatedFixedCost =
+    p.monthly_miles > 0 ? totalMiles * (totalFixed / p.monthly_miles) : 0;
+
+  const tollsCost = load.tolls_actual != null ? Number(load.tolls_actual) : 0;
+  const lumpersCost =
+    load.lumpers_actual != null ? Number(load.lumpers_actual) : 0;
+
+  const totalCost =
+    fuelCost +
+    maintenanceCost +
+    tiresCost +
+    defCost +
+    driverPayCost +
+    allocatedFixedCost +
+    tollsCost +
+    lumpersCost;
+
+  const profit = revenue - totalCost;
+  const rpm = totalMiles > 0 ? revenue / totalMiles : 0;
+  const cpm = totalMiles > 0 ? totalCost / totalMiles : 0;
+  const profitPerMile = totalMiles > 0 ? profit / totalMiles : 0;
+
+  return {
+    totalMiles,
+    deadheadPct,
+    revenue,
+    fuelCost,
+    fuelIsEstimated,
+    maintenanceCost,
+    tiresCost,
+    defCost,
+    driverPayCost,
+    allocatedFixedCost,
+    tollsCost,
+    lumpersCost,
+    totalCost,
+    profit,
+    rpm,
+    cpm,
+    profitPerMile,
+  };
+}
+
+// Week boundaries — Monday is the start of the week (matches most trucking
+// settlement periods).
+export function startOfWeek(d: Date): Date {
+  const x = new Date(d);
+  const day = x.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+export function endOfWeek(d: Date): Date {
+  const start = startOfWeek(d);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+export function isoDate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function formatWeekLabel(start: Date): string {
+  const end = endOfWeek(start);
+  const sm = start.toLocaleString("en-US", { month: "short" });
+  const em = end.toLocaleString("en-US", { month: "short" });
+  const year = end.getFullYear();
+  if (start.getMonth() === end.getMonth()) {
+    return `${sm} ${start.getDate()}–${end.getDate()}, ${year}`;
+  }
+  return `${sm} ${start.getDate()} – ${em} ${end.getDate()}, ${year}`;
+}
+
+export function parseDateParam(
+  dateStr: string | null | undefined
+): Date {
+  if (!dateStr) return new Date();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return new Date();
+  return new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    12,
+    0,
+    0
+  );
+}
+
+export type WeekTotals = {
+  loads: number;
+  loadedMiles: number;
+  deadheadMiles: number;
+  totalMiles: number;
+  deadheadPct: number;
+  revenue: number;
+  totalCost: number;
+  profit: number;
+  rpm: number;
+  cpm: number;
+};
+
+export function aggregateWeek(
+  loads: Load[],
+  profile: CostProfile
+): WeekTotals {
+  let loadedMiles = 0;
+  let deadheadMiles = 0;
+  let revenue = 0;
+  let totalCost = 0;
+
+  for (const l of loads) {
+    const e = computeLoadEconomics(l, profile);
+    loadedMiles += Number(l.loaded_miles || 0);
+    deadheadMiles += Number(l.deadhead_miles || 0);
+    revenue += e.revenue;
+    totalCost += e.totalCost;
+  }
+
+  const totalMiles = loadedMiles + deadheadMiles;
+  return {
+    loads: loads.length,
+    loadedMiles,
+    deadheadMiles,
+    totalMiles,
+    deadheadPct: totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0,
+    revenue,
+    totalCost,
+    profit: revenue - totalCost,
+    rpm: totalMiles > 0 ? revenue / totalMiles : 0,
+    cpm: totalMiles > 0 ? totalCost / totalMiles : 0,
+  };
+}

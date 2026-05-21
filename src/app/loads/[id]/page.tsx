@@ -1,0 +1,124 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Wordmark } from "@/components/Wordmark";
+import { HeaderNav } from "@/components/HeaderNav";
+import { isAdminEmail } from "@/lib/admin";
+import { type CostProfile } from "@/app/actions";
+import type { Load } from "@/lib/loads";
+import { LoadForm } from "../LoadForm";
+
+const EMPTY_PROFILE: CostProfile = {
+  truck_payment: 0,
+  trailer_payment: 0,
+  insurance: 0,
+  eld_subscriptions: 0,
+  permits_irp_ifta: 0,
+  office_misc: 0,
+  monthly_miles: 0,
+  mpg: 0,
+  fuel_price_per_gallon: 0,
+  maintenance_per_mile: 0,
+  tires_per_mile: 0,
+  def_per_mile: 0,
+  driver_pay_per_mile: 0,
+  tolls_misc_per_mile: 0,
+  desired_profit_per_mile: 0,
+};
+
+export default async function EditLoadPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [loadRes, costRes] = await Promise.all([
+    supabase
+      .from("loads")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("cost_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  if (!loadRes.data) notFound();
+  const r = loadRes.data;
+
+  const initial: Load = {
+    id: r.id,
+    load_date: r.load_date,
+    broker: r.broker ?? "",
+    origin: r.origin ?? "",
+    destination: r.destination ?? "",
+    loaded_miles: Number(r.loaded_miles) || 0,
+    deadhead_miles: Number(r.deadhead_miles) || 0,
+    linehaul_pay: Number(r.linehaul_pay) || 0,
+    fuel_surcharge: Number(r.fuel_surcharge) || 0,
+    accessorials: Number(r.accessorials) || 0,
+    fuel_actual: r.fuel_actual == null ? null : Number(r.fuel_actual),
+    tolls_actual: r.tolls_actual == null ? null : Number(r.tolls_actual),
+    lumpers_actual:
+      r.lumpers_actual == null ? null : Number(r.lumpers_actual),
+    notes: r.notes ?? "",
+  };
+
+  const costData = costRes.data;
+  const profile: CostProfile = costData
+    ? {
+        truck_payment: Number(costData.truck_payment) || 0,
+        trailer_payment: Number(costData.trailer_payment) || 0,
+        insurance: Number(costData.insurance) || 0,
+        eld_subscriptions: Number(costData.eld_subscriptions) || 0,
+        permits_irp_ifta: Number(costData.permits_irp_ifta) || 0,
+        office_misc: Number(costData.office_misc) || 0,
+        monthly_miles: Number(costData.monthly_miles) || 0,
+        mpg: Number(costData.mpg) || 0,
+        fuel_price_per_gallon: Number(costData.fuel_price_per_gallon) || 0,
+        maintenance_per_mile: Number(costData.maintenance_per_mile) || 0,
+        tires_per_mile: Number(costData.tires_per_mile) || 0,
+        def_per_mile: Number(costData.def_per_mile) || 0,
+        driver_pay_per_mile: Number(costData.driver_pay_per_mile) || 0,
+        tolls_misc_per_mile: Number(costData.tolls_misc_per_mile) || 0,
+        desired_profit_per_mile:
+          Number(costData.desired_profit_per_mile) || 0,
+      }
+    : EMPTY_PROFILE;
+
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <header className="sticky top-0 z-10 bg-white border-b border-border">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <Wordmark size="md" />
+          <HeaderNav
+            variant="loads"
+            email={user.email ?? ""}
+            isAdmin={isAdminEmail(user.email)}
+          />
+        </div>
+      </header>
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-12">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-2xl font-black">Edit Load</h1>
+          <Link
+            href="/loads"
+            className="text-sm font-semibold text-brand hover:text-brand-dark"
+          >
+            ← Back
+          </Link>
+        </div>
+        <LoadForm initial={initial} costProfile={profile} loadId={id} />
+      </div>
+    </main>
+  );
+}
