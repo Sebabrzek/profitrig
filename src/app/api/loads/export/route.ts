@@ -7,6 +7,7 @@ import {
   startOfWeek,
   type Load,
 } from "@/lib/loads";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { CostProfile } from "@/app/actions";
 
 const EMPTY_PROFILE: CostProfile = {
@@ -124,6 +125,12 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+  const sub = await fetchSubscription(supabase, user.id);
+  if (!isPro(sub)) {
+    return new Response("Upgrade to ProfitRig Pro to export.", {
+      status: 402,
+    });
   }
 
   // Resolve range

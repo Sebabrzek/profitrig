@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { signOutAction } from "@/app/actions";
 
-type Variant = "calculator" | "loads" | "history" | "profile" | "admin";
+type Variant =
+  | "calculator"
+  | "loads"
+  | "history"
+  | "profile"
+  | "admin"
+  | "upgrade";
 
 const linkClass =
   "text-sm font-semibold text-brand hover:text-brand-dark whitespace-nowrap";
 
 const navItems: Array<{
-  variant: Exclude<Variant, "admin">;
+  variant: Exclude<Variant, "admin" | "upgrade">;
   href: string;
   label: string;
 }> = [
@@ -21,10 +27,12 @@ export function HeaderNav({
   variant,
   email,
   isAdmin = false,
+  isPro = false,
 }: {
   variant: Variant;
   email?: string;
   isAdmin?: boolean;
+  isPro?: boolean;
 }) {
   return (
     <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto">
@@ -35,6 +43,19 @@ export function HeaderNav({
             {n.label}
           </Link>
         ))}
+      {!isPro && variant !== "upgrade" && (
+        <Link
+          href="/upgrade"
+          className="text-xs font-bold uppercase tracking-wider bg-brand text-white px-2 py-1 rounded-full hover:bg-brand-dark transition whitespace-nowrap"
+        >
+          Upgrade
+        </Link>
+      )}
+      {isPro && (
+        <span className="text-xs font-bold uppercase tracking-wider bg-brand-soft text-brand-dark px-2 py-1 rounded-full whitespace-nowrap">
+          Pro
+        </span>
+      )}
       {isAdmin && variant !== "admin" && (
         <Link
           href="/admin"

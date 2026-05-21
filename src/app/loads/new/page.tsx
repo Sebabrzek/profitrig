@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "@/app/actions";
 import { EMPTY_LOAD, type Load } from "@/lib/loads";
 import { LoadForm } from "../LoadForm";
@@ -36,6 +38,8 @@ export default async function NewLoadPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
+  const sub = await fetchSubscription(supabase, user.id);
+  if (!isPro(sub)) redirect("/upgrade");
 
   const { data: costData } = await supabase
     .from("cost_profiles")
@@ -78,6 +82,7 @@ export default async function NewLoadPage({
             variant="loads"
             email={user.email ?? ""}
             isAdmin={isAdminEmail(user.email)}
+            isPro
           />
         </div>
       </header>

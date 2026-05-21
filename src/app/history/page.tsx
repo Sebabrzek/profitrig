@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import { HistoryList, type Snapshot } from "./HistoryList";
 
 export default async function HistoryPage() {
@@ -13,7 +14,9 @@ export default async function HistoryPage() {
 
   let snapshots: Snapshot[] = [];
   const email = user?.email ?? "";
+  let userIsPro = false;
   if (user) {
+    userIsPro = isPro(await fetchSubscription(supabase, user.id));
     const { data } = await supabase
       .from("cost_profile_snapshots")
       .select(
@@ -33,6 +36,7 @@ export default async function HistoryPage() {
             variant="history"
             email={email}
             isAdmin={isAdminEmail(email)}
+            isPro={userIsPro}
           />
         </div>
       </header>

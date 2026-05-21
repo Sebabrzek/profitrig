@@ -216,3 +216,29 @@ drop policy if exists "Owners can delete own loads" on public.loads;
 create policy "Owners can delete own loads"
   on public.loads for delete
   using (auth.uid() = user_id);
+
+-- Stripe subscriptions for ProfitRig Pro. Writes happen exclusively via the
+-- Stripe webhook running as service_role; users can read their own row.
+create table if not exists public.subscriptions (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  stripe_customer_id text unique,
+  stripe_subscription_id text,
+  status text not null default 'inactive',
+  plan text,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists subscriptions_status_idx
+  on public.subscriptions (status);
+create index if not exists subscriptions_customer_idx
+  on public.subscriptions (stripe_customer_id);
+
+alter table public.subscriptions enable row level security;
+
+drop policy if exists "Owners can view own subscription" on public.subscriptions;
+create policy "Owners can view own subscription"
+  on public.subscriptions for select
+  using (auth.uid() = user_id);

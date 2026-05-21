@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
@@ -14,8 +15,10 @@ export default async function ProfilePage() {
 
   let initial: DriverProfile = EMPTY_DRIVER_PROFILE;
   let email = "";
+  let userIsPro = false;
   if (user) {
     email = user.email ?? "";
+    userIsPro = isPro(await fetchSubscription(supabase, user.id));
     const { data } = await supabase
       .from("driver_profiles")
       .select("*")
@@ -46,6 +49,7 @@ export default async function ProfilePage() {
             variant="profile"
             email={email}
             isAdmin={isAdminEmail(email)}
+            isPro={userIsPro}
           />
         </div>
       </header>

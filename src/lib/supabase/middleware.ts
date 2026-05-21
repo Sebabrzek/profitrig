@@ -32,8 +32,11 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/auth");
+  // Stripe webhook is signature-verified and must stay reachable without
+  // a Supabase session.
+  const isPublicApi = pathname.startsWith("/api/stripe");
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublicApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

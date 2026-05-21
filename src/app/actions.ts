@@ -341,3 +341,141 @@ export async function deleteLoadAction(
   revalidatePath("/loads");
   return { ok: true };
 }
+
+import { headers } from "next/headers";
+import {
+  getStripe,
+  STRIPE_PRICE_MONTHLY,
+  STRIPE_PRICE_YEARLY,
+} from "@/lib/stripe/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fetchSubscription } from "@/lib/subscription";
+
+async function siteOrigin(): Promise<string> {
+  const h = await headers();
+  const host =
+    h.get("x-forwarded-host") ?? h.get("host") ?? "www.profitrig.com";
+  const proto =
+    h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+export async function createCheckoutAction(input: {
+  plan: "monthly" | "yearly";
+  promoCode?: string | null;
+}): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const stripe = getStripe();
+  if (!stripe) return { ok: false, error: "Stripe is not configured yet." };
+
+  const priceId =
+    input.plan === "yearly" ? STRIPE_PRICE_YEARLY : STRIPE_PRICE_MONTHLY;
+  if (!priceId) {
+    return {
+      ok: false,
+      error: `Missing STRIPE_PRICE_${input.plan.toUpperCase()} env var.`,
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  // Resolve a discount (if a promo code was entered) or fall back to letting
+  // Stripe's own checkout UI take a code.
+  const discounts: { promotion_code: string }[] = [];
+  if (input.promoCode && input.promoCode.trim()) {
+    try {
+      const list = await stripe.promotionCodes.list({
+        code: input.promoCode.trim(),
+        active: true,
+        limit: 1,
+      });
+      const promo = list.data[0];
+      if (!promo) {
+        return { ok: false, error: "That code isn't valid." };
+      }
+      discounts.push({ promotion_code: promo.id });
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Could not check that code.",
+      };
+    }
+  }
+
+  // Find or create Stripe customer for this user.
+  const admin = createSupabaseAdminClient();
+  let stripeCustomerId: string | undefined;
+  if (admin) {
+    const sub = await fetchSubscription(supabase, user.id);
+    stripeCustomerId = sub?.stripe_customer_id ?? undefined;
+  }
+  if (!stripeCustomerId) {
+    const customer = await stripe.customers.create({
+      email: user.email ?? undefined,
+      metadata: { user_id: user.id },
+    });
+    stripeCustomerId = customer.id;
+    if (admin) {
+      await admin.from("subscriptions").upsert(
+        {
+          user_id: user.id,
+          stripe_customer_id: stripeCustomerId,
+          status: "inactive",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+    }
+  }
+
+  const origin = await siteOrigin();
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    customer: stripeCustomerId,
+    line_items: [{ price: priceId, quantity: 1 }],
+    subscription_data: {
+      trial_period_days: 7,
+      metadata: { user_id: user.id, plan: input.plan },
+    },
+    discounts: discounts.length > 0 ? discounts : undefined,
+    allow_promotion_codes: discounts.length === 0 ? true : undefined,
+    payment_method_collection: "if_required",
+    client_reference_id: user.id,
+    success_url: `${origin}/loads?upgraded=1`,
+    cancel_url: `${origin}/upgrade?canceled=1`,
+    metadata: { user_id: user.id, plan: input.plan },
+  });
+
+  if (!session.url) {
+    return { ok: false, error: "Stripe returned no checkout URL." };
+  }
+  return { ok: true, url: session.url };
+}
+
+export async function createPortalAction(): Promise<
+  { ok: true; url: string } | { ok: false; error: string }
+> {
+  const stripe = getStripe();
+  if (!stripe) return { ok: false, error: "Stripe is not configured yet." };
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const sub = await fetchSubscription(supabase, user.id);
+  if (!sub?.stripe_customer_id) {
+    return { ok: false, error: "No Stripe customer record yet." };
+  }
+
+  const origin = await siteOrigin();
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: sub.stripe_customer_id,
+    return_url: `${origin}/upgrade`,
+  });
+  return { ok: true, url: portal.url };
+}

@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "@/app/actions";
 import type { Load } from "@/lib/loads";
 import { LoadForm } from "../LoadForm";
@@ -37,6 +38,8 @@ export default async function EditLoadPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
+  const sub = await fetchSubscription(supabase, user.id);
+  if (!isPro(sub)) redirect("/upgrade");
 
   const [loadRes, costRes] = await Promise.all([
     supabase
@@ -104,6 +107,7 @@ export default async function EditLoadPage({
             variant="loads"
             email={user.email ?? ""}
             isAdmin={isAdminEmail(user.email)}
+            isPro
           />
         </div>
       </header>

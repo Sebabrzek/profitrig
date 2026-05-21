@@ -3,6 +3,7 @@ import { Calculator } from "./Calculator";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "./actions";
 import { isProfileComplete, type DriverProfile } from "@/lib/profile";
 
@@ -33,8 +34,10 @@ export default async function HomePage() {
   let initial: CostProfile = DEFAULTS;
   let email = "";
   let driverProfile: DriverProfile | null = null;
+  let userIsPro = false;
   if (user) {
     email = user.email ?? "";
+    userIsPro = isPro(await fetchSubscription(supabase, user.id));
     const [costRes, driverRes] = await Promise.all([
       supabase
         .from("cost_profiles")
@@ -93,6 +96,7 @@ export default async function HomePage() {
             variant="calculator"
             email={email}
             isAdmin={isAdminEmail(email)}
+            isPro={userIsPro}
           />
         </div>
       </header>

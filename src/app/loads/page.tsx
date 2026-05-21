@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "../actions";
 import {
   type Load,
@@ -60,6 +62,9 @@ export default async function LoadsPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null; // middleware redirects to /login
+
+  const sub = await fetchSubscription(supabase, user.id);
+  if (!isPro(sub)) redirect("/upgrade");
 
   // Resolve target week
   const targetDate = parseDateParam(params.week);
@@ -137,6 +142,7 @@ export default async function LoadsPage({
             variant="loads"
             email={user.email ?? ""}
             isAdmin={isAdminEmail(user.email)}
+            isPro
           />
         </div>
       </header>
