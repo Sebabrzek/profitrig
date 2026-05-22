@@ -11,11 +11,15 @@ export function Wordmark({ size = "md" }: Props) {
       : "text-2xl";
   return (
     <div
-      className={`${cls} font-display font-bold italic uppercase tracking-tight leading-none select-none`}
+      className={`${cls} font-display uppercase tracking-tight leading-none select-none`}
       aria-label="ProfitRig"
     >
-      <span className="text-foreground">Profit</span>
-      <span className="text-brand">Rig</span>
+      <span className="text-foreground" style={{ fontWeight: 500 }}>
+        Profit
+      </span>
+      <span className="text-brand" style={{ fontWeight: 900 }}>
+        Rig
+      </span>
     </div>
   );
 }

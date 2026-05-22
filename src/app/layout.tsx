@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Montserrat } from "next/font/google";
+import { Geist, Orbitron } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -7,11 +7,10 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
   subsets: ["latin"],
-  weight: ["700"],
-  style: ["italic"],
+  weight: ["500", "900"],
 });
 
 export const metadata: Metadata = {
@@ -41,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${montserrat.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${orbitron.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground">
         {children}
