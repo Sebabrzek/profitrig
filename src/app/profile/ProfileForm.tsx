@@ -256,7 +256,9 @@ export function ProfileForm({
         </label>
       </section>
 
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-border px-4 py-3 z-10">
+      <div
+        className="fixed inset-x-0 bg-white border-t border-border px-4 py-3 z-20 bottom-[calc(64px+env(safe-area-inset-bottom))] md:bottom-0"
+      >
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <div className="flex-1 text-xs text-muted">
             {saved === "ok"

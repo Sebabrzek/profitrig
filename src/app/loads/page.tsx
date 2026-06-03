@@ -5,6 +5,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
+import { BottomNav } from "@/components/BottomNav";
 import { type CostProfile } from "../actions";
 import {
   type Load,
@@ -153,7 +154,7 @@ export default async function LoadsPage({
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-32">
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-28 md:pb-8">
         {!isConfigured && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
             <p className="font-bold text-sm">Set up your cost per mile first</p>
@@ -374,6 +375,7 @@ export default async function LoadsPage({
           </div>
         )}
       </div>
+      <BottomNav isPro />
     </main>
   );
 }

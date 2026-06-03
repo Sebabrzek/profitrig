@@ -7,6 +7,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "@/app/actions";
 import { EMPTY_LOAD, type Load } from "@/lib/loads";
+import { BottomNav } from "@/components/BottomNav";
 import { LoadForm } from "../LoadForm";
 
 const EMPTY_PROFILE: CostProfile = {
@@ -92,7 +93,7 @@ export default async function NewLoadPage({
           />
         </div>
       </header>
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-12">
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-28 md:pb-8">
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-2xl font-black">Add a Load</h1>
           <Link
@@ -104,6 +105,7 @@ export default async function NewLoadPage({
         </div>
         <LoadForm initial={initial} costProfile={profile} />
       </div>
+      <BottomNav isPro />
     </main>
   );
 }

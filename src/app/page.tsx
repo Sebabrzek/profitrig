@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Calculator } from "./Calculator";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
+import { BottomNav } from "@/components/BottomNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "./actions";
@@ -107,6 +108,7 @@ export default async function HomePage() {
         </div>
       </header>
       <Calculator initial={initial} profileComplete={profileComplete} />
+      <BottomNav isPro={userIsPro} />
     </main>
   );
 }

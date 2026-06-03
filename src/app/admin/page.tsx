@@ -7,6 +7,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { isAdminEmail, adminEmails } from "@/lib/admin";
 import { signOutAction } from "../actions";
 import { HeaderNav } from "@/components/HeaderNav";
+import { BottomNav } from "@/components/BottomNav";
 
 export const dynamic = "force-dynamic";
 
@@ -222,7 +223,7 @@ ADMIN_EMAILS = ${user.email}`}
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 py-6 pb-28 md:pb-8 space-y-6">
         <div>
           <h1 className="text-3xl font-black">ProfitRig Admin</h1>
           <p className="text-sm text-muted mt-1">
@@ -419,6 +420,7 @@ ADMIN_EMAILS = ${user.email}`}
           </div>
         </section>
       </div>
+      <BottomNav isPro />
     </main>
   );
 }

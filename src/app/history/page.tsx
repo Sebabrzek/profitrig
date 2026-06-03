@@ -4,6 +4,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
+import { BottomNav } from "@/components/BottomNav";
 import { HistoryList, type Snapshot } from "./HistoryList";
 
 export default async function HistoryPage() {
@@ -40,10 +41,16 @@ export default async function HistoryPage() {
           />
         </div>
       </header>
-      <div className="max-w-2xl mx-auto px-4 py-4">
-        <h1 className="text-2xl font-black mb-1">Save History</h1>
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-28 md:pb-8">
+        <h1 className="text-2xl font-black mb-1">Rate Per Mile History</h1>
         <p className="text-sm text-muted mb-5">
-          Every save is dated. Tap one to load it back into the calculator.
+          Saved snapshots of your cost-per-mile profile (truck costs, MPG,
+          driver pay, etc.). Tap one to restore it in the Calculator. Looking
+          for past loads? Open the{" "}
+          <Link href="/loads" className="text-brand font-semibold">
+            Loads tab
+          </Link>
+          .
         </p>
         {snapshots.length === 0 ? (
           <div className="bg-white border border-border rounded-2xl p-8 text-center">
@@ -59,6 +66,7 @@ export default async function HistoryPage() {
           <HistoryList snapshots={snapshots} />
         )}
       </div>
+      <BottomNav isPro={userIsPro} />
     </main>
   );
 }

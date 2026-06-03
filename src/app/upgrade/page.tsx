@@ -4,6 +4,7 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription } from "@/lib/subscription";
 import { isPro } from "@/lib/subscription";
+import { BottomNav } from "@/components/BottomNav";
 import { UpgradeCard } from "./UpgradeCard";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function UpgradePage({
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-28 md:pb-8">
         {canceled && !alreadyPro && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-4 text-sm">
             Checkout canceled — no charges made.
@@ -71,6 +72,7 @@ export default async function UpgradePage({
           </>
         )}
       </div>
+      <BottomNav isPro={alreadyPro} />
     </main>
   );
 }
