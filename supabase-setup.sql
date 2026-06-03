@@ -13,6 +13,9 @@ create table if not exists public.cost_profiles (
   eld_subscriptions numeric not null default 0,
   permits_irp_ifta numeric not null default 0,
   office_misc numeric not null default 0,
+  load_board_per_month numeric not null default 0,
+  other_monthly_bill numeric not null default 0,
+  other_label text,
 
   monthly_miles numeric not null default 0,
 
@@ -66,6 +69,9 @@ create table if not exists public.cost_profile_snapshots (
   eld_subscriptions numeric not null default 0,
   permits_irp_ifta numeric not null default 0,
   office_misc numeric not null default 0,
+  load_board_per_month numeric not null default 0,
+  other_monthly_bill numeric not null default 0,
+  other_label text,
 
   monthly_miles numeric not null default 0,
 

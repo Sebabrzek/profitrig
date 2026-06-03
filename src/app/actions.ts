@@ -66,6 +66,9 @@ export type CostProfile = {
   eld_subscriptions: number;
   permits_irp_ifta: number;
   office_misc: number;
+  load_board_per_month: number;
+  other_monthly_bill: number;
+  other_label: string;
   monthly_miles: number;
   mpg: number;
   fuel_price_per_gallon: number;
@@ -84,7 +87,9 @@ function computeTotals(p: CostProfile) {
     p.insurance +
     p.eld_subscriptions +
     p.permits_irp_ifta +
-    p.office_misc;
+    p.office_misc +
+    p.load_board_per_month +
+    p.other_monthly_bill;
   const fuelPerMile = p.mpg > 0 ? p.fuel_price_per_gallon / p.mpg : 0;
   const variablePerMile =
     fuelPerMile +
@@ -99,17 +104,43 @@ function computeTotals(p: CostProfile) {
 }
 
 export async function saveProfileAction(
-  profile: CostProfile,
-  label: string | null
+  profile: CostProfile
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
 
-  if (!user) {
-    return { ok: false, error: "Not signed in." };
+  const { error } = await supabase.from("cost_profiles").upsert(
+    {
+      user_id: user.id,
+      ...profile,
+      other_label: profile.other_label.trim() || null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function saveSnapshotAction(
+  profile: CostProfile,
+  label: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = label.trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      error: "Give the snapshot a name (e.g. \"Carrier XYZ\" or \"Aug 2026\").",
+    };
   }
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
 
   const now = new Date().toISOString();
 
@@ -117,6 +148,7 @@ export async function saveProfileAction(
     {
       user_id: user.id,
       ...profile,
+      other_label: profile.other_label.trim() || null,
       updated_at: now,
     },
     { onConflict: "user_id" }
@@ -129,8 +161,9 @@ export async function saveProfileAction(
     .from("cost_profile_snapshots")
     .insert({
       user_id: user.id,
-      label: label && label.length > 0 ? label : null,
+      label: trimmed,
       ...profile,
+      other_label: profile.other_label.trim() || null,
       total_cpm: totalCpm,
       required_rate: requiredRate,
     });
@@ -167,6 +200,9 @@ export async function loadSnapshotAction(
       eld_subscriptions: snap.eld_subscriptions,
       permits_irp_ifta: snap.permits_irp_ifta,
       office_misc: snap.office_misc,
+      load_board_per_month: snap.load_board_per_month ?? 0,
+      other_monthly_bill: snap.other_monthly_bill ?? 0,
+      other_label: snap.other_label ?? null,
       monthly_miles: snap.monthly_miles,
       mpg: snap.mpg,
       fuel_price_per_gallon: snap.fuel_price_per_gallon,

@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { saveProfileAction, type CostProfile } from "./actions";
+import {
+  saveProfileAction,
+  saveSnapshotAction,
+  type CostProfile,
+} from "./actions";
 import { ProfileBanner } from "@/components/ProfileBanner";
 
 const money = (n: number) =>
@@ -136,8 +140,9 @@ export function Calculator({
 }) {
   const [p, setP] = useState<CostProfile>(initial);
   const [label, setLabel] = useState("");
+  const [showSnapshot, setShowSnapshot] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [saved, setSaved] = useState<null | "ok" | string>(null);
+  const [saved, setSaved] = useState<null | "ok" | "snapshot" | string>(null);
 
   const set = (k: NumKey) => (v: number) => setP((s) => ({ ...s, [k]: v }));
 
@@ -148,7 +153,9 @@ export function Calculator({
       p.insurance +
       p.eld_subscriptions +
       p.permits_irp_ifta +
-      p.office_misc;
+      p.office_misc +
+      p.load_board_per_month +
+      p.other_monthly_bill;
 
     const fuelPerMile = p.mpg > 0 ? p.fuel_price_per_gallon / p.mpg : 0;
     const variablePerMile =
@@ -180,11 +187,25 @@ export function Calculator({
   function save() {
     setSaved(null);
     startTransition(async () => {
-      const r = await saveProfileAction(p, label.trim() || null);
+      const r = await saveProfileAction(p);
       if (r.ok) {
         setSaved("ok");
-        setLabel("");
         setTimeout(() => setSaved(null), 2500);
+      } else {
+        setSaved(r.error);
+      }
+    });
+  }
+
+  function saveSnapshot() {
+    setSaved(null);
+    startTransition(async () => {
+      const r = await saveSnapshotAction(p, label);
+      if (r.ok) {
+        setSaved("snapshot");
+        setLabel("");
+        setShowSnapshot(false);
+        setTimeout(() => setSaved(null), 3000);
       } else {
         setSaved(r.error);
       }
@@ -257,15 +278,49 @@ export function Calculator({
           onChange={set("eld_subscriptions")}
         />
         <MoneyInput
-          label="Permits / IRP / IFTA"
+          label="Permits / IRP / IFTA / HUT"
+          hint="Include HUT (Form 2290) for trucks over 55,000 lbs. Yearly fees ÷ 12."
           value={p.permits_irp_ifta}
           onChange={set("permits_irp_ifta")}
         />
         <MoneyInput
-          label="Office / Parking / Misc"
+          label="Office / Parking"
           value={p.office_misc}
           onChange={set("office_misc")}
         />
+        <MoneyInput
+          label="Load Board"
+          hint="DAT, Truckstop, 123Loadboard, etc."
+          value={p.load_board_per_month}
+          onChange={set("load_board_per_month")}
+        />
+        <div className="sm:col-span-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-foreground">
+              Other Monthly Bill
+            </span>
+            <span className="text-xs text-muted -mt-1">
+              Anything else: Skool, lawyer, accounting, board load, etc. Name
+              it so you remember.
+            </span>
+            <input
+              type="text"
+              value={p.other_label}
+              onChange={(e) =>
+                setP((s) => ({ ...s, other_label: e.target.value.slice(0, 60) }))
+              }
+              placeholder="What is it? (e.g. Skool)"
+              className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+          </label>
+          <div className="mt-3">
+            <MoneyInput
+              label="Amount per month"
+              value={p.other_monthly_bill}
+              onChange={set("other_monthly_bill")}
+            />
+          </div>
+        </div>
         <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
           <span className="font-semibold">Total Fixed Costs</span>
           <span className="font-bold">{money(totals.fixed)}</span>
@@ -365,21 +420,52 @@ export function Calculator({
       </Section>
 
       <div className="bg-white border border-border rounded-2xl p-5 mb-4">
-        <label className="block text-sm font-semibold mb-1.5">
-          Label this save (optional)
-        </label>
-        <p className="text-xs text-muted mb-2">
-          e.g. &quot;Carrier XYZ&quot; or &quot;After paying off trailer&quot;. Every
-          save is dated so you can look back later.
+        <p className="text-sm font-semibold mb-1">Want to keep a record?</p>
+        <p className="text-xs text-muted mb-3 leading-snug">
+          Save a snapshot whenever your costs change (new carrier, paid off
+          trailer, etc.) so you can compare later. Regular Save just updates
+          your current numbers.
         </p>
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Optional label"
-          maxLength={80}
-          className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
-        />
+        {showSnapshot ? (
+          <div className="flex flex-col gap-2">
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder='e.g. "Carrier XYZ" or "Aug 2026"'
+              maxLength={80}
+              autoFocus
+              className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowSnapshot(false);
+                  setLabel("");
+                }}
+                disabled={pending}
+                className="h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveSnapshot}
+                disabled={pending || !label.trim()}
+                className="flex-1 h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold text-sm disabled:opacity-50"
+              >
+                {pending ? "Saving…" : "Save snapshot"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowSnapshot(true)}
+            className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+          >
+            + Save as snapshot
+          </button>
+        )}
         <div className="mt-3 text-right">
           <Link
             href="/history"
@@ -396,16 +482,18 @@ export function Calculator({
           <div className="flex-1 text-xs text-muted">
             {saved === "ok"
               ? "✓ Saved"
+              : saved === "snapshot"
+              ? "✓ Snapshot saved to History"
               : saved && saved !== "ok"
               ? `Error: ${saved}`
-              : "Saves your current numbers and adds a dated snapshot."}
+              : "Just updates your numbers. No snapshot."}
           </div>
           <button
             onClick={save}
             disabled={pending}
             className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold transition disabled:opacity-60"
           >
-            {pending ? "Saving..." : "Save"}
+            {pending && !showSnapshot ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
