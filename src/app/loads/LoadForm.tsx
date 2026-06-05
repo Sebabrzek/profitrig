@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
+  MTD_FALLBACK_THRESHOLD_MILES,
   type Load,
   computeLoadEconomics,
 } from "@/lib/loads";
@@ -185,10 +186,19 @@ export function LoadForm({
   initial,
   costProfile,
   loadId,
+  otherMonthMiles = 0,
 }: {
   initial: Load;
   costProfile: CostProfile;
   loadId?: string;
+  /**
+   * Total miles already logged in this load's calendar month for every
+   * OTHER load. Used so this form can preview the MTD-allocated fixed
+   * cost live — adding this load's current miles in computeLoadEconomics.
+   * Defaults to 0 for safety; computeLoadEconomics will then fall back to
+   * the saved Monthly Miles assumption.
+   */
+  otherMonthMiles?: number;
 }) {
   const router = useRouter();
   const [load, setLoad] = useState<Load>({ ...initial, id: loadId });
@@ -197,8 +207,8 @@ export function LoadForm({
   const [error, setError] = useState<string | null>(null);
 
   const e = useMemo(
-    () => computeLoadEconomics(load, costProfile),
-    [load, costProfile]
+    () => computeLoadEconomics(load, costProfile, { otherMonthMiles }),
+    [load, costProfile, otherMonthMiles]
   );
 
   const setField = <K extends keyof Load>(k: K) => (v: Load[K]) =>
@@ -253,7 +263,38 @@ export function LoadForm({
         <p className="text-5xl font-black mt-1 leading-none">
           {money(e.profit)}
         </p>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div className="bg-white/15 rounded-xl p-3">
+            <p className="opacity-80 text-xs">Rate achieved</p>
+            <p className="text-xl font-black leading-none">
+              {e.totalMiles > 0 ? `$${e.rpm.toFixed(2)}` : "—"}
+              <span className="text-xs font-bold opacity-80"> /mi</span>
+            </p>
+            {e.totalMiles > 0 && (
+              <p
+                className={`text-[11px] font-semibold mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
+                  e.rpm >= e.cpm
+                    ? "bg-white/25 text-white"
+                    : "bg-red-100/90 text-red-900"
+                }`}
+              >
+                {e.rpm >= e.cpm ? "↑" : "↓"} {`$${e.cpm.toFixed(2)}`} cost
+              </p>
+            )}
+          </div>
+          <div className="bg-white/15 rounded-xl p-3">
+            <p className="opacity-80 text-xs">Miles</p>
+            <p className="text-xl font-black leading-none">
+              {e.totalMiles.toLocaleString()}
+            </p>
+            {e.totalMiles > 0 && (
+              <p className="text-[11px] opacity-80 mt-1">
+                {e.deadheadPct.toFixed(0)}% deadhead
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Revenue</p>
             <p className="text-base font-bold">{moneyCompact(e.revenue)}</p>
@@ -262,21 +303,9 @@ export function LoadForm({
             <p className="opacity-80 text-xs">Cost</p>
             <p className="text-base font-bold">{moneyCompact(e.totalCost)}</p>
           </div>
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Miles</p>
-            <p className="text-base font-bold">
-              {e.totalMiles.toLocaleString()}
-            </p>
-            {e.totalMiles > 0 && (
-              <p className="text-[10px] opacity-80">
-                {e.deadheadPct.toFixed(0)}% deadhead
-              </p>
-            )}
-          </div>
         </div>
         {e.totalMiles > 0 && (
           <div className="mt-2 text-xs opacity-90">
-            Rate {`$${e.rpm.toFixed(2)}`}/mi • Cost {`$${e.cpm.toFixed(2)}`}/mi •
             Net {`$${e.profitPerMile.toFixed(2)}`}/mi
           </div>
         )}
@@ -334,13 +363,21 @@ export function LoadForm({
           onChange={setField("loaded_miles")}
           suffix="mi"
         />
-        <NumInput
-          label="Deadhead (empty) miles"
-          hint="Miles to get to pickup, or after drop-off."
-          value={load.deadhead_miles}
-          onChange={setField("deadhead_miles")}
-          suffix="mi"
-        />
+        <div className="sm:col-span-1">
+          <NumInput
+            label="Deadhead (empty) miles"
+            hint="Log each empty leg once — either after this load or before the next, not both."
+            value={load.deadhead_miles}
+            onChange={setField("deadhead_miles")}
+            suffix="mi"
+          />
+          {load.deadhead_miles > load.loaded_miles && load.loaded_miles > 0 && (
+            <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
+              ⚠ Deadhead is higher than loaded miles. Double-check you&apos;re
+              not counting the same empty leg here AND on the next load.
+            </p>
+          )}
+        </div>
         <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
           <span className="font-semibold">Total miles</span>
           <span className="font-bold">
@@ -437,7 +474,26 @@ export function LoadForm({
             </p>
             <p className="font-bold">{money(e.allocatedFixedCost)}</p>
             <p className="text-xs text-muted mt-0.5">
-              Share of monthly bills based on this load&apos;s miles.
+              {e.allocationBasis === "actual_mtd" ? (
+                <>
+                  Share of monthly bills based on{" "}
+                  <span className="font-semibold text-foreground">
+                    actual MTD: {e.allocationBasisMiles.toLocaleString()} mi
+                  </span>
+                  .
+                </>
+              ) : (
+                <>
+                  Share of monthly bills based on your{" "}
+                  <span className="font-semibold text-foreground">
+                    assumed Monthly Miles:{" "}
+                    {e.allocationBasisMiles.toLocaleString()} mi
+                  </span>
+                  . Switches to actual once you&apos;ve logged{" "}
+                  {MTD_FALLBACK_THRESHOLD_MILES.toLocaleString()} mi this
+                  month.
+                </>
+              )}
             </p>
           </div>
         </div>

@@ -6,7 +6,13 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "@/app/actions";
-import { EMPTY_LOAD, type Load } from "@/lib/loads";
+import {
+  EMPTY_LOAD,
+  endOfMonth,
+  isoDate,
+  startOfMonth,
+  type Load,
+} from "@/lib/loads";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadForm } from "../LoadForm";
 
@@ -29,6 +35,7 @@ const EMPTY_PROFILE: CostProfile = {
   driver_pay_per_mile: 0,
   tolls_misc_per_mile: 0,
   desired_profit_per_mile: 0,
+  real_cpm_override: null,
 };
 
 export default async function NewLoadPage({
@@ -45,11 +52,35 @@ export default async function NewLoadPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
-  const { data: costData } = await supabase
-    .from("cost_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Default to "today" for new loads. If the caller passed ?date=..., use
+  // that month for MTD context instead so the form previews the right
+  // calendar month.
+  const newLoadDate = params.date ? new Date(params.date + "T12:00:00") : new Date();
+  const monthFrom = startOfMonth(newLoadDate);
+  const monthTo = endOfMonth(newLoadDate);
+
+  const [{ data: costData }, monthLoadsRes] = await Promise.all([
+    supabase
+      .from("cost_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("loads")
+      .select("loaded_miles,deadhead_miles")
+      .eq("user_id", user.id)
+      .gte("load_date", isoDate(monthFrom))
+      .lte("load_date", isoDate(monthTo)),
+  ]);
+
+  // Sum of every OTHER load already saved in this calendar month.
+  const otherMonthMiles = (monthLoadsRes.data ?? []).reduce(
+    (acc: number, r) =>
+      acc +
+      (Number(r.loaded_miles) || 0) +
+      (Number(r.deadhead_miles) || 0),
+    0
+  );
 
   const profile: CostProfile = costData
     ? {
@@ -72,6 +103,10 @@ export default async function NewLoadPage({
         tolls_misc_per_mile: Number(costData.tolls_misc_per_mile) || 0,
         desired_profit_per_mile:
           Number(costData.desired_profit_per_mile) || 0,
+        real_cpm_override:
+          costData.real_cpm_override == null
+            ? null
+            : Number(costData.real_cpm_override),
       }
     : EMPTY_PROFILE;
 
@@ -103,7 +138,11 @@ export default async function NewLoadPage({
             ← Back
           </Link>
         </div>
-        <LoadForm initial={initial} costProfile={profile} />
+        <LoadForm
+          initial={initial}
+          costProfile={profile}
+          otherMonthMiles={otherMonthMiles}
+        />
       </div>
       <BottomNav isPro />
     </main>

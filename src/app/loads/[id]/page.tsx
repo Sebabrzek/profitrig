@@ -6,7 +6,12 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "@/app/actions";
-import type { Load } from "@/lib/loads";
+import {
+  endOfMonth,
+  isoDate,
+  startOfMonth,
+  type Load,
+} from "@/lib/loads";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadForm } from "../LoadForm";
 
@@ -29,6 +34,7 @@ const EMPTY_PROFILE: CostProfile = {
   driver_pay_per_mile: 0,
   tolls_misc_per_mile: 0,
   desired_profit_per_mile: 0,
+  real_cpm_override: null,
 };
 
 export default async function EditLoadPage({
@@ -61,6 +67,27 @@ export default async function EditLoadPage({
 
   if (!loadRes.data) notFound();
   const r = loadRes.data;
+
+  // Other loads logged in this load's same calendar month, excluding this
+  // load itself — used to compute MTD-based fixed-cost allocation live.
+  const loadDateObj = new Date(r.load_date + "T12:00:00");
+  const monthFrom = startOfMonth(loadDateObj);
+  const monthTo = endOfMonth(loadDateObj);
+  const { data: monthLoadsData } = await supabase
+    .from("loads")
+    .select("id,loaded_miles,deadhead_miles")
+    .eq("user_id", user.id)
+    .gte("load_date", isoDate(monthFrom))
+    .lte("load_date", isoDate(monthTo));
+  const otherMonthMiles = (monthLoadsData ?? [])
+    .filter((row) => row.id !== id)
+    .reduce(
+      (acc: number, row) =>
+        acc +
+        (Number(row.loaded_miles) || 0) +
+        (Number(row.deadhead_miles) || 0),
+      0
+    );
 
   const initial: Load = {
     id: r.id,
@@ -102,6 +129,10 @@ export default async function EditLoadPage({
         tolls_misc_per_mile: Number(costData.tolls_misc_per_mile) || 0,
         desired_profit_per_mile:
           Number(costData.desired_profit_per_mile) || 0,
+        real_cpm_override:
+          costData.real_cpm_override == null
+            ? null
+            : Number(costData.real_cpm_override),
       }
     : EMPTY_PROFILE;
 
@@ -128,7 +159,12 @@ export default async function EditLoadPage({
             ← Back
           </Link>
         </div>
-        <LoadForm initial={initial} costProfile={profile} loadId={id} />
+        <LoadForm
+          initial={initial}
+          costProfile={profile}
+          loadId={id}
+          otherMonthMiles={otherMonthMiles}
+        />
       </div>
       <BottomNav isPro />
     </main>

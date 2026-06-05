@@ -29,6 +29,10 @@ create table if not exists public.cost_profiles (
 
   desired_profit_per_mile numeric not null default 0,
 
+  -- Phase 0: user-tappable override of the computed totalCPM, set from the
+  -- realCPM derived from their logged loads. NULL = no override.
+  real_cpm_override numeric,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

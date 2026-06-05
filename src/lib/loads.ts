@@ -41,6 +41,19 @@ export function todayIso(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+export type AllocationBasis = "actual_mtd" | "monthly_estimate";
+
+export type MtdContext = {
+  /**
+   * Sum of total_miles (loaded + deadhead) for every OTHER load in the same
+   * calendar month as this load. This load's own miles are added during the
+   * compute step so the live form can flex its own input.
+   */
+  otherMonthMiles: number;
+};
+
+export const MTD_FALLBACK_THRESHOLD_MILES = 1000;
+
 export type LoadEconomics = {
   totalMiles: number;
   deadheadPct: number;
@@ -52,6 +65,8 @@ export type LoadEconomics = {
   defCost: number;
   driverPayCost: number;
   allocatedFixedCost: number;
+  allocationBasis: AllocationBasis;
+  allocationBasisMiles: number;
   tollsCost: number;
   lumpersCost: number;
   totalCost: number;
@@ -61,9 +76,23 @@ export type LoadEconomics = {
   profitPerMile: number;
 };
 
+function sumFixedMonthly(p: CostProfile): number {
+  return (
+    p.truck_payment +
+    p.trailer_payment +
+    p.insurance +
+    p.eld_subscriptions +
+    p.permits_irp_ifta +
+    p.office_misc +
+    p.load_board_per_month +
+    p.other_monthly_bill
+  );
+}
+
 export function computeLoadEconomics(
   load: Load,
-  p: CostProfile
+  p: CostProfile,
+  mtd?: MtdContext
 ): LoadEconomics {
   const totalMiles =
     Number(load.loaded_miles || 0) + Number(load.deadhead_miles || 0);
@@ -85,15 +114,31 @@ export function computeLoadEconomics(
   const defCost = totalMiles * p.def_per_mile;
   const driverPayCost = totalMiles * p.driver_pay_per_mile;
 
-  const totalFixed =
-    p.truck_payment +
-    p.trailer_payment +
-    p.insurance +
-    p.eld_subscriptions +
-    p.permits_irp_ifta +
-    p.office_misc;
-  const allocatedFixedCost =
-    p.monthly_miles > 0 ? totalMiles * (totalFixed / p.monthly_miles) : 0;
+  const totalFixed = sumFixedMonthly(p);
+
+  // Phase 0.1: allocate fixed costs by the ACTUAL miles logged that month
+  // (so a slow month gives a fairer per-load share). Falls back to the saved
+  // Monthly Miles assumption when there isn't enough data yet.
+  let allocationBasis: AllocationBasis = "monthly_estimate";
+  let allocationBasisMiles = p.monthly_miles;
+  let allocatedFixedCost = 0;
+
+  if (mtd) {
+    const mtdMiles = Math.max(0, mtd.otherMonthMiles) + totalMiles;
+    if (mtdMiles >= MTD_FALLBACK_THRESHOLD_MILES) {
+      allocationBasis = "actual_mtd";
+      allocationBasisMiles = mtdMiles;
+      allocatedFixedCost =
+        totalFixed > 0 && mtdMiles > 0
+          ? (totalFixed / mtdMiles) * totalMiles
+          : 0;
+    }
+  }
+
+  if (allocationBasis === "monthly_estimate") {
+    allocatedFixedCost =
+      p.monthly_miles > 0 ? totalMiles * (totalFixed / p.monthly_miles) : 0;
+  }
 
   const tollsCost = load.tolls_actual != null ? Number(load.tolls_actual) : 0;
   const lumpersCost =
@@ -125,6 +170,8 @@ export function computeLoadEconomics(
     defCost,
     driverPayCost,
     allocatedFixedCost,
+    allocationBasis,
+    allocationBasisMiles,
     tollsCost,
     lumpersCost,
     totalCost,
@@ -133,6 +180,25 @@ export function computeLoadEconomics(
     cpm,
     profitPerMile,
   };
+}
+
+// Returns "YYYY-MM" for the load's date. Used for grouping loads into
+// calendar-month buckets for MTD computation.
+export function loadMonthKey(loadDate: string): string {
+  // load_date is always YYYY-MM-DD per the Load type.
+  return loadDate.slice(0, 7);
+}
+
+// Build a map of yearMonth -> sum of (loaded + deadhead) miles, given a
+// list of loads. Used to feed MtdContext into computeLoadEconomics.
+export function monthlyMilesByLoad(loads: Load[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const l of loads) {
+    const key = loadMonthKey(l.load_date);
+    const miles = Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
+    m.set(key, (m.get(key) ?? 0) + miles);
+  }
+  return m;
 }
 
 // Week boundaries — Monday is the start of the week (matches most trucking
@@ -152,6 +218,19 @@ export function endOfWeek(d: Date): Date {
   end.setDate(end.getDate() + 6);
   end.setHours(23, 59, 59, 999);
   return end;
+}
+
+export function startOfMonth(d: Date): Date {
+  const x = new Date(d);
+  x.setDate(1);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+export function endOfMonth(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  x.setHours(23, 59, 59, 999);
+  return x;
 }
 
 export function isoDate(d: Date): string {
@@ -203,7 +282,8 @@ export type WeekTotals = {
 
 export function aggregateWeek(
   loads: Load[],
-  profile: CostProfile
+  profile: CostProfile,
+  monthMiles?: Map<string, number>
 ): WeekTotals {
   let loadedMiles = 0;
   let deadheadMiles = 0;
@@ -211,7 +291,18 @@ export function aggregateWeek(
   let totalCost = 0;
 
   for (const l of loads) {
-    const e = computeLoadEconomics(l, profile);
+    const monthKey = loadMonthKey(l.load_date);
+    const ownMiles =
+      Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
+    const otherMonthMiles =
+      monthMiles != null
+        ? Math.max(0, (monthMiles.get(monthKey) ?? 0) - ownMiles)
+        : 0;
+    const e = computeLoadEconomics(
+      l,
+      profile,
+      monthMiles ? { otherMonthMiles } : undefined
+    );
     loadedMiles += Number(l.loaded_miles || 0);
     deadheadMiles += Number(l.deadhead_miles || 0);
     revenue += e.revenue;

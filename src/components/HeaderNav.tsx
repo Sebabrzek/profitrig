@@ -18,13 +18,36 @@ export function HeaderNav({
   email,
   isAdmin = false,
   isPro = false,
+  isAuthed = true,
 }: {
   variant: Variant;
   email?: string;
   isAdmin?: boolean;
   isPro?: boolean;
+  isAuthed?: boolean;
 }) {
   void variant; // intentional: rendering no longer depends on variant
+
+  // Phase 0.6: visitors get a stripped header with just a Sign In CTA.
+  if (!isAuthed) {
+    return (
+      <div className="flex items-center gap-2">
+        <Link
+          href="/login"
+          className="text-sm font-semibold text-brand hover:text-brand-dark whitespace-nowrap"
+        >
+          Sign In
+        </Link>
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center h-9 px-3 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-bold whitespace-nowrap"
+        >
+          Create Account
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 sm:gap-5">
       <DesktopNavLinks isPro={isPro} />

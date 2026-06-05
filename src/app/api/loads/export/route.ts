@@ -3,6 +3,8 @@ import {
   computeLoadEconomics,
   endOfWeek,
   isoDate,
+  loadMonthKey,
+  monthlyMilesByLoad,
   parseDateParam,
   startOfWeek,
   type Load,
@@ -29,6 +31,7 @@ const EMPTY_PROFILE: CostProfile = {
   driver_pay_per_mile: 0,
   tolls_misc_per_mile: 0,
   desired_profit_per_mile: 0,
+  real_cpm_override: null,
 };
 
 const HEADERS = [
@@ -97,6 +100,10 @@ function mapProfile(data: Record<string, unknown> | null): CostProfile {
     driver_pay_per_mile: Number(data.driver_pay_per_mile) || 0,
     tolls_misc_per_mile: Number(data.tolls_misc_per_mile) || 0,
     desired_profit_per_mile: Number(data.desired_profit_per_mile) || 0,
+    real_cpm_override:
+      data.real_cpm_override == null
+        ? null
+        : Number(data.real_cpm_override),
   };
 }
 
@@ -184,6 +191,10 @@ export async function GET(request: Request) {
   const loads: Load[] = (loadsRes.data ?? []).map((r) =>
     mapLoad(r as Record<string, unknown>)
   );
+  // For ranges that span months (the All Time export, or any custom range
+  // wider than a single month), allocate fixed costs per-load using each
+  // load's own month total, not the whole export range.
+  const monthMiles = monthlyMilesByLoad(loads);
 
   // Accumulators for totals row
   let tLoaded = 0;
@@ -205,7 +216,14 @@ export async function GET(request: Request) {
   const rows: string[] = [csvRow(HEADERS)];
 
   for (const load of loads) {
-    const e = computeLoadEconomics(load, profile);
+    const ownMiles =
+      Number(load.loaded_miles || 0) + Number(load.deadhead_miles || 0);
+    const monthKey = loadMonthKey(load.load_date);
+    const otherMonthMiles = Math.max(
+      0,
+      (monthMiles.get(monthKey) ?? 0) - ownMiles
+    );
+    const e = computeLoadEconomics(load, profile, { otherMonthMiles });
     rows.push(
       csvRow([
         load.load_date,

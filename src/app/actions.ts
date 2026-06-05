@@ -78,6 +78,12 @@ export type CostProfile = {
   driver_pay_per_mile: number;
   tolls_misc_per_mile: number;
   desired_profit_per_mile: number;
+  /**
+   * Phase 0.2: when set, the Calculator displays this as the user's "true"
+   * cost per mile (a management-lens override derived from their logged
+   * loads). NULL = use the computed totalCPM from the line items.
+   */
+  real_cpm_override: number | null;
 };
 
 function computeTotals(p: CostProfile) {
@@ -275,6 +281,31 @@ export async function submitFeedbackAction(
     .from("feedback")
     .insert({ user_id: user.id, message: trimmed });
   if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function setRealCpmOverrideAction(
+  value: number | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  if (value != null && (!Number.isFinite(value) || value < 0)) {
+    return { ok: false, error: "Invalid value." };
+  }
+
+  const { error } = await supabase
+    .from("cost_profiles")
+    .update({
+      real_cpm_override: value,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

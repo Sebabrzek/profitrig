@@ -11,10 +11,14 @@ import {
   type Load,
   aggregateWeek,
   computeLoadEconomics,
+  endOfMonth,
   endOfWeek,
   formatWeekLabel,
   isoDate,
+  loadMonthKey,
+  monthlyMilesByLoad,
   parseDateParam,
+  startOfMonth,
   startOfWeek,
 } from "@/lib/loads";
 
@@ -37,6 +41,7 @@ const EMPTY_PROFILE: CostProfile = {
   driver_pay_per_mile: 0,
   tolls_misc_per_mile: 0,
   desired_profit_per_mile: 0,
+  real_cpm_override: null,
 };
 
 function money(n: number) {
@@ -79,8 +84,21 @@ export default async function LoadsPage({
   const nextWeek = new Date(weekStart);
   nextWeek.setDate(nextWeek.getDate() + 7);
 
-  // Fetch cost profile + this week's loads in parallel
-  const [costRes, loadsRes] = await Promise.all([
+  // Fetch broader month range so we can compute MTD-based fixed-cost
+  // allocation for every load in the displayed week, even when a week
+  // crosses a month boundary.
+  const monthFromCandidate = startOfMonth(weekStart);
+  const monthToCandidate = endOfMonth(weekEnd);
+  const monthFrom =
+    monthFromCandidate < startOfMonth(weekEnd)
+      ? monthFromCandidate
+      : startOfMonth(weekEnd);
+  const monthTo =
+    monthToCandidate > endOfMonth(weekStart)
+      ? monthToCandidate
+      : endOfMonth(weekStart);
+
+  const [costRes, monthLoadsRes] = await Promise.all([
     supabase
       .from("cost_profiles")
       .select("*")
@@ -90,11 +108,18 @@ export default async function LoadsPage({
       .from("loads")
       .select("*")
       .eq("user_id", user.id)
-      .gte("load_date", isoDate(weekStart))
-      .lte("load_date", isoDate(weekEnd))
+      .gte("load_date", isoDate(monthFrom))
+      .lte("load_date", isoDate(monthTo))
       .order("load_date", { ascending: false })
       .order("created_at", { ascending: false }),
   ]);
+
+  // Synthetic "loadsRes" filtered to the displayed week.
+  const loadsRes = {
+    data: (monthLoadsRes.data ?? []).filter((r) => {
+      return r.load_date >= isoDate(weekStart) && r.load_date <= isoDate(weekEnd);
+    }),
+  };
 
   const profile: CostProfile = costRes.data
     ? {
@@ -117,6 +142,10 @@ export default async function LoadsPage({
         tolls_misc_per_mile: Number(costRes.data.tolls_misc_per_mile) || 0,
         desired_profit_per_mile:
           Number(costRes.data.desired_profit_per_mile) || 0,
+        real_cpm_override:
+          costRes.data.real_cpm_override == null
+            ? null
+            : Number(costRes.data.real_cpm_override),
       }
     : EMPTY_PROFILE;
 
@@ -137,7 +166,27 @@ export default async function LoadsPage({
     notes: r.notes ?? "",
   }));
 
-  const totals = aggregateWeek(loads, profile);
+  // Build map of YYYY-MM -> total miles using ALL loads in the broader
+  // month range, so each load's allocation reflects its full month.
+  const monthLoads: Load[] = (monthLoadsRes.data ?? []).map((r) => ({
+    id: r.id,
+    load_date: r.load_date,
+    broker: r.broker ?? "",
+    origin: r.origin ?? "",
+    destination: r.destination ?? "",
+    loaded_miles: Number(r.loaded_miles) || 0,
+    deadhead_miles: Number(r.deadhead_miles) || 0,
+    linehaul_pay: 0,
+    fuel_surcharge: 0,
+    accessorials: 0,
+    fuel_actual: null,
+    tolls_actual: null,
+    lumpers_actual: null,
+    notes: "",
+  }));
+  const monthMiles = monthlyMilesByLoad(monthLoads);
+
+  const totals = aggregateWeek(loads, profile, monthMiles);
   const isConfigured = profileIsConfigured(profile);
 
   return (
@@ -303,7 +352,15 @@ export default async function LoadsPage({
         ) : (
           <div className="flex flex-col gap-3">
             {loads.map((load) => {
-              const e = computeLoadEconomics(load, profile);
+              const ownMiles =
+                Number(load.loaded_miles || 0) +
+                Number(load.deadhead_miles || 0);
+              const monthKey = loadMonthKey(load.load_date);
+              const otherMonthMiles = Math.max(
+                0,
+                (monthMiles.get(monthKey) ?? 0) - ownMiles
+              );
+              const e = computeLoadEconomics(load, profile, { otherMonthMiles });
               const dateLabel = new Date(
                 load.load_date + "T12:00:00"
               ).toLocaleDateString("en-US", {

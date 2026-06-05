@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   saveProfileAction,
   saveSnapshotAction,
+  setRealCpmOverrideAction,
   type CostProfile,
 } from "./actions";
 import { ProfileBanner } from "@/components/ProfileBanner";
+import {
+  VISITOR_PROFILE_KEY,
+  loadVisitorProfile,
+  saveVisitorProfile,
+  clearVisitorProfile,
+} from "@/lib/visitorProfile";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -134,17 +142,46 @@ function Section({
 export function Calculator({
   initial,
   profileComplete,
+  loggedLoadCount = 0,
+  realCPMFromLoads = null,
+  isAuthed = true,
+  hasSavedProfile = true,
 }: {
   initial: CostProfile;
   profileComplete: boolean;
+  loggedLoadCount?: number;
+  realCPMFromLoads?: number | null;
+  isAuthed?: boolean;
+  hasSavedProfile?: boolean;
 }) {
+  const router = useRouter();
   const [p, setP] = useState<CostProfile>(initial);
   const [label, setLabel] = useState("");
   const [showSnapshot, setShowSnapshot] = useState(false);
+  const [showSignupCTA, setShowSignupCTA] = useState(false);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<null | "ok" | "snapshot" | string>(null);
+  const [overridePending, startOverride] = useTransition();
+  const [overrideJustSet, setOverrideJustSet] = useState<number | null>(null);
 
   const set = (k: NumKey) => (v: number) => setP((s) => ({ ...s, [k]: v }));
+
+  // Phase 0.6: hydrate from localStorage for visitors (no DB) AND for
+  // freshly-signed-up users whose DB row is still empty. Skip if the
+  // signed-in user already has a saved profile.
+  useEffect(() => {
+    if (isAuthed && hasSavedProfile) return;
+    const stored = loadVisitorProfile();
+    if (stored) setP((s) => ({ ...s, ...stored }));
+  }, [isAuthed, hasSavedProfile]);
+
+  // Mirror state to localStorage at all times for visitors, so their
+  // numbers survive a refresh or a signup hop.
+  useEffect(() => {
+    if (!isAuthed) {
+      saveVisitorProfile(p);
+    }
+  }, [p, isAuthed]);
 
   const totals = useMemo(() => {
     const fixed =
@@ -167,7 +204,13 @@ export function Calculator({
       p.tolls_misc_per_mile;
 
     const fixedPerMile = p.monthly_miles > 0 ? fixed / p.monthly_miles : 0;
-    const totalCPM = fixedPerMile + variablePerMile;
+    const computedCPM = fixedPerMile + variablePerMile;
+    // Phase 0.2: when the user has tapped "Update my estimate", we display
+    // and use the override instead of the freshly-computed total.
+    const totalCPM =
+      p.real_cpm_override != null && p.real_cpm_override > 0
+        ? p.real_cpm_override
+        : computedCPM;
     const requiredRate = totalCPM + p.desired_profit_per_mile;
     const breakEven = totalCPM * p.monthly_miles;
     const projectedProfit = p.desired_profit_per_mile * p.monthly_miles;
@@ -177,6 +220,7 @@ export function Calculator({
       fuelPerMile,
       variablePerMile,
       fixedPerMile,
+      computedCPM,
       totalCPM,
       requiredRate,
       breakEven,
@@ -185,14 +229,33 @@ export function Calculator({
   }, [p]);
 
   function save() {
+    if (!isAuthed) {
+      saveVisitorProfile(p);
+      setShowSignupCTA(true);
+      return;
+    }
     setSaved(null);
     startTransition(async () => {
       const r = await saveProfileAction(p);
       if (r.ok) {
         setSaved("ok");
+        clearVisitorProfile();
         setTimeout(() => setSaved(null), 2500);
       } else {
         setSaved(r.error);
+      }
+    });
+  }
+
+  function applyRealCpmOverride(value: number | null) {
+    if (!isAuthed) return;
+    startOverride(async () => {
+      const r = await setRealCpmOverrideAction(value);
+      if (r.ok) {
+        setP((s) => ({ ...s, real_cpm_override: value }));
+        setOverrideJustSet(value);
+        setTimeout(() => setOverrideJustSet(null), 2500);
+        router.refresh();
       }
     });
   }
@@ -212,9 +275,50 @@ export function Calculator({
     });
   }
 
+  const realInsightVisible =
+    isAuthed && loggedLoadCount >= 5 && realCPMFromLoads != null;
+  const overrideActive =
+    p.real_cpm_override != null && p.real_cpm_override > 0;
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 pb-44 md:pb-28">
-      <ProfileBanner profileComplete={profileComplete} />
+      {isAuthed && <ProfileBanner profileComplete={profileComplete} />}
+      {realInsightVisible && (
+        <div className="bg-white border border-border rounded-2xl p-4 mb-4">
+          <p className="text-xs uppercase tracking-wider text-muted font-semibold">
+            From your loads
+          </p>
+          <p className="text-sm mt-1 leading-snug">
+            Your real cost/mile from{" "}
+            <span className="font-bold">{loggedLoadCount} logged loads</span>:{" "}
+            <span className="font-bold text-brand-dark">
+              ${realCPMFromLoads!.toFixed(2)}
+            </span>{" "}
+            <span className="text-muted">
+              (you estimated ${totals.computedCPM.toFixed(2)})
+            </span>
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => applyRealCpmOverride(realCPMFromLoads!)}
+              disabled={overridePending}
+              className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold disabled:opacity-60"
+            >
+              {overridePending
+                ? "Updating…"
+                : overrideActive
+                ? `Refresh override to $${realCPMFromLoads!.toFixed(2)}`
+                : `Update my estimate to $${realCPMFromLoads!.toFixed(2)}`}
+            </button>
+            {overrideJustSet != null && (
+              <span className="text-xs text-brand-dark font-semibold">
+                ✓ Updated
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       {/* Big result card */}
       <div className="bg-gradient-to-br from-brand to-brand-dark text-white rounded-2xl p-5 mb-4 shadow-sm">
         <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
@@ -223,6 +327,24 @@ export function Calculator({
         <p className="text-5xl font-black mt-1 leading-none">
           {cpm(totals.totalCPM)}
         </p>
+        {overrideActive && (
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+            <span
+              className="inline-flex items-center gap-1 bg-amber-300 text-amber-950 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
+              title="You set this value manually from your logged loads. Editing the line items below will not change this number until you reset."
+            >
+              Manual
+            </span>
+            <button
+              type="button"
+              onClick={() => applyRealCpmOverride(null)}
+              disabled={overridePending}
+              className="underline underline-offset-2 text-white/90 hover:text-white font-semibold disabled:opacity-60"
+            >
+              Reset to computed (${totals.computedCPM.toFixed(2)})
+            </button>
+          </div>
+        )}
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Minimum target rate</p>
@@ -420,11 +542,10 @@ export function Calculator({
       </Section>
 
       <div className="bg-white border border-border rounded-2xl p-5 mb-4">
-        <p className="text-sm font-semibold mb-1">Want to keep a record?</p>
+        <p className="text-sm font-semibold mb-1">Save a dated snapshot</p>
         <p className="text-xs text-muted mb-3 leading-snug">
-          Save a snapshot whenever your costs change (new carrier, paid off
-          trailer, etc.) so you can compare later. Regular Save just updates
-          your current numbers.
+          Keep a record of these costs to compare later. Use this whenever
+          your costs change meaningfully — new carrier, paid off trailer, etc.
         </p>
         {showSnapshot ? (
           <div className="flex flex-col gap-2">
@@ -450,20 +571,26 @@ export function Calculator({
               </button>
               <button
                 onClick={saveSnapshot}
-                disabled={pending || !label.trim()}
+                disabled={pending || !label.trim() || !isAuthed}
                 className="flex-1 h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold text-sm disabled:opacity-50"
               >
-                {pending ? "Saving…" : "Save snapshot"}
+                {pending ? "Saving…" : "Save a dated snapshot"}
               </button>
             </div>
           </div>
         ) : (
           <button
             type="button"
-            onClick={() => setShowSnapshot(true)}
+            onClick={() => {
+              if (!isAuthed) {
+                setShowSignupCTA(true);
+                return;
+              }
+              setShowSnapshot(true);
+            }}
             className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
           >
-            + Save as snapshot
+            + Save a dated snapshot
           </button>
         )}
         <div className="mt-3 text-right">
@@ -483,22 +610,67 @@ export function Calculator({
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <div className="flex-1 text-xs text-muted">
             {saved === "ok"
-              ? "✓ Saved"
+              ? "✓ Costs updated"
               : saved === "snapshot"
               ? "✓ Snapshot saved to History"
               : saved && saved !== "ok"
               ? `Error: ${saved}`
-              : "Just updates your numbers. No snapshot."}
+              : isAuthed
+              ? "Changes your current numbers. No dated copy."
+              : "Free to play with — sign up to save your numbers."}
           </div>
           <button
             onClick={save}
             disabled={pending}
             className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold transition disabled:opacity-60"
           >
-            {pending && !showSnapshot ? "Saving..." : "Save"}
+            {pending && !showSnapshot
+              ? "Saving..."
+              : isAuthed
+              ? "Update my costs"
+              : "Save my numbers"}
           </button>
         </div>
       </div>
+
+      {showSignupCTA && (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 px-4"
+          onClick={() => setShowSignupCTA(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-5 max-w-sm w-full"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <h3 className="text-lg font-black mb-1">
+              Create a free account to save this
+            </h3>
+            <p className="text-sm text-muted mb-4 leading-snug">
+              We&apos;ll keep these numbers so they&apos;re ready next time
+              you open the app — and you&apos;ll unlock saved snapshots so
+              you can compare different setups.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/login"
+                className="h-12 inline-flex items-center justify-center rounded-xl bg-brand hover:bg-brand-dark text-white font-bold"
+              >
+                Create free account
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowSignupCTA(false)}
+                className="h-10 inline-flex items-center justify-center rounded-xl text-sm text-muted hover:text-foreground"
+              >
+                Keep tinkering
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Silence unused-import warnings when both helpers aren't reached
+          at runtime in some code paths. */}
+      {false && <span>{VISITOR_PROFILE_KEY}</span>}
     </div>
   );
 }
