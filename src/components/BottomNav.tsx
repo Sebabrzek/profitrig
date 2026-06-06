@@ -25,7 +25,7 @@ export function BottomNav({ isPro = false }: Props) {
   }[] = [
     {
       key: "calc",
-      label: "Calculator",
+      label: "Calc",
       href: "/",
       active: pathname === "/",
       locked: false,
@@ -38,6 +38,14 @@ export function BottomNav({ isPro = false }: Props) {
       active: pathname.startsWith("/loads"),
       locked: !isPro,
       icon: <TruckIcon />,
+    },
+    {
+      key: "tax",
+      label: "Tax",
+      href: isPro ? "/tax" : "/upgrade",
+      active: pathname.startsWith("/tax"),
+      locked: !isPro,
+      icon: <ReceiptIcon />,
     },
     {
       key: "history",
@@ -62,7 +70,7 @@ export function BottomNav({ isPro = false }: Props) {
       className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-border"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="max-w-2xl mx-auto grid grid-cols-4">
+      <div className="max-w-2xl mx-auto grid grid-cols-5">
         {tabs.map((t) => (
           <Link
             key={t.key}
@@ -176,6 +184,26 @@ function UserIcon() {
     >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21 a8 8 0 0 1 16 0" />
+    </svg>
+  );
+}
+
+function ReceiptIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 3 L18 3 L18 21 L15 19 L12 21 L9 19 L6 21 Z" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="9" y1="12" x2="15" y2="12" />
+      <line x1="9" y1="16" x2="13" y2="16" />
     </svg>
   );
 }

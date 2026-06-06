@@ -21,6 +21,12 @@ const items: { key: string; label: string; href: (isPro: boolean) => string; mat
     match: (p) => p.startsWith("/loads"),
   },
   {
+    key: "tax",
+    label: "Tax",
+    href: (isPro) => (isPro ? "/tax" : "/upgrade"),
+    match: (p) => p.startsWith("/tax"),
+  },
+  {
     key: "history",
     label: "History",
     href: () => "/history",
@@ -41,7 +47,7 @@ export function DesktopNavLinks({ isPro = false }: Props) {
     <div className="hidden md:flex items-center gap-5">
       {items.map((it) => {
         const active = it.match(pathname);
-        const locked = it.key === "loads" && !isPro;
+        const locked = (it.key === "loads" || it.key === "tax") && !isPro;
         return (
           <Link
             key={it.key}

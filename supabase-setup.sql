@@ -252,3 +252,121 @@ drop policy if exists "Owners can view own subscription" on public.subscriptions
 create policy "Owners can view own subscription"
   on public.subscriptions for select
   using (auth.uid() = user_id);
+
+-- Phase 1 (Tax Pack) tables. See supabase-migration-009.sql for full notes.
+-- All five tables are deliberately separated from the management/cost-profile
+-- world; the Tax Pack reads ONLY from these + load actuals + load revenue.
+
+create table if not exists public.tax_profiles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  entity_type text,
+  has_hired_driver boolean not null default false,
+  truck_financing text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.tax_profiles enable row level security;
+drop policy if exists "Owners can view own tax profile" on public.tax_profiles;
+create policy "Owners can view own tax profile"
+  on public.tax_profiles for select using (auth.uid() = user_id);
+drop policy if exists "Owners can insert own tax profile" on public.tax_profiles;
+create policy "Owners can insert own tax profile"
+  on public.tax_profiles for insert with check (auth.uid() = user_id);
+drop policy if exists "Owners can update own tax profile" on public.tax_profiles;
+create policy "Owners can update own tax profile"
+  on public.tax_profiles for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  expense_date date not null,
+  category text not null,
+  amount numeric not null check (amount >= 0),
+  vendor text,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists expenses_user_date_idx
+  on public.expenses (user_id, expense_date desc);
+alter table public.expenses enable row level security;
+drop policy if exists "Owners can view own expenses" on public.expenses;
+create policy "Owners can view own expenses"
+  on public.expenses for select using (auth.uid() = user_id);
+drop policy if exists "Owners can insert own expenses" on public.expenses;
+create policy "Owners can insert own expenses"
+  on public.expenses for insert with check (auth.uid() = user_id);
+drop policy if exists "Owners can update own expenses" on public.expenses;
+create policy "Owners can update own expenses"
+  on public.expenses for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Owners can delete own expenses" on public.expenses;
+create policy "Owners can delete own expenses"
+  on public.expenses for delete using (auth.uid() = user_id);
+
+create table if not exists public.capital_assets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  description text not null,
+  placed_in_service date not null,
+  cost numeric not null check (cost >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists capital_assets_user_date_idx
+  on public.capital_assets (user_id, placed_in_service desc);
+alter table public.capital_assets enable row level security;
+drop policy if exists "Owners can view own assets" on public.capital_assets;
+create policy "Owners can view own assets"
+  on public.capital_assets for select using (auth.uid() = user_id);
+drop policy if exists "Owners can insert own assets" on public.capital_assets;
+create policy "Owners can insert own assets"
+  on public.capital_assets for insert with check (auth.uid() = user_id);
+drop policy if exists "Owners can update own assets" on public.capital_assets;
+create policy "Owners can update own assets"
+  on public.capital_assets for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Owners can delete own assets" on public.capital_assets;
+create policy "Owners can delete own assets"
+  on public.capital_assets for delete using (auth.uid() = user_id);
+
+create table if not exists public.per_diem_rates (
+  id uuid primary key default gen_random_uuid(),
+  effective_date date not null unique,
+  conus_rate numeric not null,
+  ooc_rate numeric not null,
+  notice text,
+  created_at timestamptz not null default now()
+);
+alter table public.per_diem_rates enable row level security;
+drop policy if exists "Anyone can view per_diem_rates" on public.per_diem_rates;
+create policy "Anyone can view per_diem_rates"
+  on public.per_diem_rates for select using (true);
+insert into public.per_diem_rates (effective_date, conus_rate, ooc_rate, notice)
+values
+  ('2023-10-01', 69, 74, 'IRS Notice 2023-68'),
+  ('2024-10-01', 80, 86, 'IRS Notice 2024-68'),
+  ('2025-10-01', 80, 86, 'IRS Notice 2025-54')
+on conflict (effective_date) do nothing;
+
+create table if not exists public.per_diem_summary (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  tax_year integer not null,
+  period_a_nights numeric not null default 0,
+  period_b_nights numeric not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, tax_year)
+);
+alter table public.per_diem_summary enable row level security;
+drop policy if exists "Owners can view own per_diem_summary" on public.per_diem_summary;
+create policy "Owners can view own per_diem_summary"
+  on public.per_diem_summary for select using (auth.uid() = user_id);
+drop policy if exists "Owners can insert own per_diem_summary" on public.per_diem_summary;
+create policy "Owners can insert own per_diem_summary"
+  on public.per_diem_summary for insert with check (auth.uid() = user_id);
+drop policy if exists "Owners can update own per_diem_summary" on public.per_diem_summary;
+create policy "Owners can update own per_diem_summary"
+  on public.per_diem_summary for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);

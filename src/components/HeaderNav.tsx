@@ -8,6 +8,7 @@ import { DesktopNavLinks } from "./DesktopNavLinks";
 type Variant =
   | "calculator"
   | "loads"
+  | "tax"
   | "history"
   | "profile"
   | "admin"

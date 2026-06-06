@@ -163,13 +163,20 @@ export async function saveSnapshotAction(
 
   const { totalCpm, requiredRate } = computeTotals(profile);
 
+  // cost_profile_snapshots does not have a real_cpm_override column — the
+  // override is a "live" management number on the current profile only, not
+  // a snapshotable concept. Strip it out so the INSERT does not fail with
+  // PGRST204 "could not find column".
+  const { real_cpm_override: _omitOverride, ...snapshotPayload } = profile;
+  void _omitOverride;
+
   const { error: snapErr } = await supabase
     .from("cost_profile_snapshots")
     .insert({
       user_id: user.id,
       label: trimmed,
-      ...profile,
-      other_label: profile.other_label.trim() || null,
+      ...snapshotPayload,
+      other_label: snapshotPayload.other_label.trim() || null,
       total_cpm: totalCpm,
       required_rate: requiredRate,
     });
