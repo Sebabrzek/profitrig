@@ -160,23 +160,91 @@ ADMIN_EMAILS = ${user.email}`}
   });
   const users = usersData?.users ?? [];
 
-  const [profilesRes, feedbackRes, costProfilesCountRes, snapshotsCountRes] =
-    await Promise.all([
-      admin.from("driver_profiles").select("*"),
-      admin
-        .from("feedback")
-        .select("id,user_id,message,created_at")
-        .order("created_at", { ascending: false })
-        .limit(50),
-      admin.from("cost_profiles").select("*", { count: "exact", head: true }),
-      admin
-        .from("cost_profile_snapshots")
-        .select("*", { count: "exact", head: true }),
-    ]);
+  const [
+    profilesRes,
+    feedbackRes,
+    costProfilesRes,
+    snapshotsCountRes,
+    loadCountRes,
+  ] = await Promise.all([
+    admin.from("driver_profiles").select("*"),
+    admin
+      .from("feedback")
+      .select("id,user_id,message,created_at")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    // Pull every cost_profile so we can compute each user's CPM + target
+    // rate the same way the Calculator does. Small enough at our scale.
+    admin
+      .from("cost_profiles")
+      .select(
+        "user_id,truck_payment,trailer_payment,insurance,eld_subscriptions,permits_irp_ifta,office_misc,load_board_per_month,other_monthly_bill,monthly_miles,mpg,fuel_price_per_gallon,maintenance_per_mile,tires_per_mile,def_per_mile,driver_pay_per_mile,tolls_misc_per_mile,desired_profit_per_mile,real_cpm_override,updated_at"
+      ),
+    admin
+      .from("cost_profile_snapshots")
+      .select("*", { count: "exact", head: true }),
+    admin.from("loads").select("user_id"),
+  ]);
 
   const profiles: DriverProfileRow[] = profilesRes.data ?? [];
   const feedback: FeedbackRow[] = feedbackRes.data ?? [];
   const profileByUser = new Map(profiles.map((p) => [p.user_id, p]));
+
+  // Build per-user CPM map. Same math as the Calculator: fixed monthly /
+  // monthly miles + per-mile variables. Override (if set) wins for totalCPM.
+  type CpmRow = {
+    totalCPM: number;
+    computedCPM: number;
+    requiredRate: number;
+    monthlyMiles: number;
+    hasOverride: boolean;
+    updatedAt: string | null;
+  };
+  const cpmByUser = new Map<string, CpmRow>();
+  for (const row of costProfilesRes.data ?? []) {
+    const r = row as Record<string, unknown>;
+    const n = (k: string) => Number(r[k]) || 0;
+    const fixed =
+      n("truck_payment") +
+      n("trailer_payment") +
+      n("insurance") +
+      n("eld_subscriptions") +
+      n("permits_irp_ifta") +
+      n("office_misc") +
+      n("load_board_per_month") +
+      n("other_monthly_bill");
+    const mpg = n("mpg");
+    const fuelPerMile =
+      mpg > 0 ? n("fuel_price_per_gallon") / mpg : 0;
+    const variablePerMile =
+      fuelPerMile +
+      n("maintenance_per_mile") +
+      n("tires_per_mile") +
+      n("def_per_mile") +
+      n("driver_pay_per_mile") +
+      n("tolls_misc_per_mile");
+    const monthlyMiles = n("monthly_miles");
+    const fixedPerMile = monthlyMiles > 0 ? fixed / monthlyMiles : 0;
+    const computedCPM = fixedPerMile + variablePerMile;
+    const override = r.real_cpm_override == null ? null : Number(r.real_cpm_override);
+    const totalCPM = override != null && override > 0 ? override : computedCPM;
+    const requiredRate = totalCPM + n("desired_profit_per_mile");
+    cpmByUser.set(String(r.user_id), {
+      totalCPM,
+      computedCPM,
+      requiredRate,
+      monthlyMiles,
+      hasOverride: override != null && override > 0,
+      updatedAt: (r.updated_at as string | null) ?? null,
+    });
+  }
+
+  // Loads-per-user counter for "is this user actually using the tracker?".
+  const loadCountByUser = new Map<string, number>();
+  for (const row of loadCountRes.data ?? []) {
+    const uid = String((row as Record<string, unknown>).user_id);
+    loadCountByUser.set(uid, (loadCountByUser.get(uid) ?? 0) + 1);
+  }
 
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
@@ -187,6 +255,8 @@ ADMIN_EMAILS = ${user.email}`}
     (u) => now - new Date(u.created_at).getTime() < 30 * day
   ).length;
   const confirmed = users.filter((u) => Boolean(u.email_confirmed_at)).length;
+  const usersWithCPM = cpmByUser.size;
+  const usersWithLoads = loadCountByUser.size;
   const profileFilled = profiles.filter(
     (p) => (p.first_name?.trim() ?? "") && (p.phone?.trim() ?? "")
   ).length;
@@ -258,16 +328,39 @@ ADMIN_EMAILS = ${user.email}`}
           />
         </section>
 
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <StatCard label="Cost profiles saved" value={costProfilesCountRes.count ?? 0} />
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard
+            label="Cost profiles saved"
+            value={usersWithCPM}
+            sublabel={`of ${users.length} users`}
+          />
+          <StatCard
+            label="Tracking loads"
+            value={usersWithLoads}
+            sublabel={`of ${users.length} users`}
+          />
           <StatCard
             label="History snapshots"
             value={snapshotsCountRes.count ?? 0}
           />
+          <StatCard
+            label="Total loads logged"
+            value={Array.from(loadCountByUser.values()).reduce(
+              (a, b) => a + b,
+              0
+            )}
+          />
         </section>
 
         <section className="bg-white border border-border rounded-2xl p-5">
-          <h2 className="text-lg font-bold mb-3">Recent signups</h2>
+          <h2 className="text-lg font-bold mb-1">
+            User activity — every signup
+          </h2>
+          <p className="text-xs text-muted mb-3">
+            CPM = computed cost/mile from the user&apos;s saved cost profile
+            (override applied if they set one). Target = CPM + their desired
+            profit/mile.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -277,17 +370,23 @@ ADMIN_EMAILS = ${user.email}`}
                   <th className="py-2 pr-3 font-semibold">Name</th>
                   <th className="py-2 pr-3 font-semibold">State</th>
                   <th className="py-2 pr-3 font-semibold">Trailer</th>
-                  <th className="py-2 pr-3 font-semibold">Authority</th>
+                  <th className="py-2 pr-3 font-semibold">CPM</th>
+                  <th className="py-2 pr-3 font-semibold">Target rate</th>
+                  <th className="py-2 pr-3 font-semibold">Mo. miles</th>
+                  <th className="py-2 pr-3 font-semibold"># Loads</th>
+                  <th className="py-2 pr-3 font-semibold">Last save</th>
                   <th className="py-2 pr-3 font-semibold">Opt-in</th>
                   <th className="py-2 pr-3 font-semibold">Conf.</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedUsers.slice(0, 30).map((u) => {
+                {sortedUsers.map((u) => {
                   const p = sumProfileForUser(u.id);
                   const name = [p?.first_name, p?.last_name]
                     .filter(Boolean)
                     .join(" ");
+                  const cpm = cpmByUser.get(u.id);
+                  const loads = loadCountByUser.get(u.id) ?? 0;
                   return (
                     <tr
                       key={u.id}
@@ -306,11 +405,29 @@ ADMIN_EMAILS = ${user.email}`}
                           ? TRAILER_LABELS[p.trailer_type] ?? p.trailer_type
                           : "—"}
                       </td>
-                      <td className="py-2 pr-3">
-                        {p?.authority_type
-                          ? AUTHORITY_LABELS[p.authority_type] ??
-                            p.authority_type
+                      <td className="py-2 pr-3 whitespace-nowrap font-semibold">
+                        {cpm
+                          ? `$${cpm.totalCPM.toFixed(2)}`
                           : "—"}
+                        {cpm?.hasOverride && (
+                          <span className="ml-1 text-[9px] uppercase tracking-wider bg-amber-200 text-amber-900 px-1 rounded-full font-bold">
+                            man
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap font-semibold text-brand-dark">
+                        {cpm ? `$${cpm.requiredRate.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap">
+                        {cpm && cpm.monthlyMiles > 0
+                          ? cpm.monthlyMiles.toLocaleString()
+                          : "—"}
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap">
+                        {loads > 0 ? loads : "—"}
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap text-muted text-xs">
+                        {cpm?.updatedAt ? formatDate(cpm.updatedAt) : "—"}
                       </td>
                       <td className="py-2 pr-3">
                         {p?.marketing_opt_in ? "✓" : ""}
@@ -323,7 +440,7 @@ ADMIN_EMAILS = ${user.email}`}
                 })}
                 {sortedUsers.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-6 text-center text-muted">
+                    <td colSpan={12} className="py-6 text-center text-muted">
                       No signups yet.
                     </td>
                   </tr>
@@ -331,11 +448,9 @@ ADMIN_EMAILS = ${user.email}`}
               </tbody>
             </table>
           </div>
-          {sortedUsers.length > 30 && (
-            <p className="text-xs text-muted mt-3">
-              Showing latest 30 of {sortedUsers.length}.
-            </p>
-          )}
+          <p className="text-xs text-muted mt-3">
+            Showing all {sortedUsers.length} users, newest first.
+          </p>
         </section>
 
         <section className="bg-white border border-border rounded-2xl p-5">
