@@ -111,6 +111,7 @@ export type LoadEconomics = {
   revenue: number;
   fuelCost: number;
   fuelIsEstimated: boolean;
+  tollsIsEstimated: boolean;
   maintenanceCost: number;
   tiresCost: number;
   defCost: number;
@@ -167,9 +168,9 @@ export function computeLoadEconomics(
 
   const totalFixed = sumFixedMonthly(p);
 
-  // Phase 0.1: allocate fixed costs by the ACTUAL miles logged that month
-  // (so a slow month gives a fairer per-load share). Falls back to the saved
-  // Monthly Miles assumption when there isn't enough data yet.
+  // Allocate fixed costs across a MONTH of miles, using real mileage where
+  // it exists so a genuinely slow month shows a fairer per-load share. See
+  // MtdContext for why miles-to-date alone is not a month's mileage.
   let allocationBasis: AllocationBasis = "monthly_estimate";
   let allocationBasisMiles = p.monthly_miles;
   let allocatedFixedCost = 0;
@@ -205,7 +206,15 @@ export function computeLoadEconomics(
       p.monthly_miles > 0 ? totalMiles * (totalFixed / p.monthly_miles) : 0;
   }
 
-  const tollsCost = load.tolls_actual != null ? Number(load.tolls_actual) : 0;
+  // Mirror the fuel rule: an actual wins, otherwise fall back to the saved
+  // per-mile estimate. Dropping to zero here quietly understated every load
+  // by the driver's tolls/scales/misc rate and made per-load cost disagree
+  // with the calculator's cost per mile. An explicit 0 still means "no tolls
+  // on this run" and is respected — only a blank field estimates.
+  const tollsIsEstimated = load.tolls_actual == null;
+  const tollsCost = tollsIsEstimated
+    ? totalMiles * p.tolls_misc_per_mile
+    : Number(load.tolls_actual);
   const lumpersCost =
     load.lumpers_actual != null ? Number(load.lumpers_actual) : 0;
 
@@ -230,6 +239,7 @@ export function computeLoadEconomics(
     revenue,
     fuelCost,
     fuelIsEstimated,
+    tollsIsEstimated,
     maintenanceCost,
     tiresCost,
     defCost,
