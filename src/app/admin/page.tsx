@@ -32,6 +32,14 @@ type FeedbackRow = {
   created_at: string;
 };
 
+type ChatRow = {
+  id: string;
+  user_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
 const TRAILER_LABELS: Record<string, string> = {
   dry_van: "Dry Van",
   reefer: "Reefer",
@@ -166,6 +174,7 @@ ADMIN_EMAILS = ${user.email}`}
     costProfilesRes,
     snapshotsCountRes,
     loadCountRes,
+    chatRes,
   ] = await Promise.all([
     admin.from("driver_profiles").select("*"),
     admin
@@ -184,10 +193,19 @@ ADMIN_EMAILS = ${user.email}`}
       .from("cost_profile_snapshots")
       .select("*", { count: "exact", head: true }),
     admin.from("loads").select("user_id"),
+    // Support chat: latest questions drivers asked the AI (migration-010).
+    // Errors gracefully to empty if the table doesn't exist yet.
+    admin
+      .from("support_chats")
+      .select("id,user_id,role,content,created_at")
+      .order("created_at", { ascending: false })
+      .limit(120),
   ]);
 
   const profiles: DriverProfileRow[] = profilesRes.data ?? [];
   const feedback: FeedbackRow[] = feedbackRes.data ?? [];
+  const chatRows: ChatRow[] = (chatRes.data as ChatRow[] | null) ?? [];
+  const chatQuestions = chatRows.filter((c) => c.role === "user");
   const profileByUser = new Map(profiles.map((p) => [p.user_id, p]));
 
   // Build per-user CPM map. Same math as the Calculator: fixed monthly /
@@ -485,6 +503,74 @@ ADMIN_EMAILS = ${user.email}`}
           {feedback.length > 20 && (
             <p className="text-xs text-muted mt-3">
               Showing latest 20 of {feedback.length}.
+            </p>
+          )}
+        </section>
+
+        <section className="bg-white border border-border rounded-2xl p-5">
+          <h2 className="text-lg font-bold mb-1">
+            What users are asking{" "}
+            <span className="text-sm text-muted font-normal">
+              (Ask ProfitRig chat)
+            </span>
+          </h2>
+          <p className="text-xs text-muted mb-3">
+            Latest driver questions to the AI assistant. Repeated questions =
+            something the app should make more obvious.
+          </p>
+          {chatQuestions.length === 0 ? (
+            <p className="text-muted text-sm">
+              No chat questions yet.
+              {chatRes.error ? (
+                <span className="block text-red-600 mt-1">
+                  ({chatRes.error.message} — did you run
+                  supabase-migration-010.sql?)
+                </span>
+              ) : null}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {chatQuestions.slice(0, 25).map((q) => {
+                // Newest-first list: the answer is the oldest assistant row
+                // from the same user that is still newer than the question.
+                const answer = [...chatRows]
+                  .reverse()
+                  .find(
+                    (a) =>
+                      a.role === "assistant" &&
+                      a.user_id === q.user_id &&
+                      a.created_at > q.created_at
+                  );
+                return (
+                  <li key={q.id} className="border border-border rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-3 text-xs text-muted mb-1">
+                      <span>
+                        {emailByUser.get(q.user_id) ?? "Unknown user"}
+                      </span>
+                      <span>{formatDate(q.created_at)}</span>
+                    </div>
+                    <p className="text-sm font-semibold whitespace-pre-wrap">
+                      {q.content}
+                    </p>
+                    {answer && (
+                      <details className="mt-1.5">
+                        <summary className="text-xs text-brand-dark cursor-pointer select-none">
+                          AI answer
+                        </summary>
+                        <p className="text-sm text-muted whitespace-pre-wrap mt-1">
+                          {answer.content}
+                        </p>
+                      </details>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {chatQuestions.length > 25 && (
+            <p className="text-xs text-muted mt-3">
+              Showing latest 25 of {chatQuestions.length} in the last 120
+              messages.
             </p>
           )}
         </section>

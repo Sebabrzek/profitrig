@@ -10,6 +10,7 @@ import {
   type CostProfile,
 } from "./actions";
 import { ProfileBanner } from "@/components/ProfileBanner";
+import { VisitorPitch } from "@/components/VisitorPitch";
 import {
   VISITOR_PROFILE_KEY,
   loadVisitorProfile,
@@ -602,6 +603,9 @@ export function Calculator({
           </Link>
         </div>
       </div>
+
+      {/* Visitors: after they've seen their own number, pitch the tracker. */}
+      {!isAuthed && <VisitorPitch />}
 
       {/* Save bar */}
       <div

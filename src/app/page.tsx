@@ -3,6 +3,7 @@ import { Calculator } from "./Calculator";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
 import { BottomNav } from "@/components/BottomNav";
+import { VisitorHero } from "@/components/VisitorHero";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "./actions";
@@ -175,6 +176,7 @@ export default async function HomePage() {
           />
         </div>
       </header>
+      {!user && <VisitorHero />}
       <Calculator
         initial={initial}
         profileComplete={profileComplete}

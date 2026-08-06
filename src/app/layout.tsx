@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Orbitron } from "next/font/google";
+import { SupportChatMount } from "@/components/SupportChatMount";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,6 +45,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         {children}
+        <SupportChatMount />
       </body>
     </html>
   );
