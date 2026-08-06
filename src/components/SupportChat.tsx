@@ -93,6 +93,21 @@ export function SupportChat() {
         return;
       }
 
+      // Belt-and-suspenders: if anything but the answer stream comes back
+      // (e.g. a redirect to an HTML page after a session expires), don't
+      // render it as an answer.
+      if (!res.headers.get("content-type")?.startsWith("text/plain")) {
+        setMessages([
+          ...outgoing,
+          {
+            role: "assistant",
+            content:
+              "Looks like you got signed out. Refresh the page and sign back in, then ask me again.",
+          },
+        ]);
+        return;
+      }
+
       const reader = res.body?.getReader();
       if (!reader) {
         setMessages([

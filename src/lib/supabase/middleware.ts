@@ -34,7 +34,11 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/login") || pathname.startsWith("/auth");
   // Stripe webhook is signature-verified and must stay reachable without
   // a Supabase session.
-  const isPublicApi = pathname.startsWith("/api/stripe");
+  // /api/chat runs its own auth check and answers with JSON — it must not be
+  // redirected to the HTML login page, or an expired session would stream
+  // login-page markup back into the chat widget as an "answer".
+  const isPublicApi =
+    pathname.startsWith("/api/stripe") || pathname.startsWith("/api/chat");
   // Phase 0.6: the calculator landing page is public. Visitors can play
   // with the math; saving prompts an account. /loads, /history, /profile,
   // /admin remain auth-gated below.
