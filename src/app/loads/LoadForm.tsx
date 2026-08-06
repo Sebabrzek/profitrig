@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   MTD_FALLBACK_THRESHOLD_MILES,
   type Load,
+  buildMtdContext,
   computeLoadEconomics,
 } from "@/lib/loads";
 import type { CostProfile } from "../actions";
@@ -207,7 +208,12 @@ export function LoadForm({
   const [error, setError] = useState<string | null>(null);
 
   const e = useMemo(
-    () => computeLoadEconomics(load, costProfile, { otherMonthMiles }),
+    () =>
+      computeLoadEconomics(
+        load,
+        costProfile,
+        buildMtdContext(load.load_date, otherMonthMiles)
+      ),
     [load, costProfile, otherMonthMiles]
   );
 

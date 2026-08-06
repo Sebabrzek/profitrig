@@ -9,6 +9,7 @@ import { fetchSubscription, isPro } from "@/lib/subscription";
 import { type CostProfile } from "./actions";
 import { isProfileComplete, type DriverProfile } from "@/lib/profile";
 import {
+  buildMtdContext,
   computeLoadEconomics,
   loadMonthKey,
   monthlyMilesByLoad,
@@ -135,7 +136,11 @@ export default async function HomePage() {
             0,
             (monthMiles.get(loadMonthKey(l.load_date)) ?? 0) - ownMiles
           );
-          const e = computeLoadEconomics(l, initial, { otherMonthMiles });
+          const e = computeLoadEconomics(
+            l,
+            initial,
+            buildMtdContext(l.load_date, otherMonthMiles)
+          );
           totalMiles += e.totalMiles;
           totalCost += e.totalCost;
         }

@@ -10,6 +10,7 @@ import { type CostProfile } from "../actions";
 import {
   type Load,
   aggregateWeek,
+  buildMtdContext,
   computeLoadEconomics,
   endOfMonth,
   endOfWeek,
@@ -401,7 +402,11 @@ export default async function LoadsPage({
                 0,
                 (monthMiles.get(monthKey) ?? 0) - ownMiles
               );
-              const e = computeLoadEconomics(load, profile, { otherMonthMiles });
+              const e = computeLoadEconomics(
+                load,
+                profile,
+                buildMtdContext(load.load_date, otherMonthMiles)
+              );
               const dateLabel = new Date(
                 load.load_date + "T12:00:00"
               ).toLocaleDateString("en-US", {

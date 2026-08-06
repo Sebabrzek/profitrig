@@ -50,9 +50,60 @@ export type MtdContext = {
    * compute step so the live form can flex its own input.
    */
   otherMonthMiles: number;
+  /**
+   * How far into the load's calendar month we are. `daysElapsed >=
+   * daysInMonth` means the month is over and the mileage is final.
+   *
+   * This exists because miles-to-date is NOT a month's mileage. On Aug 6 a
+   * driver has run six days of miles but still owes a full month of truck
+   * payment and insurance — dividing one by the other charged early-month
+   * loads roughly 7x their real fixed share and made profitable weeks look
+   * catastrophic. Build this with `buildMtdContext` rather than by hand.
+   */
+  daysElapsed: number;
+  daysInMonth: number;
 };
 
 export const MTD_FALLBACK_THRESHOLD_MILES = 1000;
+
+/**
+ * A month must be at least this far along before its run rate is worth
+ * projecting from. Below it we use the driver's own monthly-miles estimate,
+ * because two days of driving says nothing about how the month will end.
+ */
+export const MTD_MIN_DAYS_FOR_RUN_RATE = 7;
+
+function monthKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Build the allocation context for a load. Every caller must go through this
+ * so that the Loads tab, the load form, the calculator's real-CPM insight,
+ * and the CSV export all allocate fixed costs identically.
+ */
+export function buildMtdContext(
+  loadDate: string,
+  otherMonthMiles: number,
+  now: Date = new Date()
+): MtdContext {
+  const monthKey = loadMonthKey(loadDate);
+  const [year, month] = monthKey.split("-").map(Number);
+  // Day 0 of the next month === last day of this one.
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const nowKey = monthKeyOf(now);
+
+  let daysElapsed: number;
+  if (monthKey < nowKey) {
+    daysElapsed = daysInMonth; // month is over — its mileage is final
+  } else if (monthKey > nowKey) {
+    daysElapsed = 0; // future-dated load — no run rate to read yet
+  } else {
+    daysElapsed = now.getDate();
+  }
+
+  return { otherMonthMiles, daysElapsed, daysInMonth };
+}
 
 export type LoadEconomics = {
   totalMiles: number;
@@ -125,13 +176,27 @@ export function computeLoadEconomics(
 
   if (mtd) {
     const mtdMiles = Math.max(0, mtd.otherMonthMiles) + totalMiles;
-    if (mtdMiles >= MTD_FALLBACK_THRESHOLD_MILES) {
+    const monthIsOver = mtd.daysElapsed >= mtd.daysInMonth;
+
+    // Fixed bills are monthly, so they must be spread over a MONTH of miles.
+    // Mid-month, miles-to-date is only part of that month, so project the
+    // rest from the run rate. Without this, a load logged on the 3rd carries
+    // the whole month's truck payment and insurance.
+    let basisMiles: number;
+    if (monthIsOver) {
+      basisMiles = mtdMiles;
+    } else if (mtd.daysElapsed >= MTD_MIN_DAYS_FOR_RUN_RATE) {
+      basisMiles = (mtdMiles * mtd.daysInMonth) / mtd.daysElapsed;
+    } else {
+      // Too early to read a run rate — fall through to the saved estimate.
+      basisMiles = 0;
+    }
+
+    if (basisMiles >= MTD_FALLBACK_THRESHOLD_MILES) {
       allocationBasis = "actual_mtd";
-      allocationBasisMiles = mtdMiles;
+      allocationBasisMiles = basisMiles;
       allocatedFixedCost =
-        totalFixed > 0 && mtdMiles > 0
-          ? (totalFixed / mtdMiles) * totalMiles
-          : 0;
+        totalFixed > 0 ? (totalFixed / basisMiles) * totalMiles : 0;
     }
   }
 
@@ -312,7 +377,7 @@ export function aggregateWeek(
     const e = computeLoadEconomics(
       l,
       profile,
-      monthMiles ? { otherMonthMiles } : undefined
+      monthMiles ? buildMtdContext(l.load_date, otherMonthMiles) : undefined
     );
     loadedMiles += Number(l.loaded_miles || 0);
     deadheadMiles += Number(l.deadhead_miles || 0);

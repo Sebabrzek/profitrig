@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  buildMtdContext,
   computeLoadEconomics,
   endOfWeek,
   isoDate,
@@ -243,7 +244,11 @@ export async function GET(request: Request) {
       0,
       (monthMiles.get(monthKey) ?? 0) - ownMiles
     );
-    const e = computeLoadEconomics(load, profile, { otherMonthMiles });
+    const e = computeLoadEconomics(
+      load,
+      profile,
+      buildMtdContext(load.load_date, otherMonthMiles)
+    );
     rows.push(
       csvRow([
         load.load_date,
