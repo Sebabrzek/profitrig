@@ -337,6 +337,7 @@ export async function deleteSnapshotAction(
 }
 
 import type { Load } from "@/lib/loads";
+import { isRoadCategory } from "@/lib/roadExpenses";
 
 function nullableNum(v: number | null): number | null {
   if (v == null) return null;
@@ -413,6 +414,67 @@ export async function deleteLoadAction(
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/loads");
+  return { ok: true };
+}
+
+export async function addRoadExpenseAction(input: {
+  spent_on: string;
+  category: string;
+  amount: number;
+  note: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.spent_on)) {
+    return { ok: false, error: "Pick a date." };
+  }
+  if (!isRoadCategory(input.category)) {
+    return { ok: false, error: "Pick a category." };
+  }
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Enter an amount." };
+  }
+  if (amount > 1_000_000) {
+    return { ok: false, error: "That amount looks too large." };
+  }
+
+  const { error } = await supabase.from("road_expenses").insert({
+    user_id: user.id,
+    spent_on: input.spent_on,
+    category: input.category,
+    amount,
+    note: input.note.trim().slice(0, 300) || null,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/loads");
+  revalidatePath("/tax");
+  return { ok: true };
+}
+
+export async function deleteRoadExpenseAction(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("road_expenses")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/loads");
+  revalidatePath("/tax");
   return { ok: true };
 }
 

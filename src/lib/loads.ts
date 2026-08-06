@@ -274,6 +274,11 @@ export type WeekTotals = {
   totalMiles: number;
   deadheadPct: number;
   revenue: number;
+  /** Cost from the loads themselves (fuel, per-mile, allocated fixed). */
+  loadCost: number;
+  /** On-the-road expenses dated inside this week, not tied to any load. */
+  roadExpenses: number;
+  /** loadCost + roadExpenses — what the week actually cost. */
   totalCost: number;
   profit: number;
   rpm: number;
@@ -283,7 +288,13 @@ export type WeekTotals = {
 export function aggregateWeek(
   loads: Load[],
   profile: CostProfile,
-  monthMiles?: Map<string, number>
+  monthMiles?: Map<string, number>,
+  /**
+   * Total of road expenses dated inside this week. Kept as a plain number so
+   * this module stays free of the road-expense types — the caller has already
+   * filtered to the week.
+   */
+  roadExpenseTotal = 0
 ): WeekTotals {
   let loadedMiles = 0;
   let deadheadMiles = 0;
@@ -310,6 +321,8 @@ export function aggregateWeek(
   }
 
   const totalMiles = loadedMiles + deadheadMiles;
+  const roadExpenses = Math.max(0, Number(roadExpenseTotal) || 0);
+  const combinedCost = totalCost + roadExpenses;
   return {
     loads: loads.length,
     loadedMiles,
@@ -317,9 +330,11 @@ export function aggregateWeek(
     totalMiles,
     deadheadPct: totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0,
     revenue,
-    totalCost,
-    profit: revenue - totalCost,
+    loadCost: totalCost,
+    roadExpenses,
+    totalCost: combinedCost,
+    profit: revenue - combinedCost,
     rpm: totalMiles > 0 ? revenue / totalMiles : 0,
-    cpm: totalMiles > 0 ? totalCost / totalMiles : 0,
+    cpm: totalMiles > 0 ? combinedCost / totalMiles : 0,
   };
 }

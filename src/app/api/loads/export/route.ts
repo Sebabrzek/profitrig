@@ -11,6 +11,11 @@ import {
 } from "@/lib/loads";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { CostProfile } from "@/app/actions";
+import {
+  roadCategoryMeta,
+  sumRoadExpenses,
+  type RoadExpense,
+} from "@/lib/roadExpenses";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -171,7 +176,7 @@ export async function GET(request: Request) {
     label = `Week-${from}`;
   }
 
-  const [costRes, loadsRes] = await Promise.all([
+  const [costRes, loadsRes, roadExpensesRes] = await Promise.all([
     supabase
       .from("cost_profiles")
       .select("*")
@@ -185,7 +190,22 @@ export async function GET(request: Request) {
       .lte("load_date", to)
       .order("load_date", { ascending: true })
       .order("created_at", { ascending: true }),
+    supabase
+      .from("road_expenses")
+      .select("id,spent_on,category,amount,note")
+      .eq("user_id", user.id)
+      .gte("spent_on", from)
+      .lte("spent_on", to)
+      .order("spent_on", { ascending: true }),
   ]);
+
+  const roadExpenses: RoadExpense[] = (roadExpensesRes.data ?? []).map((r) => ({
+    id: r.id,
+    spent_on: r.spent_on,
+    category: r.category,
+    amount: Number(r.amount) || 0,
+    note: r.note ?? "",
+  }));
 
   const profile = mapProfile(costRes.data as Record<string, unknown> | null);
   const loads: Load[] = (loadsRes.data ?? []).map((r) =>
@@ -308,6 +328,61 @@ export async function GET(request: Request) {
         num(tTotalMiles > 0 ? tCost / tTotalMiles : 0),
         num(tTotalMiles > 0 ? tProfit / tTotalMiles : 0),
         "",
+      ])
+    );
+  }
+
+  // Other expenses — not tied to any load, so they get their own block
+  // rather than a column on the per-load rows above.
+  if (roadExpenses.length > 0) {
+    const roadTotal = sumRoadExpenses(roadExpenses);
+    rows.push("");
+    rows.push(csvRow(["OTHER EXPENSES (not tied to a load)"]));
+    rows.push(csvRow(["Date", "What", "Note", "Amount", "In tax report?"]));
+    for (const r of roadExpenses) {
+      const meta = roadCategoryMeta(r.category);
+      rows.push(
+        csvRow([
+          r.spent_on,
+          meta.label,
+          r.note,
+          num(r.amount),
+          meta.taxCategory == null ? "No — per diem covers meals" : "Yes",
+        ])
+      );
+    }
+    rows.push(
+      csvRow(["OTHER EXPENSES TOTAL", "", "", num(roadTotal), ""])
+    );
+
+    const grandCost = tCost + roadTotal;
+    const grandProfit = tRevenue - grandCost;
+    rows.push("");
+    rows.push(
+      csvRow([
+        "NET AFTER OTHER EXPENSES",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        num(tRevenue),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        num(grandCost),
+        num(grandProfit),
       ])
     );
   }

@@ -10,6 +10,11 @@ import {
 import { CATEGORIES } from "@/lib/tax/categories";
 import { computePerDiem } from "@/lib/tax/perDiem";
 import {
+  sumRoadExpenses,
+  sumUntaxedRoadExpenses,
+  type RoadExpense,
+} from "@/lib/roadExpenses";
+import {
   driverPayTreatment,
   entityTypeLabel,
   truckFinancingLabel,
@@ -86,6 +91,7 @@ export async function GET(request: Request) {
     assetsRes,
     perDiemRes,
     ratesRes,
+    roadExpensesRes,
   ] = await Promise.all([
     supabase
       .from("tax_profiles")
@@ -125,6 +131,13 @@ export async function GET(request: Request) {
       .from("per_diem_rates")
       .select("effective_date,conus_rate,ooc_rate,notice")
       .order("effective_date", { ascending: true }),
+    supabase
+      .from("road_expenses")
+      .select("id,spent_on,category,amount,note")
+      .eq("user_id", user.id)
+      .gte("spent_on", yStart)
+      .lte("spent_on", yEnd)
+      .order("spent_on", { ascending: true }),
   ]);
 
   const profile: TaxProfile = profileRes.data
@@ -183,9 +196,21 @@ export async function GET(request: Request) {
     notice: r.notice ?? "",
   }));
 
+  const roadExpenses: RoadExpense[] = (roadExpensesRes.data ?? []).map((r) => ({
+    id: r.id,
+    spent_on: r.spent_on,
+    category: r.category,
+    amount: Number(r.amount) || 0,
+    note: r.note ?? "",
+  }));
+
   const revenue = aggregateRevenue(loads);
   const loadActuals = aggregateLoadActuals(loads);
-  const scheduleCGroups = buildScheduleCGroups(expenses, loadActuals);
+  const scheduleCGroups = buildScheduleCGroups(
+    expenses,
+    loadActuals,
+    roadExpenses
+  );
   const perDiem = computePerDiem(perDiemSummary, rates, year);
   const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const assetTotal = assets.reduce((s, a) => s + a.cost, 0);

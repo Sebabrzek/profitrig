@@ -20,7 +20,10 @@ import {
   parseDateParam,
   startOfMonth,
   startOfWeek,
+  todayIso,
 } from "@/lib/loads";
+import { RoadExpenseCard } from "@/components/RoadExpenseCard";
+import { sumRoadExpenses, type RoadExpense } from "@/lib/roadExpenses";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -98,7 +101,7 @@ export default async function LoadsPage({
       ? monthToCandidate
       : endOfMonth(weekStart);
 
-  const [costRes, monthLoadsRes] = await Promise.all([
+  const [costRes, monthLoadsRes, roadExpensesRes] = await Promise.all([
     supabase
       .from("cost_profiles")
       .select("*")
@@ -112,7 +115,28 @@ export default async function LoadsPage({
       .lte("load_date", isoDate(monthTo))
       .order("load_date", { ascending: false })
       .order("created_at", { ascending: false }),
+    // Road expenses for the displayed week only — they aren't part of the
+    // per-load allocation, so there's no need for the wider month range.
+    supabase
+      .from("road_expenses")
+      .select("id,spent_on,category,amount,note")
+      .eq("user_id", user.id)
+      .gte("spent_on", isoDate(weekStart))
+      .lte("spent_on", isoDate(weekEnd))
+      .order("spent_on", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
+
+  const roadExpenses: RoadExpense[] = (roadExpensesRes.data ?? []).map(
+    (r) => ({
+      id: r.id,
+      spent_on: r.spent_on,
+      category: r.category,
+      amount: Number(r.amount) || 0,
+      note: r.note ?? "",
+    })
+  );
+  const roadExpenseTotal = sumRoadExpenses(roadExpenses);
 
   // Synthetic "loadsRes" filtered to the displayed week.
   const loadsRes = {
@@ -186,7 +210,7 @@ export default async function LoadsPage({
   }));
   const monthMiles = monthlyMilesByLoad(monthLoads);
 
-  const totals = aggregateWeek(loads, profile, monthMiles);
+  const totals = aggregateWeek(loads, profile, monthMiles, roadExpenseTotal);
   const isConfigured = profileIsConfigured(profile);
 
   return (
@@ -265,6 +289,11 @@ export default async function LoadsPage({
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Costs</p>
               <p className="text-base font-bold">{money(totals.totalCost)}</p>
+              {totals.roadExpenses > 0 && (
+                <p className="text-xs opacity-80">
+                  incl. {money(totals.roadExpenses)} other
+                </p>
+              )}
             </div>
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Loads</p>
@@ -294,6 +323,18 @@ export default async function LoadsPage({
             </div>
           </div>
         </div>
+
+        {/* Other expenses this week (not tied to a single load) */}
+        <RoadExpenseCard
+          rows={roadExpenses}
+          weekStartIso={isoDate(weekStart)}
+          weekEndIso={isoDate(weekEnd)}
+          defaultDateIso={
+            todayIso() >= isoDate(weekStart) && todayIso() <= isoDate(weekEnd)
+              ? todayIso()
+              : isoDate(weekStart)
+          }
+        />
 
         {/* Add load CTA */}
         <Link

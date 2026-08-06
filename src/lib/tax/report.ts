@@ -17,6 +17,10 @@
 import type { Load } from "@/lib/loads";
 import { categoryMeta } from "./categories";
 import type { Expense } from "./types";
+import {
+  roadExpensesByTaxCategory,
+  type RoadExpense,
+} from "@/lib/roadExpenses";
 
 export type RevenueTotals = {
   linehaul: number;
@@ -96,7 +100,14 @@ export type ScheduleCGroup = {
  */
 export function buildScheduleCGroups(
   expenses: Expense[],
-  loadActuals: LoadActualTotals
+  loadActuals: LoadActualTotals,
+  /**
+   * On-the-road expenses logged on the Loads tab. Only actual dollars, same
+   * as everything else here. `roadExpensesByTaxCategory` drops meals, which
+   * the per-diem worksheet reports instead — never include them here or the
+   * accountant sees meals twice.
+   */
+  roadExpenses: RoadExpense[] = []
 ): ScheduleCGroup[] {
   const groups = new Map<
     string,
@@ -144,6 +155,21 @@ export function buildScheduleCGroups(
       meta.scheduleC,
       `${meta.label}${e.vendor ? ` — ${e.vendor}` : ""}`,
       Number(e.amount) || 0
+    );
+  }
+
+  // Road expenses from the Loads tab, rolled up per tax category (meals
+  // already dropped by roadExpensesByTaxCategory).
+  for (const [taxCategory, agg] of roadExpensesByTaxCategory(roadExpenses)) {
+    if (agg.amount <= 0) continue;
+    const meta = categoryMeta(taxCategory);
+    add(
+      meta.scheduleCLine,
+      meta.scheduleC,
+      `${meta.label} — ${agg.count} on-the-road ${
+        agg.count === 1 ? "entry" : "entries"
+      } (from Loads)`,
+      agg.amount
     );
   }
 
