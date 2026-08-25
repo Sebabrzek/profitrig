@@ -17,7 +17,7 @@ import {
   formatWeekLabel,
   isoDate,
   loadMonthKey,
-  monthlyMilesByLoad,
+  monthStatsByLoad,
   parseDateParam,
   startOfMonth,
   startOfWeek,
@@ -209,9 +209,9 @@ export default async function LoadsPage({
     lumpers_actual: null,
     notes: "",
   }));
-  const monthMiles = monthlyMilesByLoad(monthLoads);
+  const monthStats = monthStatsByLoad(monthLoads);
 
-  const totals = aggregateWeek(loads, profile, monthMiles, roadExpenseTotal);
+  const totals = aggregateWeek(loads, profile, monthStats, roadExpenseTotal);
   const isConfigured = profileIsConfigured(profile);
 
   return (
@@ -397,15 +397,15 @@ export default async function LoadsPage({
               const ownMiles =
                 Number(load.loaded_miles || 0) +
                 Number(load.deadhead_miles || 0);
-              const monthKey = loadMonthKey(load.load_date);
-              const otherMonthMiles = Math.max(
-                0,
-                (monthMiles.get(monthKey) ?? 0) - ownMiles
-              );
+              const stats = monthStats.get(loadMonthKey(load.load_date));
               const e = computeLoadEconomics(
                 load,
                 profile,
-                buildMtdContext(load.load_date, otherMonthMiles)
+                buildMtdContext(
+                  load.load_date,
+                  Math.max(0, (stats?.miles ?? 0) - ownMiles),
+                  stats?.firstDay ?? 1
+                )
               );
               const dateLabel = new Date(
                 load.load_date + "T12:00:00"

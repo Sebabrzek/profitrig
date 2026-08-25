@@ -67,7 +67,7 @@ export default async function NewLoadPage({
       .maybeSingle(),
     supabase
       .from("loads")
-      .select("loaded_miles,deadhead_miles")
+      .select("load_date,loaded_miles,deadhead_miles")
       .eq("user_id", user.id)
       .gte("load_date", isoDate(monthFrom))
       .lte("load_date", isoDate(monthTo)),
@@ -80,6 +80,13 @@ export default async function NewLoadPage({
       (Number(r.loaded_miles) || 0) +
       (Number(r.deadhead_miles) || 0),
     0
+  );
+  // Earliest day already logged this month. buildMtdContext clamps this to
+  // the new load's own date, so a first-ever load starts its own window.
+  const monthFirstDay = (monthLoadsRes.data ?? []).reduce(
+    (min: number, r) =>
+      Math.min(min, Number(String(r.load_date).slice(8, 10)) || 31),
+    31
   );
 
   const profile: CostProfile = costData
@@ -142,6 +149,7 @@ export default async function NewLoadPage({
           initial={initial}
           costProfile={profile}
           otherMonthMiles={otherMonthMiles}
+          monthFirstDay={monthFirstDay}
         />
       </div>
       <BottomNav isPro />

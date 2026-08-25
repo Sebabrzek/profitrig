@@ -5,7 +5,7 @@ import {
   endOfWeek,
   isoDate,
   loadMonthKey,
-  monthlyMilesByLoad,
+  monthStatsByLoad,
   parseDateParam,
   startOfWeek,
   type Load,
@@ -215,7 +215,7 @@ export async function GET(request: Request) {
   // For ranges that span months (the All Time export, or any custom range
   // wider than a single month), allocate fixed costs per-load using each
   // load's own month total, not the whole export range.
-  const monthMiles = monthlyMilesByLoad(loads);
+  const monthStats = monthStatsByLoad(loads);
 
   // Accumulators for totals row
   let tLoaded = 0;
@@ -239,15 +239,15 @@ export async function GET(request: Request) {
   for (const load of loads) {
     const ownMiles =
       Number(load.loaded_miles || 0) + Number(load.deadhead_miles || 0);
-    const monthKey = loadMonthKey(load.load_date);
-    const otherMonthMiles = Math.max(
-      0,
-      (monthMiles.get(monthKey) ?? 0) - ownMiles
-    );
+    const stats = monthStats.get(loadMonthKey(load.load_date));
     const e = computeLoadEconomics(
       load,
       profile,
-      buildMtdContext(load.load_date, otherMonthMiles)
+      buildMtdContext(
+        load.load_date,
+        Math.max(0, (stats?.miles ?? 0) - ownMiles),
+        stats?.firstDay ?? 1
+      )
     );
     rows.push(
       csvRow([

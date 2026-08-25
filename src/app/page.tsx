@@ -12,7 +12,7 @@ import {
   buildMtdContext,
   computeLoadEconomics,
   loadMonthKey,
-  monthlyMilesByLoad,
+  monthStatsByLoad,
   type Load,
 } from "@/lib/loads";
 
@@ -126,20 +126,21 @@ export default async function HomePage() {
       }));
       loggedLoadCount = loads.length;
       if (loggedLoadCount >= 5) {
-        const monthMiles = monthlyMilesByLoad(loads);
+        const monthStats = monthStatsByLoad(loads);
         let totalMiles = 0;
         let totalCost = 0;
         for (const l of loads) {
           const ownMiles =
             Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
-          const otherMonthMiles = Math.max(
-            0,
-            (monthMiles.get(loadMonthKey(l.load_date)) ?? 0) - ownMiles
-          );
+          const stats = monthStats.get(loadMonthKey(l.load_date));
           const e = computeLoadEconomics(
             l,
             initial,
-            buildMtdContext(l.load_date, otherMonthMiles)
+            buildMtdContext(
+              l.load_date,
+              Math.max(0, (stats?.miles ?? 0) - ownMiles),
+              stats?.firstDay ?? 1
+            )
           );
           totalMiles += e.totalMiles;
           totalCost += e.totalCost;

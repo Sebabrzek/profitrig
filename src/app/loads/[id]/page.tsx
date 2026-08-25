@@ -75,7 +75,7 @@ export default async function EditLoadPage({
   const monthTo = endOfMonth(loadDateObj);
   const { data: monthLoadsData } = await supabase
     .from("loads")
-    .select("id,loaded_miles,deadhead_miles")
+    .select("id,load_date,loaded_miles,deadhead_miles")
     .eq("user_id", user.id)
     .gte("load_date", isoDate(monthFrom))
     .lte("load_date", isoDate(monthTo));
@@ -88,6 +88,13 @@ export default async function EditLoadPage({
         (Number(row.deadhead_miles) || 0),
       0
     );
+  // Earliest day this driver logged anything in the load's month — the start
+  // of the run-rate window.
+  const monthFirstDay = (monthLoadsData ?? []).reduce(
+    (min: number, row) =>
+      Math.min(min, Number(String(row.load_date).slice(8, 10)) || 31),
+    31
+  );
 
   const initial: Load = {
     id: r.id,
@@ -164,6 +171,7 @@ export default async function EditLoadPage({
           costProfile={profile}
           loadId={id}
           otherMonthMiles={otherMonthMiles}
+          monthFirstDay={monthFirstDay}
         />
       </div>
       <BottomNav isPro />

@@ -188,6 +188,7 @@ export function LoadForm({
   costProfile,
   loadId,
   otherMonthMiles = 0,
+  monthFirstDay = 1,
 }: {
   initial: Load;
   costProfile: CostProfile;
@@ -200,6 +201,12 @@ export function LoadForm({
    * the saved Monthly Miles assumption.
    */
   otherMonthMiles?: number;
+  /**
+   * Day-of-month of the earliest load already logged in this load's month.
+   * Drives the run-rate window so a driver who started mid-month isn't
+   * charged as though they had been parked since the 1st.
+   */
+  monthFirstDay?: number;
 }) {
   const router = useRouter();
   const [load, setLoad] = useState<Load>({ ...initial, id: loadId });
@@ -212,9 +219,9 @@ export function LoadForm({
       computeLoadEconomics(
         load,
         costProfile,
-        buildMtdContext(load.load_date, otherMonthMiles)
+        buildMtdContext(load.load_date, otherMonthMiles, monthFirstDay)
       ),
-    [load, costProfile, otherMonthMiles]
+    [load, costProfile, otherMonthMiles, monthFirstDay]
   );
 
   const setField = <K extends keyof Load>(k: K) => (v: Load[K]) =>

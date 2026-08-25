@@ -51,27 +51,34 @@ export type MtdContext = {
    */
   otherMonthMiles: number;
   /**
-   * How far into the load's calendar month we are. `daysElapsed >=
-   * daysInMonth` means the month is over and the mileage is final.
+   * How many days of this month we have actually WATCHED — from the
+   * driver's first logged load of the month through today (or through
+   * month end once the month is over).
    *
-   * This exists because miles-to-date is NOT a month's mileage. On Aug 6 a
-   * driver has run six days of miles but still owes a full month of truck
-   * payment and insurance — dividing one by the other charged early-month
-   * loads roughly 7x their real fixed share and made profitable weeks look
-   * catastrophic. Build this with `buildMtdContext` rather than by hand.
+   * Two different mistakes made this necessary, and both produced the same
+   * symptom: a wildly inflated fixed-cost share and a fake catastrophic
+   * loss.
+   *   1. Using miles-to-date as a month's mileage. On Aug 6 a driver has
+   *      six days of miles but owes a full month of truck payment.
+   *   2. Counting elapsed days from the 1st. A driver who signed up on the
+   *      20th has not been logging since the 1st, so their run rate looked
+   *      7x worse than it was — on their very first load.
+   *
+   * Watching-days is the honest denominator for a run rate. Build this with
+   * `buildMtdContext`; never assemble it by hand.
    */
-  daysElapsed: number;
+  observedDays: number;
   daysInMonth: number;
 };
 
 export const MTD_FALLBACK_THRESHOLD_MILES = 1000;
 
 /**
- * A month must be at least this far along before its run rate is worth
- * projecting from. Below it we use the driver's own monthly-miles estimate,
- * because two days of driving says nothing about how the month will end.
+ * We must have watched a driver for at least this many days before trusting
+ * their run rate. Below it we use their own monthly-miles estimate, because
+ * a couple of days of driving says nothing about how the month will end.
  */
-export const MTD_MIN_DAYS_FOR_RUN_RATE = 7;
+export const MTD_MIN_OBSERVED_DAYS = 7;
 
 function monthKeyOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -85,6 +92,13 @@ function monthKeyOf(d: Date): string {
 export function buildMtdContext(
   loadDate: string,
   otherMonthMiles: number,
+  /**
+   * Day-of-month (1-31) of the earliest load this driver has logged in the
+   * load's calendar month. Required, not optional: defaulting it to 1 would
+   * silently reintroduce the mid-month-signup bug at any call site that
+   * forgot to pass it, and that bug is invisible until a user complains.
+   */
+  firstLoggedDay: number,
   now: Date = new Date()
 ): MtdContext {
   const monthKey = loadMonthKey(loadDate);
@@ -93,16 +107,58 @@ export function buildMtdContext(
   const daysInMonth = new Date(year, month, 0).getDate();
   const nowKey = monthKeyOf(now);
 
-  let daysElapsed: number;
+  // The load being priced is itself part of the month, so it can only pull
+  // the observation window earlier — never later than its own date.
+  const loadDay = Number(loadDate.slice(8, 10)) || 1;
+  const startDay = Math.min(
+    Math.max(1, Math.round(firstLoggedDay) || loadDay),
+    loadDay
+  );
+
+  let throughDay: number;
   if (monthKey < nowKey) {
-    daysElapsed = daysInMonth; // month is over — its mileage is final
+    throughDay = daysInMonth; // month is over — we saw all of it we ever will
   } else if (monthKey > nowKey) {
-    daysElapsed = 0; // future-dated load — no run rate to read yet
+    throughDay = 0; // future-dated load — nothing observed yet
   } else {
-    daysElapsed = now.getDate();
+    throughDay = now.getDate();
   }
 
-  return { otherMonthMiles, daysElapsed, daysInMonth };
+  return {
+    otherMonthMiles,
+    observedDays: Math.max(0, throughDay - startDay + 1),
+    daysInMonth,
+  };
+}
+
+export type MonthStats = {
+  /** Total loaded + deadhead miles logged in this calendar month. */
+  miles: number;
+  /** Day-of-month of the earliest load logged in this calendar month. */
+  firstDay: number;
+};
+
+/**
+ * Summarize what we know about each calendar month the loads touch. Miles
+ * and first-logged-day travel together so a caller cannot supply one
+ * without the other — the pair is what makes the run rate meaningful.
+ */
+export function monthStatsByLoad(loads: Load[]): Map<string, MonthStats> {
+  const m = new Map<string, MonthStats>();
+  for (const l of loads) {
+    const key = loadMonthKey(l.load_date);
+    const miles =
+      (Number(l.loaded_miles) || 0) + (Number(l.deadhead_miles) || 0);
+    const day = Number(l.load_date.slice(8, 10)) || 1;
+    const prev = m.get(key);
+    if (prev) {
+      prev.miles += miles;
+      prev.firstDay = Math.min(prev.firstDay, day);
+    } else {
+      m.set(key, { miles, firstDay: day });
+    }
+  }
+  return m;
 }
 
 export type LoadEconomics = {
@@ -177,19 +233,17 @@ export function computeLoadEconomics(
 
   if (mtd) {
     const mtdMiles = Math.max(0, mtd.otherMonthMiles) + totalMiles;
-    const monthIsOver = mtd.daysElapsed >= mtd.daysInMonth;
 
     // Fixed bills are monthly, so they must be spread over a MONTH of miles.
-    // Mid-month, miles-to-date is only part of that month, so project the
-    // rest from the run rate. Without this, a load logged on the 3rd carries
-    // the whole month's truck payment and insurance.
+    // We rarely have a whole month, so scale what we watched up to one.
     let basisMiles: number;
-    if (monthIsOver) {
+    if (mtd.observedDays >= mtd.daysInMonth) {
+      // Watched the whole month — its mileage is the real thing.
       basisMiles = mtdMiles;
-    } else if (mtd.daysElapsed >= MTD_MIN_DAYS_FOR_RUN_RATE) {
-      basisMiles = (mtdMiles * mtd.daysInMonth) / mtd.daysElapsed;
+    } else if (mtd.observedDays >= MTD_MIN_OBSERVED_DAYS) {
+      basisMiles = (mtdMiles * mtd.daysInMonth) / mtd.observedDays;
     } else {
-      // Too early to read a run rate — fall through to the saved estimate.
+      // Watched too little to read a run rate — use the saved estimate.
       basisMiles = 0;
     }
 
@@ -262,18 +316,6 @@ export function computeLoadEconomics(
 export function loadMonthKey(loadDate: string): string {
   // load_date is always YYYY-MM-DD per the Load type.
   return loadDate.slice(0, 7);
-}
-
-// Build a map of yearMonth -> sum of (loaded + deadhead) miles, given a
-// list of loads. Used to feed MtdContext into computeLoadEconomics.
-export function monthlyMilesByLoad(loads: Load[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const l of loads) {
-    const key = loadMonthKey(l.load_date);
-    const miles = Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
-    m.set(key, (m.get(key) ?? 0) + miles);
-  }
-  return m;
 }
 
 // Week boundaries — Monday is the start of the week (matches most trucking
@@ -363,7 +405,7 @@ export type WeekTotals = {
 export function aggregateWeek(
   loads: Load[],
   profile: CostProfile,
-  monthMiles?: Map<string, number>,
+  months?: Map<string, MonthStats>,
   /**
    * Total of road expenses dated inside this week. Kept as a plain number so
    * this module stays free of the road-expense types — the caller has already
@@ -377,17 +419,19 @@ export function aggregateWeek(
   let totalCost = 0;
 
   for (const l of loads) {
-    const monthKey = loadMonthKey(l.load_date);
+    const stats = months?.get(loadMonthKey(l.load_date));
     const ownMiles =
       Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
-    const otherMonthMiles =
-      monthMiles != null
-        ? Math.max(0, (monthMiles.get(monthKey) ?? 0) - ownMiles)
-        : 0;
     const e = computeLoadEconomics(
       l,
       profile,
-      monthMiles ? buildMtdContext(l.load_date, otherMonthMiles) : undefined
+      stats
+        ? buildMtdContext(
+            l.load_date,
+            Math.max(0, stats.miles - ownMiles),
+            stats.firstDay
+          )
+        : undefined
     );
     loadedMiles += Number(l.loaded_miles || 0);
     deadheadMiles += Number(l.deadhead_miles || 0);
