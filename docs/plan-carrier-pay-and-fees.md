@@ -48,6 +48,148 @@ This is also the honest marketing story: *know what you are really being paid.*
 
 ---
 
+## Two owner types, one app
+
+There are two owner-operators with different money-in realities, and the app
+currently pretends there is one:
+
+| | **Leased-on** | **Independent (own MC)** |
+|---|---|---|
+| Paid | % of the load | 100% of the load |
+| Deductions | carrier fees, often undisclosed | none |
+| Money in | weekly settlement | invoices brokers / factors |
+| Negotiates | rarely — takes what's offered | every load, directly |
+| Needs | % split visible, fee tracking, settlement reconciliation | invoicing, A/R aging, rate-con review |
+| Doesn't need | invoicing | carrier fees, % split |
+
+`driver_profiles.authority_type` already stores leased / own_mc / both. The
+field exists; nothing reads it. That is the hook.
+
+### Do NOT build two apps
+
+Tempting, and wrong. What differs between these two is the **revenue layer**.
+What is identical is the entire **cost engine** — fixed costs, per-mile costs,
+fixed-cost allocation, fuel, road expenses, per diem, capital assets, tax
+records. That is most of the app.
+
+Forking it means two cost-per-mile implementations. Every bug fixed on 25 Aug
+2026 — the allocation basis, the mid-month observation window, the tolls
+parity — lived in that engine. Two copies means fixing each twice and
+eventually missing one, which is exactly the class of failure that has already
+cost this app three bugs in one day.
+
+**One engine. Branch the revenue layer, and branch which tools appear.**
+
+```
+                 ┌──────────────────────────────┐
+                 │  SHARED — never fork this     │
+                 │  cost per mile · fixed costs  │
+                 │  per-mile costs · allocation  │
+                 │  road expenses · fuel         │
+                 │  per diem · tax pack · chat   │
+                 └───────────────┬──────────────┘
+                                 │
+            ┌────────────────────┴────────────────────┐
+            │                                          │
+   ┌────────▼─────────┐                    ┌───────────▼────────┐
+   │ LEASED-ON        │                    │ INDEPENDENT        │
+   │ carrier + % split│                    │ 100% of the load   │
+   │ carrier fees     │                    │ invoicing + aging  │
+   │ settlements      │                    │ rate-con review    │
+   │ reconciliation   │                    │ factoring          │
+   └──────────────────┘                    └────────────────────┘
+```
+
+### The double-count solve falls out of this
+
+For a leased driver, **most fixed costs ARE carrier deductions** — insurance,
+trailer, ELD are commonly taken off the settlement. So for that persona the
+carrier-fee list should **feed** the calculator's fixed-cost fields rather than
+sit beside them: the field shows the carrier-deducted amount, marked as such,
+and is not typed twice. One source of truth, and the driver gets fields filled
+in for free.
+
+For an independent, those same fields stay hand-entered as today.
+
+### Where to ask the question
+
+**Not at signup.** The free calculator is the top of the funnel and must stay a
+two-minute experience; asking a stranger about their authority before showing
+them anything will cost conversions.
+
+Ask when it first changes what they see — at Pro onboarding, before the first
+load. Frame it in their language, not FMCSA's:
+
+> **How do you get paid?**
+> ( ) I'm leased to a carrier — they pay me a percentage
+> ( ) I run my own authority — brokers pay me directly
+
+Store to `authority_type`. Re-askable from Profile (drivers switch carriers and
+go independent; this is not a one-time fact).
+
+### The "both" case
+
+`authority_type` already allows `both`, and real drivers do run leased on one
+truck and their own authority on another, or transition mid-year. Do not let
+this edge case block the 90% case — but do not model it out of existence
+either. Simplest workable shape: a **primary** persona drives the UI, and pay
+basis is resolved **per load** (default from primary, overridable). If loads
+carry their own pay basis from the start, `both` costs almost nothing later.
+
+### Showing the split at all times
+
+For leased drivers the percentage should be persistent context, not buried in
+setup — a header chip on the tracker: `D. Lewis Transport · 80% of all-in`, and
+on every load:
+
+```
+Load paid          $1,280
+Your 80%           $1,024   <- this is what feeds profit
+```
+
+Showing both numbers is the honest version and doubles as education: the driver
+sees the gap on every single load rather than once a week.
+
+---
+
+## Error catching — what "AI support" should concretely do
+
+Both personas want the app to check their work. These are specific,
+implementable checks, not a chatbot:
+
+**Leased-on**
+- Settlement's implied percentage does not match the carrier's stated split
+- A deduction appears that is not in the known fee list — *"new charge: $15
+  'admin'. Did they tell you about this?"*
+- Settlement's stated load gross is lower than the rate confirmation
+  (**the carrier shaved the load**) — the highest-value check in the app
+- A cost is present both as a carrier deduction and as a typed fixed cost
+- Escrow balance is not being tracked / not returned when expected
+
+**Independent**
+- Rate confirmation has no detention clause — *"this rate con doesn't mention
+  detention. Worth asking before you book."* (owners routinely forget to
+  negotiate accessorials, and this is the moment to catch it)
+- Load is below break-even before it is accepted
+- Invoice unpaid past terms
+- Accessorials earned but never invoiced
+
+**Both**
+- Cost per mile drifting from the estimate
+- Miles logged well below odometer (untracked miles)
+
+---
+
+## Free hooks, one per persona
+
+The free CPM calculator works for both, but each persona has a sharper question:
+
+- **Leased-on:** *"What is my carrier really paying me?"* — enter the load
+  gross and the deductions, see the true percentage and true per-mile take.
+  Every leased driver has this question and no honest tool answers it.
+- **Independent:** the CPM calculator, plus eventually a free invoice generator
+  (every invoice sent carries ProfitRig branding into a broker's inbox).
+
 ## Phases
 
 Each phase is useful on its own. Do not jump ahead — extraction has nowhere to
