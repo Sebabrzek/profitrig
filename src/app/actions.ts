@@ -269,6 +269,38 @@ export async function saveDriverProfileAction(
   return { ok: true };
 }
 
+export async function saveWeekStartAction(
+  weekStart: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (weekStart !== "monday" && weekStart !== "sunday") {
+    return { ok: false, error: "Pick Monday or Sunday." };
+  }
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  // Only this column is sent, so an existing profile keeps everything else.
+  const { error } = await supabase.from("driver_profiles").upsert(
+    {
+      user_id: user.id,
+      week_start: weekStart,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+  if (error) {
+    return {
+      ok: false,
+      error: "Couldn't save that. Try again, or tap Talk to a human.",
+    };
+  }
+
+  revalidatePath("/loads");
+  return { ok: true };
+}
+
 export async function submitFeedbackAction(
   message: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

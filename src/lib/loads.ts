@@ -18,7 +18,10 @@ export type Load = {
 };
 
 export const EMPTY_LOAD: Load = {
-  load_date: todayIso(),
+  // Filled per request from the driver's own calendar (todayIsoIn). Calling
+  // todayIso() here froze the date at module load, so a warm server kept
+  // handing out the day it booted.
+  load_date: "",
   broker: "",
   origin: "",
   destination: "",
@@ -39,6 +42,39 @@ export function todayIso(): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Cookie holding the browser's IANA time zone. Set by TimeZoneCookie. */
+export const TZ_COOKIE = "pr_tz";
+
+/**
+ * Today, YYYY-MM-DD, on the DRIVER's calendar. Pages render on a UTC server,
+ * so a load entered at 8:30pm Sunday in California defaulted to Monday and
+ * landed in next week. Falls back to this runtime's clock when the zone is
+ * missing or not a real IANA zone — the cookie is user-controlled.
+ */
+export function todayIsoIn(
+  timeZone: string | null | undefined,
+  now: Date = new Date()
+): string {
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(now);
+      const part = (type: string) => parts.find((p) => p.type === type)?.value;
+      const y = part("year");
+      const m = part("month");
+      const d = part("day");
+      if (y && m && d) return `${y}-${m}-${d}`;
+    } catch {
+      // Unknown time zone — fall through to the runtime clock.
+    }
+  }
+  return isoDate(now);
 }
 
 export type AllocationBasis = "actual_mtd" | "monthly_estimate";
@@ -161,6 +197,52 @@ export function monthStatsByLoad(loads: Load[]): Map<string, MonthStats> {
   return m;
 }
 
+/** A real pace under this share of the driver's own estimate is worth saying out loud. */
+export const LOW_PACE_RATIO = 0.75;
+
+export type MonthAllocationNote = {
+  monthKey: string;
+  basis: AllocationBasis;
+  /** The month is over: its allocation is settled and will not move again. */
+  final: boolean;
+  /** The month of miles fixed bills are spread over — real pace or the estimate. */
+  basisMiles: number;
+  estimateMiles: number;
+  /** Real pace well under the estimate: unlogged loads, or genuine downtime. */
+  lowPace: boolean;
+};
+
+/**
+ * Why a month's loads carry the fixed-cost share they do, and whether it can
+ * still move. While a month is open its bills are spread over the miles
+ * logged so far, so a driver who stops logging watches an old profitable
+ * week turn into a loss with nothing about that week changing. This is what
+ * the Loads tab shows so that never happens silently.
+ */
+export function describeMonthAllocation(
+  monthKey: string,
+  stats: MonthStats,
+  p: CostProfile,
+  now: Date = new Date()
+): MonthAllocationNote {
+  const firstDate = `${monthKey}-${String(stats.firstDay).padStart(2, "0")}`;
+  const ctx = buildMtdContext(firstDate, stats.miles, stats.firstDay, now);
+  // Every load in a month resolves to the same basis (its own miles plus the
+  // rest of the month's), so asking with zero extra miles reads the month.
+  const { basis, basisMiles } = resolveAllocationBasis(p, ctx, 0);
+  return {
+    monthKey,
+    basis,
+    final: monthKey < monthKeyOf(now),
+    basisMiles,
+    estimateMiles: p.monthly_miles,
+    lowPace:
+      basis === "actual_mtd" &&
+      p.monthly_miles > 0 &&
+      basisMiles < p.monthly_miles * LOW_PACE_RATIO,
+  };
+}
+
 export type LoadEconomics = {
   totalMiles: number;
   deadheadPct: number;
@@ -197,6 +279,49 @@ function sumFixedMonthly(p: CostProfile): number {
   );
 }
 
+export type AllocationResolution = {
+  basis: AllocationBasis;
+  /** The month of miles fixed bills are spread over. */
+  basisMiles: number;
+};
+
+/**
+ * Which month of miles fixed bills are spread over. The only place this rule
+ * lives: load pricing and the Loads tab's explanation both read it, so the
+ * explanation can never describe a different rule than the one that priced
+ * the load.
+ */
+export function resolveAllocationBasis(
+  p: CostProfile,
+  mtd: MtdContext | undefined,
+  loadMiles: number
+): AllocationResolution {
+  // Use real mileage where it exists, so a genuinely slow month shows a
+  // fairer per-load share. See MtdContext for why miles-to-date alone is not
+  // a month's mileage.
+  if (mtd) {
+    const mtdMiles = Math.max(0, mtd.otherMonthMiles) + loadMiles;
+
+    // Fixed bills are monthly, so they must be spread over a MONTH of miles.
+    // We rarely have a whole month, so scale what we watched up to one.
+    let basisMiles: number;
+    if (mtd.observedDays >= mtd.daysInMonth) {
+      // Watched the whole month — its mileage is the real thing.
+      basisMiles = mtdMiles;
+    } else if (mtd.observedDays >= MTD_MIN_OBSERVED_DAYS) {
+      basisMiles = (mtdMiles * mtd.daysInMonth) / mtd.observedDays;
+    } else {
+      // Watched too little to read a run rate — use the saved estimate.
+      basisMiles = 0;
+    }
+
+    if (basisMiles >= MTD_FALLBACK_THRESHOLD_MILES) {
+      return { basis: "actual_mtd", basisMiles };
+    }
+  }
+  return { basis: "monthly_estimate", basisMiles: p.monthly_miles };
+}
+
 export function computeLoadEconomics(
   load: Load,
   p: CostProfile,
@@ -224,41 +349,13 @@ export function computeLoadEconomics(
 
   const totalFixed = sumFixedMonthly(p);
 
-  // Allocate fixed costs across a MONTH of miles, using real mileage where
-  // it exists so a genuinely slow month shows a fairer per-load share. See
-  // MtdContext for why miles-to-date alone is not a month's mileage.
-  let allocationBasis: AllocationBasis = "monthly_estimate";
-  let allocationBasisMiles = p.monthly_miles;
-  let allocatedFixedCost = 0;
-
-  if (mtd) {
-    const mtdMiles = Math.max(0, mtd.otherMonthMiles) + totalMiles;
-
-    // Fixed bills are monthly, so they must be spread over a MONTH of miles.
-    // We rarely have a whole month, so scale what we watched up to one.
-    let basisMiles: number;
-    if (mtd.observedDays >= mtd.daysInMonth) {
-      // Watched the whole month — its mileage is the real thing.
-      basisMiles = mtdMiles;
-    } else if (mtd.observedDays >= MTD_MIN_OBSERVED_DAYS) {
-      basisMiles = (mtdMiles * mtd.daysInMonth) / mtd.observedDays;
-    } else {
-      // Watched too little to read a run rate — use the saved estimate.
-      basisMiles = 0;
-    }
-
-    if (basisMiles >= MTD_FALLBACK_THRESHOLD_MILES) {
-      allocationBasis = "actual_mtd";
-      allocationBasisMiles = basisMiles;
-      allocatedFixedCost =
-        totalFixed > 0 ? (totalFixed / basisMiles) * totalMiles : 0;
-    }
-  }
-
-  if (allocationBasis === "monthly_estimate") {
-    allocatedFixedCost =
-      p.monthly_miles > 0 ? totalMiles * (totalFixed / p.monthly_miles) : 0;
-  }
+  // Allocate fixed costs across a MONTH of miles — see resolveAllocationBasis.
+  const { basis: allocationBasis, basisMiles: allocationBasisMiles } =
+    resolveAllocationBasis(p, mtd, totalMiles);
+  const allocatedFixedCost =
+    allocationBasisMiles > 0
+      ? totalMiles * (totalFixed / allocationBasisMiles)
+      : 0;
 
   // Mirror the fuel rule: an actual wins, otherwise fall back to the saved
   // per-mile estimate. Dropping to zero here quietly understated every load
@@ -318,20 +415,28 @@ export function loadMonthKey(loadDate: string): string {
   return loadDate.slice(0, 7);
 }
 
-// Week boundaries — Monday is the start of the week (matches most trucking
-// settlement periods).
-export function startOfWeek(d: Date): Date {
+/**
+ * The day a driver's week starts on. Carrier settlements disagree — some pay
+ * Monday–Sunday, others Sunday–Saturday — and a Sunday load has to land in
+ * the same week as the settlement that pays for it.
+ */
+export type WeekStart = "monday" | "sunday";
+
+/** Anything but exactly "sunday" is a Monday week, the long-standing default. */
+export function parseWeekStart(v: unknown): WeekStart {
+  return v === "sunday" ? "sunday" : "monday";
+}
+
+export function startOfWeek(d: Date, weekStart: WeekStart = "monday"): Date {
   const x = new Date(d);
-  const day = x.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
+  const first = weekStart === "sunday" ? 0 : 1; // getDay(): 0=Sun … 6=Sat
+  x.setDate(x.getDate() - ((x.getDay() - first + 7) % 7));
   x.setHours(0, 0, 0, 0);
   return x;
 }
 
-export function endOfWeek(d: Date): Date {
-  const start = startOfWeek(d);
-  const end = new Date(start);
+export function endOfWeek(d: Date, weekStart: WeekStart = "monday"): Date {
+  const end = startOfWeek(d, weekStart);
   end.setDate(end.getDate() + 6);
   end.setHours(23, 59, 59, 999);
   return end;
@@ -350,6 +455,22 @@ export function endOfMonth(d: Date): Date {
   return x;
 }
 
+/**
+ * The loads to fetch when pricing a week: every day of each month the week
+ * touches. Fixed costs are allocated per month, so pricing a week from that
+ * week's loads alone gives a different profit than the Loads tab. The Loads
+ * tab and the week CSV both use this so they cannot drift apart again.
+ */
+export function monthRangeForWeek(
+  weekStart: Date,
+  weekEnd: Date
+): { from: string; to: string } {
+  return {
+    from: isoDate(startOfMonth(weekStart)),
+    to: isoDate(endOfMonth(weekEnd)),
+  };
+}
+
 export function isoDate(d: Date): string {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -358,7 +479,10 @@ export function isoDate(d: Date): string {
 }
 
 export function formatWeekLabel(start: Date): string {
-  const end = endOfWeek(start);
+  // `start` is already the week's first day, whichever day that is.
+  // Re-deriving it with endOfWeek's Monday default would shift a Sunday week.
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
   const sm = start.toLocaleString("en-US", { month: "short" });
   const em = end.toLocaleString("en-US", { month: "short" });
   const year = end.getFullYear();
@@ -411,7 +535,12 @@ export function aggregateWeek(
    * this module stays free of the road-expense types — the caller has already
    * filtered to the week.
    */
-  roadExpenseTotal = 0
+  roadExpenseTotal = 0,
+  /**
+   * Today on the driver's calendar. Omitted, it is this runtime's clock —
+   * UTC on the server — so pages should pass the driver's own date.
+   */
+  now?: Date
 ): WeekTotals {
   let loadedMiles = 0;
   let deadheadMiles = 0;
@@ -429,7 +558,8 @@ export function aggregateWeek(
         ? buildMtdContext(
             l.load_date,
             Math.max(0, stats.miles - ownMiles),
-            stats.firstDay
+            stats.firstDay,
+            now
           )
         : undefined
     );

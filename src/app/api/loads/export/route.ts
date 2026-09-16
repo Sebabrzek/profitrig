@@ -5,11 +5,13 @@ import {
   endOfWeek,
   isoDate,
   loadMonthKey,
+  monthRangeForWeek,
   monthStatsByLoad,
   parseDateParam,
   startOfWeek,
   type Load,
 } from "@/lib/loads";
+import { driverToday, fetchWeekStart } from "@/lib/driverClock";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { CostProfile } from "@/app/actions";
 import {
@@ -152,11 +154,17 @@ export async function GET(request: Request) {
     });
   }
 
-  // Resolve range
-  const target = parseDateParam(dateParam);
+  // Resolve range on the driver's calendar — the server's is UTC.
+  const { now } = await driverToday();
+  const target = dateParam ? parseDateParam(dateParam) : now;
   let from: string;
   let to: string;
   let label: string;
+  // Loads to fetch for pricing. For a week this is wider than the rows
+  // exported: fixed costs are allocated per month, so a week priced from its
+  // own loads alone disagreed with the Loads tab.
+  let fetchFrom: string;
+  let fetchTo: string;
 
   if (range === "month") {
     const y = target.getFullYear();
@@ -165,16 +173,22 @@ export async function GET(request: Request) {
     to = isoDate(new Date(y, m + 1, 0));
     const monthName = target.toLocaleString("en-US", { month: "long" });
     label = `${monthName}-${y}`;
+    fetchFrom = from;
+    fetchTo = to;
   } else if (range === "all") {
     from = "1900-01-01";
     to = "2999-12-31";
     label = "All-Time";
+    fetchFrom = from;
+    fetchTo = to;
   } else {
-    const ws = startOfWeek(target);
-    const we = endOfWeek(target);
+    const weekStartsOn = await fetchWeekStart(supabase, user.id);
+    const ws = startOfWeek(target, weekStartsOn);
+    const we = endOfWeek(target, weekStartsOn);
     from = isoDate(ws);
     to = isoDate(we);
     label = `Week-${from}`;
+    ({ from: fetchFrom, to: fetchTo } = monthRangeForWeek(ws, we));
   }
 
   const [costRes, loadsRes, roadExpensesRes] = await Promise.all([
@@ -187,8 +201,8 @@ export async function GET(request: Request) {
       .from("loads")
       .select("*")
       .eq("user_id", user.id)
-      .gte("load_date", from)
-      .lte("load_date", to)
+      .gte("load_date", fetchFrom)
+      .lte("load_date", fetchTo)
       .order("load_date", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
@@ -209,13 +223,16 @@ export async function GET(request: Request) {
   }));
 
   const profile = mapProfile(costRes.data as Record<string, unknown> | null);
-  const loads: Load[] = (loadsRes.data ?? []).map((r) =>
+  const fetched: Load[] = (loadsRes.data ?? []).map((r) =>
     mapLoad(r as Record<string, unknown>)
   );
-  // For ranges that span months (the All Time export, or any custom range
-  // wider than a single month), allocate fixed costs per-load using each
-  // load's own month total, not the whole export range.
-  const monthStats = monthStatsByLoad(loads);
+  // Rows cover only the requested range, but month stats use everything
+  // fetched, so each load's fixed-cost share comes from its own whole month
+  // — for a week, a month-spanning All Time export, or anything between.
+  const loads = fetched.filter(
+    (l) => l.load_date >= from && l.load_date <= to
+  );
+  const monthStats = monthStatsByLoad(fetched);
 
   // Accumulators for totals row
   let tLoaded = 0;
@@ -246,7 +263,8 @@ export async function GET(request: Request) {
       buildMtdContext(
         load.load_date,
         Math.max(0, (stats?.miles ?? 0) - ownMiles),
-        stats?.firstDay ?? 1
+        stats?.firstDay ?? 1,
+        now
       )
     );
     rows.push(

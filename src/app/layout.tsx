@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Orbitron } from "next/font/google";
 import { SupportChatMount } from "@/components/SupportChatMount";
+import { TimeZoneCookie } from "@/components/TimeZoneCookie";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,6 +46,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         {children}
+        <TimeZoneCookie />
         <SupportChatMount />
       </body>
     </html>

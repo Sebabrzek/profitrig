@@ -31,7 +31,7 @@ export function RoadExpenseCard({
   rows: RoadExpense[];
   weekStartIso: string;
   weekEndIso: string;
-  /** Today if today is inside this week, else the week's Monday. */
+  /** Today if today is inside this week, else the week's first day. */
   defaultDateIso: string;
 }) {
   const [open, setOpen] = useState(false);

@@ -6,7 +6,8 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { BottomNav } from "@/components/BottomNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
-import { EMPTY_CAPITAL_ASSET, type CapitalAsset, todayIso } from "@/lib/tax/types";
+import { EMPTY_CAPITAL_ASSET, type CapitalAsset } from "@/lib/tax/types";
+import { driverToday } from "@/lib/driverClock";
 import { AssetForm } from "../AssetForm";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +26,12 @@ export default async function NewAssetPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
+  // "Today" is the driver's, not the UTC server's.
+  const { iso: today } = await driverToday();
   const defaultDate =
-    year && /^\d{4}$/.test(year) && Number(year) !== new Date().getFullYear()
+    year && /^\d{4}$/.test(year) && year !== today.slice(0, 4)
       ? `${year}-01-01`
-      : todayIso();
+      : today;
 
   const initial: CapitalAsset = {
     ...EMPTY_CAPITAL_ASSET,

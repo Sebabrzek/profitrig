@@ -13,6 +13,7 @@ import {
   startOfMonth,
   type Load,
 } from "@/lib/loads";
+import { driverToday } from "@/lib/driverClock";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadForm } from "../LoadForm";
 
@@ -52,10 +53,11 @@ export default async function NewLoadPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
-  // Default to "today" for new loads. If the caller passed ?date=..., use
-  // that month for MTD context instead so the form previews the right
-  // calendar month.
-  const newLoadDate = params.date ? new Date(params.date + "T12:00:00") : new Date();
+  // Default to the driver's today — not the UTC server's, which is already
+  // tomorrow on a US evening. If the caller passed ?date=..., use that month
+  // for MTD context instead so the form previews the right calendar month.
+  const { iso: today, now } = await driverToday();
+  const newLoadDate = params.date ? new Date(params.date + "T12:00:00") : now;
   const monthFrom = startOfMonth(newLoadDate);
   const monthTo = endOfMonth(newLoadDate);
 
@@ -119,7 +121,7 @@ export default async function NewLoadPage({
 
   const initial: Load = {
     ...EMPTY_LOAD,
-    load_date: params.date || EMPTY_LOAD.load_date,
+    load_date: params.date || today,
   };
 
   return (

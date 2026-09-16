@@ -15,6 +15,13 @@
  *      Loads tab and the calculator disagreed about what a mile costs.
  *   4. Meals must never reach the tax report (the per-diem worksheet already
  *      reports them) and estimates must never be reported as receipts.
+ *   5. "Today" came from the UTC server, so a Sunday-evening load in
+ *      California defaulted to Monday and landed in the wrong week.
+ *   6. Weeks were fixed to Monday–Sunday while carrier settlements can run
+ *      Sunday–Saturday, so a Sunday load could never match its paycheck.
+ *   7. A past week re-priced silently — +$1,034 on the Friday, −$660 two
+ *      weeks later — when the driver stopped logging. The week CSV also
+ *      priced a week from that week's loads alone and disagreed with the tab.
  *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
@@ -24,7 +31,16 @@ import {
   aggregateWeek,
   buildMtdContext,
   computeLoadEconomics,
+  describeMonthAllocation,
+  endOfWeek,
+  formatWeekLabel,
+  isoDate,
+  monthRangeForWeek,
   monthStatsByLoad,
+  parseDateParam,
+  parseWeekStart,
+  startOfWeek,
+  todayIsoIn,
   type Load,
 } from "../src/lib/loads";
 import {
@@ -282,6 +298,174 @@ check("no toll line appears when no toll was entered", !groupsJson.includes("tol
 check(
   "Schedule C total equals the non-food road expenses",
   Math.abs(groups.reduce((s, g) => s + g.amount, 0) - 393.3) < 0.001
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("Weeks start on the day the driver's pay week starts");
+// ─────────────────────────────────────────────────────────────────────
+
+// 13 Sep 2026 is a Sunday. Real D. Lewis settlements run Sunday → Saturday.
+const sunday13 = parseDateParam("2026-09-13");
+check(
+  "the default week is unchanged: that Sunday closes Mon 7 → Sun 13",
+  isoDate(startOfWeek(sunday13)) === "2026-09-07" && isoDate(endOfWeek(sunday13)) === "2026-09-13"
+);
+check(
+  "a Sunday week opens on that Sunday: Sun 13 → Sat 19",
+  isoDate(startOfWeek(sunday13, "sunday")) === "2026-09-13" &&
+    isoDate(endOfWeek(sunday13, "sunday")) === "2026-09-19"
+);
+check(
+  "every day maps back to its week's first day, in both kinds of week",
+  ["13", "14", "15", "16", "17", "18", "19"].every(
+    (d) => isoDate(startOfWeek(parseDateParam(`2026-09-${d}`), "sunday")) === "2026-09-13"
+  ) &&
+    ["14", "15", "16", "17", "18", "19", "20"].every(
+      (d) => isoDate(startOfWeek(parseDateParam(`2026-09-${d}`))) === "2026-09-14"
+    )
+);
+const sundayWeekLabel = formatWeekLabel(startOfWeek(sunday13, "sunday"));
+check("a Sunday week's label ends on Saturday", sundayWeekLabel === "Sep 13–19, 2026", sundayWeekLabel);
+const flipKeepsWeek = (iso: string) => {
+  const d = parseDateParam(iso);
+  const dayBeforeMondayWeek = startOfWeek(d, "monday");
+  dayBeforeMondayWeek.setDate(dayBeforeMondayWeek.getDate() - 1);
+  return isoDate(startOfWeek(d, "sunday")) === isoDate(dayBeforeMondayWeek);
+};
+check(
+  "the Prev/Next mid-week day keeps the same week on screen when the setting flips",
+  flipKeepsWeek("2026-09-16") && flipKeepsWeek("2026-09-17")
+);
+check("…which a week's first day would not: a Sunday jumps a whole week", !flipKeepsWeek("2026-09-13"));
+check(
+  "anything but exactly \"sunday\" is a Monday week",
+  parseWeekStart(null) === "monday" && parseWeekStart("Sunday") === "monday" && parseWeekStart("sunday") === "sunday"
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("Today is the driver's day, not the server's");
+// ─────────────────────────────────────────────────────────────────────
+
+// Sunday 13 Sep, 8:30pm in California — already Monday in UTC.
+const sundayEvening = new Date(Date.parse("2026-09-13T20:30:00-07:00"));
+check(
+  "a California driver's Sunday evening is still Sunday",
+  todayIsoIn("America/Los_Angeles", sundayEvening) === "2026-09-13"
+);
+check("the UTC server calls it Monday — the old bug", todayIsoIn("UTC", sundayEvening) === "2026-09-14");
+check("a New York driver at 11:30pm is still on Sunday", todayIsoIn("America/New_York", sundayEvening) === "2026-09-13");
+check(
+  "so a new load lands in the week that Sunday belongs to",
+  isoDate(startOfWeek(parseDateParam(todayIsoIn("America/Los_Angeles", sundayEvening)))) === "2026-09-07"
+);
+check(
+  "a made-up time zone falls back instead of crashing",
+  todayIsoIn("Mars/Olympus_Mons", sundayEvening) === isoDate(sundayEvening)
+);
+check("no time zone at all falls back too", todayIsoIn(undefined, sundayEvening) === isoDate(sundayEvening));
+
+// ─────────────────────────────────────────────────────────────────────
+section("A driver who starts mid-week");
+// ─────────────────────────────────────────────────────────────────────
+
+const trip = (d: string) => load({ load_date: d, loaded_miles: 500, deadhead_miles: 50, linehaul_pay: 1500 });
+const firstFixedMonthly =
+  profile.truck_payment + profile.trailer_payment + profile.insurance + profile.eld_subscriptions +
+  profile.permits_irp_ifta + profile.office_misc + profile.load_board_per_month + profile.other_monthly_bill;
+const sepPriced = (loads: Load[], now: Date) => {
+  const s = monthStatsByLoad(loads).get("2026-09")!;
+  return (l: Load) =>
+    computeLoadEconomics(l, profile, buildMtdContext(l.load_date, s.miles - l.loaded_miles - l.deadhead_miles, s.firstDay, now));
+};
+
+// Signs up Wednesday 16 Sep and logs Wed–Fri.
+const midWeek = [trip("2026-09-16"), trip("2026-09-17"), trip("2026-09-18")];
+const midStats = monthStatsByLoad(midWeek);
+const fridayNight = new Date(2026, 8, 18, 20);
+const firstWeek = aggregateWeek(midWeek, profile, midStats, 0, fridayNight);
+const firstWeekFixed = midWeek.map(sepPriced(midWeek, fridayNight)).reduce((s, e) => s + e.allocatedFixedCost, 0);
+
+check(
+  "their first days are priced at their own monthly-miles estimate",
+  describeMonthAllocation("2026-09", midStats.get("2026-09")!, profile, fridayNight).basis === "monthly_estimate"
+);
+check(
+  "their fixed cost per mile matches the calculator exactly",
+  Math.abs(firstWeekFixed / 1650 - firstFixedMonthly / profile.monthly_miles) < 0.0001,
+  `$${(firstWeekFixed / 1650).toFixed(4)}/mi`
+);
+check("a normal first week shows a profit", firstWeek.profit > 0, `$${firstWeek.profit.toFixed(0)}`);
+
+// ─────────────────────────────────────────────────────────────────────
+section("A past week's profit moves — and the week says why");
+// ─────────────────────────────────────────────────────────────────────
+
+const sep30 = new Date(2026, 8, 30, 20);
+const stoppedWeek = aggregateWeek(midWeek, profile, midStats, 0, sep30);
+const stoppedNote = describeMonthAllocation("2026-09", midStats.get("2026-09")!, profile, sep30);
+const keptLogging = [...midWeek, ...["21", "22", "23", "24", "25", "28", "29", "30"].map((d) => trip(`2026-09-${d}`))];
+const keptStats = monthStatsByLoad(keptLogging);
+const keptWeek = aggregateWeek(midWeek, profile, keptStats, 0, sep30);
+const keptNote = describeMonthAllocation("2026-09", keptStats.get("2026-09")!, profile, sep30);
+
+check(
+  "the same three loads swing from profit to loss when logging stops",
+  firstWeek.profit > 0 && stoppedWeek.profit < 0,
+  `$${firstWeek.profit.toFixed(0)} → $${stoppedWeek.profit.toFixed(0)}`
+);
+check(
+  "…and the note explains it: real pace, well under the estimate",
+  stoppedNote.basis === "actual_mtd" && stoppedNote.lowPace && Math.round(stoppedNote.basisMiles) === 3300,
+  `${Math.round(stoppedNote.basisMiles)} mi/month`
+);
+check("a driver who kept logging gets no warning", keptNote.basis === "actual_mtd" && !keptNote.lowPace);
+check("and their week stays profitable", keptWeek.profit > 0, `$${keptWeek.profit.toFixed(0)}`);
+check("an open month is never called settled", !stoppedNote.final && !keptNote.final);
+check(
+  "once the month is over its share is settled",
+  describeMonthAllocation("2026-09", keptStats.get("2026-09")!, profile, new Date(2026, 9, 5)).final
+);
+check(
+  "the note reads the exact rule that priced the loads",
+  keptNote.basisMiles === sepPriced(keptLogging, sep30)(midWeek[0]).allocationBasisMiles
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("The week CSV prices a week the way the Loads tab does");
+// ─────────────────────────────────────────────────────────────────────
+
+// The same Wed–Fri week, for a driver who also hauled on the 1st–3rd.
+const monthOfLoads = [trip("2026-09-01"), trip("2026-09-02"), trip("2026-09-03"), ...midWeek];
+const pricedFromWeekOnly = aggregateWeek(midWeek, profile, monthStatsByLoad(midWeek), 0, fridayNight);
+const pricedFromMonth = aggregateWeek(midWeek, profile, monthStatsByLoad(monthOfLoads), 0, fridayNight);
+check(
+  "pricing a week from its own loads alone gives a different profit",
+  Math.abs(pricedFromWeekOnly.profit - pricedFromMonth.profit) > 100,
+  `$${pricedFromWeekOnly.profit.toFixed(0)} vs $${pricedFromMonth.profit.toFixed(0)}`
+);
+const midRange = monthRangeForWeek(
+  startOfWeek(parseDateParam("2026-09-16")),
+  endOfWeek(parseDateParam("2026-09-16"))
+);
+check("the fetch range is the whole month around the week", midRange.from === "2026-09-01" && midRange.to === "2026-09-30");
+const edgeRange = monthRangeForWeek(
+  startOfWeek(parseDateParam("2026-09-30"), "sunday"),
+  endOfWeek(parseDateParam("2026-09-30"), "sunday")
+);
+check(
+  "a week running into October fetches both months",
+  edgeRange.from === "2026-09-01" && edgeRange.to === "2026-10-31",
+  `${edgeRange.from} → ${edgeRange.to}`
+);
+check(
+  "loads fetched with that range price the week exactly like the tab",
+  aggregateWeek(
+    midWeek,
+    profile,
+    monthStatsByLoad(monthOfLoads.filter((l) => l.load_date >= midRange.from && l.load_date <= midRange.to)),
+    0,
+    fridayNight
+  ).profit === pricedFromMonth.profit
 );
 
 // ─────────────────────────────────────────────────────────────────────

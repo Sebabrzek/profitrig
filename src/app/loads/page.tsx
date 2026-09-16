@@ -9,22 +9,24 @@ import { BottomNav } from "@/components/BottomNav";
 import { type CostProfile } from "../actions";
 import {
   type Load,
+  type MonthAllocationNote,
   aggregateWeek,
   buildMtdContext,
   computeLoadEconomics,
-  endOfMonth,
+  describeMonthAllocation,
   endOfWeek,
   formatWeekLabel,
   isoDate,
   loadMonthKey,
+  monthRangeForWeek,
   monthStatsByLoad,
   parseDateParam,
-  startOfMonth,
   startOfWeek,
-  todayIso,
 } from "@/lib/loads";
+import { driverToday, fetchWeekStart } from "@/lib/driverClock";
 import { RoadExpenseCard } from "@/components/RoadExpenseCard";
 import { sumRoadExpenses, type RoadExpense } from "@/lib/roadExpenses";
+import { WeekStartToggle } from "./WeekStartToggle";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -64,6 +66,35 @@ function profileIsConfigured(p: CostProfile): boolean {
   return p.monthly_miles > 0 && (p.mpg > 0 || p.maintenance_per_mile > 0);
 }
 
+function roundedMiles(n: number) {
+  return Math.round(n).toLocaleString("en-US");
+}
+
+/**
+ * Why this week's loads carry the share of monthly bills they do, and whether
+ * that can still change. Without it an old week's profit moves with no reason
+ * given — a profitable week can read as a loss two weeks later.
+ */
+function allocationNoteText(note: MonthAllocationNote): string {
+  const month = new Date(`${note.monthKey}-15T12:00:00`).toLocaleString(
+    "en-US",
+    { month: "long" }
+  );
+  const estimate = `${roundedMiles(note.estimateMiles)} mi/month estimate`;
+  if (note.final) {
+    return note.basis === "actual_mtd"
+      ? `${month} is over, so its bills are settled: spread over the ${roundedMiles(note.basisMiles)} miles you logged.`
+      : `${month} is over, so its bills are settled at your ${estimate} — not enough of the month was logged to use your real miles.`;
+  }
+  if (note.basis === "monthly_estimate") {
+    return `Monthly bills (truck payment, insurance…) are spread at your ${estimate} until you've logged about a week of ${month}. Profit here can still change this month.`;
+  }
+  const pace = `Monthly bills are spread over your real ${month} pace — about ${roundedMiles(note.basisMiles)} mi/month so far — so this week's profit keeps moving until ${month} ends.`;
+  return note.lowPace
+    ? `${pace} That's well under your ${estimate}. If you've hauled loads you haven't logged, add them — every missing load makes the logged ones carry more of your bills.`
+    : pace;
+}
+
 export default async function LoadsPage({
   searchParams,
 }: {
@@ -79,28 +110,26 @@ export default async function LoadsPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
-  // Resolve target week
-  const targetDate = parseDateParam(params.week);
-  const weekStart = startOfWeek(targetDate);
-  const weekEnd = endOfWeek(targetDate);
+  // Resolve the target week on the DRIVER's calendar, in the week they chose.
+  const [{ iso: today, now }, weekStartsOn] = await Promise.all([
+    driverToday(),
+    fetchWeekStart(supabase, user.id),
+  ]);
+  const targetDate = params.week ? parseDateParam(params.week) : now;
+  const weekStart = startOfWeek(targetDate, weekStartsOn);
+  const weekEnd = endOfWeek(targetDate, weekStartsOn);
+  // Prev/Next carry a mid-week day, not the week's first day. A mid-week day
+  // sits in both the Sunday and the Monday version of the same week, so
+  // switching the setting keeps the driver's week on screen. A Sunday in the
+  // URL would jump them back a whole week.
   const prevWeek = new Date(weekStart);
-  prevWeek.setDate(prevWeek.getDate() - 7);
+  prevWeek.setDate(prevWeek.getDate() - 7 + 3);
   const nextWeek = new Date(weekStart);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setDate(nextWeek.getDate() + 7 + 3);
 
-  // Fetch broader month range so we can compute MTD-based fixed-cost
-  // allocation for every load in the displayed week, even when a week
-  // crosses a month boundary.
-  const monthFromCandidate = startOfMonth(weekStart);
-  const monthToCandidate = endOfMonth(weekEnd);
-  const monthFrom =
-    monthFromCandidate < startOfMonth(weekEnd)
-      ? monthFromCandidate
-      : startOfMonth(weekEnd);
-  const monthTo =
-    monthToCandidate > endOfMonth(weekStart)
-      ? monthToCandidate
-      : endOfMonth(weekStart);
+  // Every day of each month the week touches, so each load's fixed-cost
+  // share comes from its whole month — even when the week crosses months.
+  const monthRange = monthRangeForWeek(weekStart, weekEnd);
 
   const [costRes, monthLoadsRes, roadExpensesRes] = await Promise.all([
     supabase
@@ -112,8 +141,8 @@ export default async function LoadsPage({
       .from("loads")
       .select("*")
       .eq("user_id", user.id)
-      .gte("load_date", isoDate(monthFrom))
-      .lte("load_date", isoDate(monthTo))
+      .gte("load_date", monthRange.from)
+      .lte("load_date", monthRange.to)
       .order("load_date", { ascending: false })
       .order("created_at", { ascending: false }),
     // Road expenses for the displayed week only — they aren't part of the
@@ -211,8 +240,25 @@ export default async function LoadsPage({
   }));
   const monthStats = monthStatsByLoad(monthLoads);
 
-  const totals = aggregateWeek(loads, profile, monthStats, roadExpenseTotal);
+  const totals = aggregateWeek(
+    loads,
+    profile,
+    monthStats,
+    roadExpenseTotal,
+    now
+  );
   const isConfigured = profileIsConfigured(profile);
+
+  // One note per month this week's loads fall in (two when a week crosses
+  // months), explaining the fixed-cost share and whether it can still move.
+  const allocationNotes = [
+    ...new Set(loads.map((l) => loadMonthKey(l.load_date))),
+  ]
+    .sort()
+    .flatMap((key) => {
+      const stats = monthStats.get(key);
+      return stats ? [describeMonthAllocation(key, stats, profile, now)] : [];
+    });
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -267,6 +313,7 @@ export default async function LoadsPage({
             Next →
           </Link>
         </div>
+        <WeekStartToggle value={weekStartsOn} />
 
         {/* Weekly summary */}
         <div
@@ -325,14 +372,32 @@ export default async function LoadsPage({
           </div>
         </div>
 
+        {/* Why this week's fixed-cost share is what it is */}
+        {isConfigured && allocationNotes.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            {allocationNotes.map((note) => (
+              <p
+                key={note.monthKey}
+                className={`text-xs leading-snug rounded-xl border px-3 py-2.5 ${
+                  note.lowPace
+                    ? "bg-amber-50 border-amber-200 text-amber-900"
+                    : "bg-white border-border text-muted"
+                }`}
+              >
+                {allocationNoteText(note)}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* Other expenses this week (not tied to a single load) */}
         <RoadExpenseCard
           rows={roadExpenses}
           weekStartIso={isoDate(weekStart)}
           weekEndIso={isoDate(weekEnd)}
           defaultDateIso={
-            todayIso() >= isoDate(weekStart) && todayIso() <= isoDate(weekEnd)
-              ? todayIso()
+            today >= isoDate(weekStart) && today <= isoDate(weekEnd)
+              ? today
               : isoDate(weekStart)
           }
         />
@@ -404,7 +469,8 @@ export default async function LoadsPage({
                 buildMtdContext(
                   load.load_date,
                   Math.max(0, (stats?.miles ?? 0) - ownMiles),
-                  stats?.firstDay ?? 1
+                  stats?.firstDay ?? 1,
+                  now
                 )
               );
               const dateLabel = new Date(

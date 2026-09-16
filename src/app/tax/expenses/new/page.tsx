@@ -6,7 +6,8 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { BottomNav } from "@/components/BottomNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
-import { EMPTY_EXPENSE, type Expense, todayIso } from "@/lib/tax/types";
+import { EMPTY_EXPENSE, type Expense } from "@/lib/tax/types";
+import { driverToday } from "@/lib/driverClock";
 import { ExpenseForm } from "../ExpenseForm";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +28,13 @@ export default async function NewExpensePage({
 
   // If a target year was passed, default the expense_date to Jan 1 of that
   // year so the entry lands in the right bucket (driver can still pick the
-  // real date).
+  // real date). "Today" is the driver's: on the UTC server a New Year's Eve
+  // receipt entered that evening would default into next tax year.
+  const { iso: today } = await driverToday();
   const defaultDate =
-    year && /^\d{4}$/.test(year) && Number(year) !== new Date().getFullYear()
+    year && /^\d{4}$/.test(year) && year !== today.slice(0, 4)
       ? `${year}-01-01`
-      : todayIso();
+      : today;
 
   const initial: Expense = { ...EMPTY_EXPENSE, expense_date: defaultDate };
 
