@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/Wordmark";
 import { HeaderNav } from "@/components/HeaderNav";
@@ -7,6 +8,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm, type PastLoadsWithoutSplit } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
+import { HistoryList, type Snapshot } from "./HistoryList";
 
 export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
@@ -18,6 +20,7 @@ export default async function ProfilePage() {
   let email = "";
   let userIsPro = false;
   let pastLoads: PastLoadsWithoutSplit = { count: 0, from: null, to: null };
+  let snapshots: Snapshot[] = [];
   if (user) {
     email = user.email ?? "";
     userIsPro = isPro(await fetchSubscription(supabase, user.id));
@@ -51,10 +54,28 @@ export default async function ProfilePage() {
         .select("load_date", { count: "exact" })
         .eq("user_id", user.id)
         .is("carrier_pct", null);
-    const [first, last] = await Promise.all([
+    const [first, last, snapRes] = await Promise.all([
       unsplit().order("load_date", { ascending: true }).limit(1),
       unsplit().order("load_date", { ascending: false }).limit(1),
+      // Every column, so snapshots still list before migration 014 adds
+      // the carrier columns.
+      supabase
+        .from("cost_profile_snapshots")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
     ]);
+    snapshots = (snapRes.data ?? []).map((s) => ({
+      id: s.id,
+      label: s.label ?? null,
+      total_cpm: Number(s.total_cpm) || 0,
+      required_rate: Number(s.required_rate) || 0,
+      monthly_miles: Number(s.monthly_miles) || 0,
+      desired_profit_per_mile: Number(s.desired_profit_per_mile) || 0,
+      created_at: s.created_at,
+      carrier_name: s.carrier_name ?? null,
+      carrier_pct: s.carrier_pct == null ? null : Number(s.carrier_pct),
+    }));
     if (!first.error && !last.error) {
       pastLoads = {
         count: first.count ?? 0,
@@ -87,6 +108,32 @@ export default async function ProfilePage() {
         <div className="mt-4">
           <FeedbackCard />
         </div>
+
+        <section id="history" className="mt-8 scroll-mt-20">
+          <h2 className="text-lg font-bold mb-1">Carrier &amp; rate history</h2>
+          <p className="text-sm text-muted mb-4">
+            Every snapshot you save on the calculator, newest first: who you
+            were driving for, your cost per mile, and your target rate. Load
+            one back into the calculator anytime.
+          </p>
+          {snapshots.length === 0 ? (
+            <div className="bg-white border border-border rounded-2xl p-6 text-center">
+              <p className="text-sm text-muted">
+                No snapshots yet. On the{" "}
+                <Link href="/" className="text-brand font-semibold">
+                  calculator
+                </Link>
+                , tap{" "}
+                <span className="font-semibold text-foreground">
+                  Save a dated snapshot
+                </span>{" "}
+                to record your first one.
+              </p>
+            </div>
+          ) : (
+            <HistoryList snapshots={snapshots} />
+          )}
+        </section>
       </div>
       <BottomNav isPro={userIsPro} />
     </main>

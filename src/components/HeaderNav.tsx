@@ -10,6 +10,7 @@ type Variant =
   | "loads"
   | "tax"
   | "history"
+  | "fuel"
   | "profile"
   | "admin"
   | "upgrade";

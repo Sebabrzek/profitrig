@@ -12,7 +12,21 @@ export type Snapshot = {
   monthly_miles: number;
   desired_profit_per_mile: number;
   created_at: string;
+  /** Carrier and split when the snapshot was saved. 0% = independent;
+   *  null on snapshots saved before carriers were recorded. */
+  carrier_name: string | null;
+  carrier_pct: number | null;
 };
+
+function carrierLine(s: Snapshot): string | null {
+  if (s.carrier_pct != null && s.carrier_pct > 0) {
+    const kept = Number((100 - s.carrier_pct).toFixed(2));
+    return `Leased to ${s.carrier_name || "a carrier"} · kept ${kept}%`;
+  }
+  if (s.carrier_pct === 0) return "Independent · kept 100%";
+  if (s.carrier_name) return `Leased to ${s.carrier_name}`;
+  return null;
+}
 
 const money = (n: number) =>
   Number.isFinite(n)
@@ -87,6 +101,11 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
                 {s.label || "Untitled save"}
               </p>
               <p className="text-xs text-muted">{formatDate(s.created_at)}</p>
+              {carrierLine(s) && (
+                <p className="text-xs font-semibold text-foreground/80 mt-0.5">
+                  {carrierLine(s)}
+                </p>
+              )}
             </div>
             <div className="text-right shrink-0">
               <p className="text-xs text-muted">Cost / mile</p>

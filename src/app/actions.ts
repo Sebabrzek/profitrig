@@ -131,6 +131,8 @@ export async function saveProfileAction(
   return { ok: true };
 }
 
+import { fetchDriverSettings } from "@/lib/driverSettings";
+
 export async function saveSnapshotAction(
   profile: CostProfile,
   label: string
@@ -163,6 +165,19 @@ export async function saveSnapshotAction(
 
   const { totalCpm, requiredRate } = computeTotals(profile);
 
+  // Stamp who they were driving for, so the history on Profile doubles as a
+  // record of carriers and splits over time. 0% marks an independent.
+  const settings = await fetchDriverSettings(supabase, user.id);
+  const carrierName = settings.carrierName.trim();
+  const carrierStamp =
+    settings.carrierPct != null
+      ? { carrier_name: carrierName || null, carrier_pct: settings.carrierPct }
+      : settings.authorityType === "own_mc"
+        ? { carrier_pct: 0 }
+        : carrierName
+          ? { carrier_name: carrierName }
+          : {};
+
   // cost_profile_snapshots does not have a real_cpm_override column — the
   // override is a "live" management number on the current profile only, not
   // a snapshotable concept. Strip it out so the INSERT does not fail with
@@ -179,10 +194,11 @@ export async function saveSnapshotAction(
       other_label: snapshotPayload.other_label.trim() || null,
       total_cpm: totalCpm,
       required_rate: requiredRate,
+      ...carrierStamp,
     });
   if (snapErr) return { ok: false, error: snapErr.message };
 
-  revalidatePath("/history");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -436,7 +452,7 @@ export async function deleteSnapshotAction(
     .eq("user_id", user.id);
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/history");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -611,6 +627,135 @@ async function siteOrigin(): Promise<string> {
   const proto =
     h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   return `${proto}://${host}`;
+}
+
+import type { Rig } from "@/lib/fuel";
+
+/** The driver's truck and the odometer they started tracking fuel from. */
+export async function saveRigAction(
+  rig: Rig
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const latestModelYear = new Date().getFullYear() + 1;
+  if (
+    rig.year != null &&
+    (!Number.isInteger(rig.year) || rig.year < 1950 || rig.year > latestModelYear)
+  ) {
+    return { ok: false, error: `Year must be between 1950 and ${latestModelYear}.` };
+  }
+  if (
+    rig.transmission !== "" &&
+    rig.transmission !== "automatic" &&
+    rig.transmission !== "manual"
+  ) {
+    return { ok: false, error: "Pick automatic or manual." };
+  }
+  if (
+    rig.starting_odometer != null &&
+    (!Number.isFinite(rig.starting_odometer) ||
+      rig.starting_odometer < 0 ||
+      rig.starting_odometer > 10_000_000)
+  ) {
+    return { ok: false, error: "That starting odometer doesn't look right." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const text = (v: string) => v.trim().slice(0, 60) || null;
+  const { error } = await supabase.from("rigs").upsert(
+    {
+      user_id: user.id,
+      make: text(rig.make),
+      model: text(rig.model),
+      year: rig.year,
+      engine: text(rig.engine),
+      transmission: rig.transmission || null,
+      starting_odometer:
+        rig.starting_odometer == null
+          ? null
+          : Math.round(rig.starting_odometer * 10) / 10,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+  if (error) {
+    return {
+      ok: false,
+      error: "Couldn't save your truck. Try again, or tap Talk to a human.",
+    };
+  }
+  revalidatePath("/fuel");
+  return { ok: true };
+}
+
+/** One week on the Fuel tab: the odometer now and gallons bought since the last reading. */
+export async function addFuelLogAction(input: {
+  logged_on: string;
+  odometer: number;
+  gallons: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.logged_on)) {
+    return { ok: false, error: "Pick a date." };
+  }
+  const odometer = Number(input.odometer);
+  const gallons = Number(input.gallons);
+  if (!Number.isFinite(odometer) || odometer <= 0 || odometer > 10_000_000) {
+    return { ok: false, error: "Enter the odometer reading." };
+  }
+  if (!Number.isFinite(gallons) || gallons <= 0) {
+    return { ok: false, error: "Enter the gallons you filled up." };
+  }
+  if (gallons > 5000) {
+    return {
+      ok: false,
+      error: "That's more fuel than a week of driving — double-check the gallons.",
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase.from("fuel_logs").insert({
+    user_id: user.id,
+    logged_on: input.logged_on,
+    odometer: Math.round(odometer * 10) / 10,
+    gallons: Math.round(gallons * 100) / 100,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: "Couldn't save that week. Try again, or tap Talk to a human.",
+    };
+  }
+  revalidatePath("/fuel");
+  return { ok: true };
+}
+
+export async function deleteFuelLogAction(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("fuel_logs")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) {
+    return { ok: false, error: "Couldn't delete that week. Try again." };
+  }
+  revalidatePath("/fuel");
+  return { ok: true };
 }
 
 export async function createCheckoutAction(input: {

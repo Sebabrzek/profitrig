@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicApi =
     pathname.startsWith("/api/stripe") || pathname.startsWith("/api/chat");
   // Phase 0.6: the calculator landing page is public. Visitors can play
-  // with the math; saving prompts an account. /loads, /history, /profile,
+  // with the math; saving prompts an account. /loads, /fuel, /profile,
   // /admin remain auth-gated below.
   const isPublicPage = pathname === "/";
 

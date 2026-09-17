@@ -59,6 +59,7 @@ import {
   buildScheduleCGroups,
 } from "../src/lib/tax/report";
 import type { CostProfile } from "../src/app/actions";
+import { computeFuelStats, isPlausibleMpg } from "../src/lib/fuel";
 
 let failures = 0;
 let checks = 0;
@@ -544,6 +545,67 @@ check(
 check(
   "the tax report still shows what the loads paid, until the 1099 question is settled",
   aggregateRevenue(settlementC).linehaul === 11790
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("Fuel tab: real miles per gallon");
+// ─────────────────────────────────────────────────────────────────────
+
+const fuelWeeks = [
+  { logged_on: "2026-09-06", odometer: 502500, gallons: 400 }, // 2,500 mi
+  { logged_on: "2026-09-13", odometer: 505100, gallons: 410 }, // 2,600 mi
+  { logged_on: "2026-09-20", odometer: 507300, gallons: 350 }, // 2,200 mi
+];
+const fuel = computeFuelStats(500000, fuelWeeks);
+check(
+  "a week's MPG is miles since the last reading ÷ gallons",
+  fuel.entries.find((e) => e.odometer === 502500)!.mpg === 6.25
+);
+check(
+  "the average is total miles ÷ total gallons, not an average of weeks",
+  fuel.averageMpg === 7300 / 1160 && fuel.milesTracked === 7300 && fuel.gallonsTracked === 1160,
+  `${fuel.averageMpg!.toFixed(2)} MPG`
+);
+check(
+  "the newest week is listed first and is the latest MPG",
+  fuel.entries[0].odometer === 507300 && fuel.latestMpg === 2200 / 350 && fuel.lastOdometer === 507300
+);
+check(
+  "weeks entered out of order still measure from the right reading",
+  computeFuelStats(500000, [fuelWeeks[2], fuelWeeks[0], fuelWeeks[1]]).averageMpg === fuel.averageMpg
+);
+
+const noStartingOdometer = computeFuelStats(null, fuelWeeks);
+check(
+  "without a starting odometer, the first reading becomes the starting point",
+  noStartingOdometer.entries[noStartingOdometer.entries.length - 1].status === "baseline" &&
+    noStartingOdometer.averageMpg === 4800 / 760
+);
+
+// A week that closes on a half-empty tank reads high, and the next one low.
+const partialFill = computeFuelStats(500000, [
+  { logged_on: "2026-09-06", odometer: 502500, gallons: 150 },
+  { logged_on: "2026-09-13", odometer: 505100, gallons: 660 },
+]);
+check(
+  "a week no semi could get is flagged for checking",
+  partialFill.entries.find((e) => e.odometer === 502500)!.status === "check"
+);
+check(
+  "…but the average still comes out true, because fill-up timing cancels out",
+  partialFill.averageMpg === 5100 / 810,
+  `${partialFill.averageMpg!.toFixed(2)} MPG`
+);
+
+const typo = computeFuelStats(500000, [...fuelWeeks, { logged_on: "2026-09-27", odometer: 450730, gallons: 380 }]);
+check(
+  "a reading below the one before it is flagged and left out of the average",
+  typo.entries.some((e) => e.status === "odometer") && typo.averageMpg === fuel.averageMpg
+);
+check("no weeks yet means no average, not zero", computeFuelStats(500000, []).averageMpg === null);
+check(
+  "normal semi MPG passes the sanity check, nonsense doesn't",
+  isPlausibleMpg(6.5) && !isPlausibleMpg(25) && !isPlausibleMpg(1.2)
 );
 
 // ─────────────────────────────────────────────────────────────────────

@@ -48,12 +48,12 @@ export function BottomNav({ isPro = false }: Props) {
       icon: <ReceiptIcon />,
     },
     {
-      key: "history",
-      label: "History",
-      href: "/history",
-      active: pathname.startsWith("/history"),
+      key: "fuel",
+      label: "Fuel",
+      href: "/fuel",
+      active: pathname.startsWith("/fuel"),
       locked: false,
-      icon: <ClockIcon />,
+      icon: <FuelIcon />,
     },
     {
       key: "profile",
@@ -152,7 +152,7 @@ function TruckIcon() {
   );
 }
 
-function ClockIcon() {
+function FuelIcon() {
   return (
     <svg
       width="24"
@@ -164,8 +164,10 @@ function ClockIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <circle cx="12" cy="12" r="9" />
-      <polyline points="12 7 12 12 15 14" />
+      <path d="M4 21 L4 5 a2 2 0 0 1 2 -2 h6 a2 2 0 0 1 2 2 v16" />
+      <line x1="3" y1="21" x2="15" y2="21" />
+      <rect x="7" y="6" width="4" height="4" rx="0.5" />
+      <path d="M14 11 h2 a2 2 0 0 1 2 2 v3 a1.5 1.5 0 0 0 3 0 v-7 l-3 -3" />
     </svg>
   );
 }

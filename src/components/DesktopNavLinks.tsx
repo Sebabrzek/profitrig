@@ -27,10 +27,10 @@ const items: { key: string; label: string; href: (isPro: boolean) => string; mat
     match: (p) => p.startsWith("/tax"),
   },
   {
-    key: "history",
-    label: "History",
-    href: () => "/history",
-    match: (p) => p.startsWith("/history"),
+    key: "fuel",
+    label: "Fuel",
+    href: () => "/fuel",
+    match: (p) => p.startsWith("/fuel"),
   },
   {
     key: "profile",

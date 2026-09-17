@@ -596,7 +596,7 @@ export function Calculator({
         )}
         <div className="mt-3 text-right">
           <Link
-            href="/history"
+            href="/profile#history"
             className="text-sm font-semibold text-brand hover:text-brand-dark"
           >
             View save history →
