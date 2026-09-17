@@ -4,6 +4,7 @@ import {
   computeLoadEconomics,
   endOfWeek,
   isoDate,
+  loadFromRow,
   loadMonthKey,
   monthRangeForWeek,
   monthStatsByLoad,
@@ -11,7 +12,8 @@ import {
   startOfWeek,
   type Load,
 } from "@/lib/loads";
-import { driverToday, fetchWeekStart } from "@/lib/driverClock";
+import { driverToday } from "@/lib/driverClock";
+import { fetchDriverSettings } from "@/lib/driverSettings";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { CostProfile } from "@/app/actions";
 import {
@@ -54,7 +56,10 @@ const HEADERS = [
   "Linehaul",
   "Fuel Surcharge",
   "Accessorials",
-  "Total Revenue",
+  "Load Pay",
+  "Carrier %",
+  "Carrier Keeps",
+  "Your Revenue",
   "Fuel Cost",
   "Fuel Source",
   "Maintenance Reserve",
@@ -115,26 +120,6 @@ function mapProfile(data: Record<string, unknown> | null): CostProfile {
   };
 }
 
-function mapLoad(r: Record<string, unknown>): Load {
-  return {
-    id: r.id as string,
-    load_date: r.load_date as string,
-    broker: (r.broker as string | null) ?? "",
-    origin: (r.origin as string | null) ?? "",
-    destination: (r.destination as string | null) ?? "",
-    loaded_miles: Number(r.loaded_miles) || 0,
-    deadhead_miles: Number(r.deadhead_miles) || 0,
-    linehaul_pay: Number(r.linehaul_pay) || 0,
-    fuel_surcharge: Number(r.fuel_surcharge) || 0,
-    accessorials: Number(r.accessorials) || 0,
-    fuel_actual: r.fuel_actual == null ? null : Number(r.fuel_actual),
-    tolls_actual: r.tolls_actual == null ? null : Number(r.tolls_actual),
-    lumpers_actual:
-      r.lumpers_actual == null ? null : Number(r.lumpers_actual),
-    notes: (r.notes as string | null) ?? "",
-  };
-}
-
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const range = (url.searchParams.get("range") ?? "week").toLowerCase();
@@ -182,7 +167,10 @@ export async function GET(request: Request) {
     fetchFrom = from;
     fetchTo = to;
   } else {
-    const weekStartsOn = await fetchWeekStart(supabase, user.id);
+    const { weekStart: weekStartsOn } = await fetchDriverSettings(
+      supabase,
+      user.id
+    );
     const ws = startOfWeek(target, weekStartsOn);
     const we = endOfWeek(target, weekStartsOn);
     from = isoDate(ws);
@@ -224,7 +212,7 @@ export async function GET(request: Request) {
 
   const profile = mapProfile(costRes.data as Record<string, unknown> | null);
   const fetched: Load[] = (loadsRes.data ?? []).map((r) =>
-    mapLoad(r as Record<string, unknown>)
+    loadFromRow(r as Record<string, unknown>)
   );
   // Rows cover only the requested range, but month stats use everything
   // fetched, so each load's fixed-cost share comes from its own whole month
@@ -240,6 +228,8 @@ export async function GET(request: Request) {
   let tLinehaul = 0;
   let tFsc = 0;
   let tAccessorials = 0;
+  let tLoadPay = 0;
+  let tCarrierCut = 0;
   let tRevenue = 0;
   let tFuel = 0;
   let tMaint = 0;
@@ -280,6 +270,9 @@ export async function GET(request: Request) {
         num(load.linehaul_pay),
         num(load.fuel_surcharge),
         num(load.accessorials),
+        num(e.loadPay),
+        e.carrierPct > 0 ? `${Number(e.carrierPct.toFixed(2))}%` : "",
+        num(e.carrierCut),
         num(e.revenue),
         num(e.fuelCost),
         e.fuelIsEstimated ? "Estimated" : "Actual",
@@ -304,6 +297,8 @@ export async function GET(request: Request) {
     tLinehaul += load.linehaul_pay;
     tFsc += load.fuel_surcharge;
     tAccessorials += load.accessorials;
+    tLoadPay += e.loadPay;
+    tCarrierCut += e.carrierCut;
     tRevenue += e.revenue;
     tFuel += e.fuelCost;
     tMaint += e.maintenanceCost;
@@ -335,6 +330,9 @@ export async function GET(request: Request) {
         num(tLinehaul),
         num(tFsc),
         num(tAccessorials),
+        num(tLoadPay),
+        "",
+        num(tCarrierCut),
         num(tRevenue),
         num(tFuel),
         "",
@@ -384,6 +382,9 @@ export async function GET(request: Request) {
     rows.push(
       csvRow([
         "NET AFTER OTHER EXPENSES",
+        "",
+        "",
+        "",
         "",
         "",
         "",

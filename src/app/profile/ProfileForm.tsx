@@ -1,8 +1,36 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveDriverProfileAction } from "../actions";
+import {
+  applyCarrierPctToPastLoadsAction,
+  saveCarrierPctAction,
+  saveDriverProfileAction,
+} from "../actions";
 import type { DriverProfile } from "@/lib/profile";
+
+export type PastLoadsWithoutSplit = {
+  /** Loads logged before the driver set a carrier % (carrier_pct is null). */
+  count: number;
+  from: string | null;
+  to: string | null;
+};
+
+const usd = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+
+const pctLabel = (n: number) => `${Number(n.toFixed(2))}%`;
+
+function shortDate(iso: string) {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 const US_STATES: { value: string; label: string }[] = [
   { value: "AL", label: "Alabama" },
@@ -58,12 +86,6 @@ const US_STATES: { value: string; label: string }[] = [
   { value: "WY", label: "Wyoming" },
 ];
 
-const AUTHORITY_OPTIONS = [
-  { value: "leased", label: "Leased to a carrier" },
-  { value: "own_mc", label: "I run on my own MC authority" },
-  { value: "both", label: "Both (own MC + leased trucks)" },
-];
-
 const TRAILER_OPTIONS = [
   { value: "dry_van", label: "Dry Van" },
   { value: "reefer", label: "Reefer" },
@@ -98,13 +120,70 @@ const inputClass =
 export function ProfileForm({
   initial,
   email,
+  pastLoads,
 }: {
   initial: DriverProfile;
   email: string;
+  pastLoads: PastLoadsWithoutSplit;
 }) {
   const [p, setP] = useState<DriverProfile>(initial);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<null | "ok" | string>(null);
+
+  // How you get paid. The switch starts on for anyone who already told us
+  // they're leased, even before they've entered the carrier's %.
+  const [leased, setLeased] = useState(
+    initial.carrier_pct != null ||
+      initial.authority_type === "leased" ||
+      initial.authority_type === "both"
+  );
+  const [pctText, setPctText] = useState(
+    initial.carrier_pct != null ? String(initial.carrier_pct) : ""
+  );
+  const [savedPct, setSavedPct] = useState<number | null>(initial.carrier_pct);
+  const [pastCount, setPastCount] = useState(pastLoads.count);
+  const [pastMessage, setPastMessage] = useState("");
+  const [applyPending, startApply] = useTransition();
+
+  const typedPct = pctText.trim() === "" ? null : Number(pctText);
+  const pctIsValid =
+    typedPct != null && Number.isFinite(typedPct) && typedPct > 0 && typedPct < 100;
+  const pastRange =
+    pastLoads.from && pastLoads.to
+      ? pastLoads.from === pastLoads.to
+        ? `on ${shortDate(pastLoads.from)}`
+        : `between ${shortDate(pastLoads.from)} and ${shortDate(pastLoads.to)}`
+      : "earlier";
+
+  function toggleLeased(on: boolean) {
+    setLeased(on);
+    setP((s) => ({
+      ...s,
+      authority_type: on
+        ? initial.authority_type === "both"
+          ? "both"
+          : "leased"
+        : "own_mc",
+    }));
+  }
+
+  function applyToPast(pct: number) {
+    setPastMessage("");
+    startApply(async () => {
+      const r = await applyCarrierPctToPastLoadsAction(pct);
+      if (!r.ok) {
+        setPastMessage(r.error);
+        return;
+      }
+      setPastCount(0);
+      const loads = r.updated === 1 ? "1 load" : `${r.updated} loads`;
+      setPastMessage(
+        pct > 0
+          ? `Done — ${loads} now count your ${pctLabel(100 - pct)} share.`
+          : `Done — ${loads} stay 100% yours.`
+      );
+    });
+  }
 
   type StringKey = {
     [K in keyof DriverProfile]: DriverProfile[K] extends string ? K : never;
@@ -115,14 +194,28 @@ export function ProfileForm({
 
   function save() {
     setSaved(null);
+    if (leased && typedPct != null && !pctIsValid) {
+      setSaved("Carrier % must be between 1 and 99.");
+      return;
+    }
+    // Off, or on without a % yet: loads keep counting 100% until one is added.
+    const nextPct = leased && pctIsValid ? typedPct : null;
     startTransition(async () => {
       const r = await saveDriverProfileAction(p);
-      if (r.ok) {
-        setSaved("ok");
-        setTimeout(() => setSaved(null), 2500);
-      } else {
+      if (!r.ok) {
         setSaved(r.error);
+        return;
       }
+      if (nextPct !== savedPct) {
+        const pr = await saveCarrierPctAction(nextPct);
+        if (!pr.ok) {
+          setSaved(pr.error);
+          return;
+        }
+        setSavedPct(nextPct);
+      }
+      setSaved("ok");
+      setTimeout(() => setSaved(null), 2500);
     });
   }
 
@@ -165,6 +258,117 @@ export function ProfileForm({
       </section>
 
       <section className="bg-white border border-border rounded-2xl p-5">
+        <h2 className="text-lg font-bold mb-1">How you get paid</h2>
+        <p className="text-sm text-muted mb-4">
+          This decides the revenue on every load you log.
+        </p>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            role="switch"
+            className="mt-1 h-5 w-5 rounded border-border accent-brand"
+            checked={leased}
+            onChange={(e) => toggleLeased(e.target.checked)}
+          />
+          <span className="text-sm">
+            <span className="font-semibold">I&apos;m leased to a carrier</span>
+            <br />
+            <span className="text-muted">
+              They keep a percentage of every load. Leave this off if you run
+              your own authority and keep 100%.
+            </span>
+          </span>
+        </label>
+
+        {leased ? (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Carrier you're leased to">
+              <input
+                className={inputClass}
+                value={p.carrier_name}
+                onChange={setStr("carrier_name")}
+              />
+            </Field>
+            <Field label="Carrier keeps" hint="Their cut of each load's total pay.">
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className={`${inputClass} pr-10`}
+                  value={pctText}
+                  placeholder="20"
+                  onChange={(e) =>
+                    setPctText(e.target.value.replace(/[^0-9.]/g, ""))
+                  }
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+                  %
+                </span>
+              </div>
+            </Field>
+            <p className="sm:col-span-2 text-sm leading-snug">
+              {pctIsValid && typedPct != null ? (
+                <>
+                  You keep{" "}
+                  <span className="font-bold">{pctLabel(100 - typedPct)}</span>
+                  : a $2,000 load pays you{" "}
+                  <span className="font-bold">
+                    {usd((2000 * (100 - typedPct)) / 100)}
+                  </span>
+                  . New loads use this, and you can change it on any single
+                  load.
+                </>
+              ) : (
+                <span className="text-muted">
+                  Add the % your carrier keeps. Until then your loads count
+                  100% of the pay as yours.
+                </span>
+              )}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted">
+            Independent: you keep 100% of every load you haul.
+          </p>
+        )}
+
+        {savedPct != null && pastCount > 0 && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+            <p className="font-semibold text-amber-950">
+              {pastCount === 1 ? "1 load" : `${pastCount} loads`} you logged{" "}
+              {pastRange} still {pastCount === 1 ? "counts" : "count"} 100% as
+              yours.
+            </p>
+            <p className="text-amber-900 mt-1">
+              Did your carrier keep {pctLabel(savedPct)} of{" "}
+              {pastCount === 1 ? "that one" : "those"} too?
+            </p>
+            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => applyToPast(savedPct)}
+                disabled={applyPending}
+                className="h-11 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold disabled:opacity-60 transition"
+              >
+                Yes — apply {pctLabel(savedPct)}
+              </button>
+              <button
+                type="button"
+                onClick={() => applyToPast(0)}
+                disabled={applyPending}
+                className="h-11 px-4 rounded-xl border border-border bg-white font-semibold hover:bg-gray-50 disabled:opacity-60 transition"
+              >
+                No — I kept 100% of those
+              </button>
+            </div>
+          </div>
+        )}
+        {pastMessage && (
+          <p className="mt-3 text-sm text-muted">{pastMessage}</p>
+        )}
+      </section>
+
+      <section className="bg-white border border-border rounded-2xl p-5">
         <h2 className="text-lg font-bold mb-4">Your Operation</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Company Name" hint="Your LLC or business name.">
@@ -173,13 +377,6 @@ export function ProfileForm({
               value={p.company_name}
               autoComplete="organization"
               onChange={setStr("company_name")}
-            />
-          </Field>
-          <Field label="Carrier You're Leased To" hint="Leave blank if own MC.">
-            <input
-              className={inputClass}
-              value={p.carrier_name}
-              onChange={setStr("carrier_name")}
             />
           </Field>
           <Field label="Domicile City">
@@ -200,20 +397,6 @@ export function ProfileForm({
               {US_STATES.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Authority">
-            <select
-              className={inputClass}
-              value={p.authority_type}
-              onChange={setStr("authority_type")}
-            >
-              <option value="">Select…</option>
-              {AUTHORITY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
                 </option>
               ))}
             </select>

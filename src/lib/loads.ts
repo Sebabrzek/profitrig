@@ -14,8 +14,52 @@ export type Load = {
   fuel_actual: number | null;
   tolls_actual: number | null;
   lumpers_actual: number | null;
+  /**
+   * Percent of this load's pay the carrier keeps, for a driver leased to a
+   * carrier. Stored on the load itself, so when a carrier changes the split
+   * (D. Lewis went 18% → 20% inside one month) past weeks keep the split
+   * they were actually paid at. null means never set: the driver keeps 100%.
+   */
+  carrier_pct: number | null;
   notes: string;
 };
+
+/**
+ * A Load from a row of the `loads` table. Every screen that reads loads goes
+ * through this, so a new column — like carrier_pct — cannot be forgotten on
+ * one screen and silently priced as 100% there.
+ */
+export function loadFromRow(r: Record<string, unknown>): Load {
+  const num = (v: unknown) => Number(v) || 0;
+  const optional = (v: unknown) => (v == null ? null : Number(v));
+  return {
+    id: (r.id as string | undefined) ?? undefined,
+    load_date: String(r.load_date ?? ""),
+    broker: (r.broker as string | null) ?? "",
+    origin: (r.origin as string | null) ?? "",
+    destination: (r.destination as string | null) ?? "",
+    loaded_miles: num(r.loaded_miles),
+    deadhead_miles: num(r.deadhead_miles),
+    linehaul_pay: num(r.linehaul_pay),
+    fuel_surcharge: num(r.fuel_surcharge),
+    accessorials: num(r.accessorials),
+    fuel_actual: optional(r.fuel_actual),
+    tolls_actual: optional(r.tolls_actual),
+    lumpers_actual: optional(r.lumpers_actual),
+    carrier_pct: optional(r.carrier_pct),
+    notes: (r.notes as string | null) ?? "",
+  };
+}
+
+/**
+ * A carrier percentage the math can trust. Anything that is not a number
+ * strictly between 0 and 100 counts as 0 — the driver keeps the whole load —
+ * rather than producing negative or runaway revenue.
+ */
+export function effectiveCarrierPct(pct: unknown): number {
+  const n = Number(pct);
+  return Number.isFinite(n) && n > 0 && n < 100 ? n : 0;
+}
 
 export const EMPTY_LOAD: Load = {
   // Filled per request from the driver's own calendar (todayIsoIn). Calling
@@ -33,6 +77,7 @@ export const EMPTY_LOAD: Load = {
   fuel_actual: null,
   tolls_actual: null,
   lumpers_actual: null,
+  carrier_pct: null,
   notes: "",
 };
 
@@ -246,6 +291,14 @@ export function describeMonthAllocation(
 export type LoadEconomics = {
   totalMiles: number;
   deadheadPct: number;
+  /** What the load paid: linehaul + fuel surcharge + accessorials. */
+  loadPay: number;
+  /** The carrier's percentage actually applied (0 for an independent). */
+  carrierPct: number;
+  /** Dollars the carrier keeps from this load. */
+  carrierCut: number;
+  /** What the DRIVER keeps: load pay minus the carrier's cut. Profit, rate
+   *  per mile, and every total are built on this. */
   revenue: number;
   fuelCost: number;
   fuelIsEstimated: boolean;
@@ -332,10 +385,19 @@ export function computeLoadEconomics(
   const deadheadPct =
     totalMiles > 0 ? (Number(load.deadhead_miles || 0) / totalMiles) * 100 : 0;
 
-  const revenue =
+  const loadPay =
     Number(load.linehaul_pay || 0) +
     Number(load.fuel_surcharge || 0) +
     Number(load.accessorials || 0);
+
+  // A leased driver's revenue is their share, not the load. Counting the
+  // whole load overstated every leased driver's profit — the dangerous
+  // direction, since it makes a losing load look acceptable. Multiplying
+  // before dividing keeps real splits exact: $1,940 at 20% is $388, not
+  // $388.00000000000006.
+  const carrierPct = effectiveCarrierPct(load.carrier_pct);
+  const carrierCut = (loadPay * carrierPct) / 100;
+  const revenue = loadPay - carrierCut;
 
   const computedFuel =
     p.mpg > 0 ? (totalMiles / p.mpg) * p.fuel_price_per_gallon : 0;
@@ -387,6 +449,9 @@ export function computeLoadEconomics(
   return {
     totalMiles,
     deadheadPct,
+    loadPay,
+    carrierPct,
+    carrierCut,
     revenue,
     fuelCost,
     fuelIsEstimated,
@@ -514,6 +579,11 @@ export type WeekTotals = {
   deadheadMiles: number;
   totalMiles: number;
   deadheadPct: number;
+  /** What the week's loads paid, before any carrier's cut. */
+  loadPay: number;
+  /** What carriers kept from the week's loads. */
+  carrierCut: number;
+  /** What the driver kept: loadPay − carrierCut. */
   revenue: number;
   /** Cost from the loads themselves (fuel, per-mile, allocated fixed). */
   loadCost: number;
@@ -544,6 +614,8 @@ export function aggregateWeek(
 ): WeekTotals {
   let loadedMiles = 0;
   let deadheadMiles = 0;
+  let loadPay = 0;
+  let carrierCut = 0;
   let revenue = 0;
   let totalCost = 0;
 
@@ -565,6 +637,8 @@ export function aggregateWeek(
     );
     loadedMiles += Number(l.loaded_miles || 0);
     deadheadMiles += Number(l.deadhead_miles || 0);
+    loadPay += e.loadPay;
+    carrierCut += e.carrierCut;
     revenue += e.revenue;
     totalCost += e.totalCost;
   }
@@ -578,6 +652,8 @@ export function aggregateWeek(
     deadheadMiles,
     totalMiles,
     deadheadPct: totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0,
+    loadPay,
+    carrierCut,
     revenue,
     loadCost: totalCost,
     roadExpenses,

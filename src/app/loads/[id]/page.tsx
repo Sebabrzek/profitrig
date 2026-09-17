@@ -9,9 +9,11 @@ import { type CostProfile } from "@/app/actions";
 import {
   endOfMonth,
   isoDate,
+  loadFromRow,
   startOfMonth,
   type Load,
 } from "@/lib/loads";
+import { fetchDriverSettings } from "@/lib/driverSettings";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadForm } from "../LoadForm";
 
@@ -51,7 +53,7 @@ export default async function EditLoadPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
-  const [loadRes, costRes] = await Promise.all([
+  const [loadRes, costRes, settings] = await Promise.all([
     supabase
       .from("loads")
       .select("*")
@@ -63,6 +65,7 @@ export default async function EditLoadPage({
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle(),
+    fetchDriverSettings(supabase, user.id),
   ]);
 
   if (!loadRes.data) notFound();
@@ -96,23 +99,7 @@ export default async function EditLoadPage({
     31
   );
 
-  const initial: Load = {
-    id: r.id,
-    load_date: r.load_date,
-    broker: r.broker ?? "",
-    origin: r.origin ?? "",
-    destination: r.destination ?? "",
-    loaded_miles: Number(r.loaded_miles) || 0,
-    deadhead_miles: Number(r.deadhead_miles) || 0,
-    linehaul_pay: Number(r.linehaul_pay) || 0,
-    fuel_surcharge: Number(r.fuel_surcharge) || 0,
-    accessorials: Number(r.accessorials) || 0,
-    fuel_actual: r.fuel_actual == null ? null : Number(r.fuel_actual),
-    tolls_actual: r.tolls_actual == null ? null : Number(r.tolls_actual),
-    lumpers_actual:
-      r.lumpers_actual == null ? null : Number(r.lumpers_actual),
-    notes: r.notes ?? "",
-  };
+  const initial: Load = loadFromRow(r);
 
   const costData = costRes.data;
   const profile: CostProfile = costData
@@ -172,6 +159,7 @@ export default async function EditLoadPage({
           loadId={id}
           otherMonthMiles={otherMonthMiles}
           monthFirstDay={monthFirstDay}
+          leased={settings.carrierPct != null}
         />
       </div>
       <BottomNav isPro />

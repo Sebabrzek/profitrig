@@ -118,6 +118,7 @@ export default async function TaxPage({
     fuel_actual: r.fuel_actual == null ? null : Number(r.fuel_actual),
     tolls_actual: r.tolls_actual == null ? null : Number(r.tolls_actual),
     lumpers_actual: r.lumpers_actual == null ? null : Number(r.lumpers_actual),
+    carrier_pct: null, // tax reports what loads paid — see aggregateRevenue
     notes: "",
   }));
 

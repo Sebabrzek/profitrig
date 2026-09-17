@@ -5,7 +5,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { BottomNav } from "@/components/BottomNav";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
-import { ProfileForm } from "./ProfileForm";
+import { ProfileForm, type PastLoadsWithoutSplit } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
 
 export default async function ProfilePage() {
@@ -17,6 +17,7 @@ export default async function ProfilePage() {
   let initial: DriverProfile = EMPTY_DRIVER_PROFILE;
   let email = "";
   let userIsPro = false;
+  let pastLoads: PastLoadsWithoutSplit = { count: 0, from: null, to: null };
   if (user) {
     email = user.email ?? "";
     userIsPro = isPro(await fetchSubscription(supabase, user.id));
@@ -37,6 +38,28 @@ export default async function ProfilePage() {
         authority_type: data.authority_type ?? "",
         trailer_type: data.trailer_type ?? "",
         marketing_opt_in: Boolean(data.marketing_opt_in),
+        carrier_pct: data.carrier_pct == null ? null : Number(data.carrier_pct),
+      };
+    }
+
+    // Loads logged before the driver set a carrier %. Profile asks once what
+    // to do with them. Any error — such as before migration 013 — just means
+    // there is nothing to ask about.
+    const unsplit = () =>
+      supabase
+        .from("loads")
+        .select("load_date", { count: "exact" })
+        .eq("user_id", user.id)
+        .is("carrier_pct", null);
+    const [first, last] = await Promise.all([
+      unsplit().order("load_date", { ascending: true }).limit(1),
+      unsplit().order("load_date", { ascending: false }).limit(1),
+    ]);
+    if (!first.error && !last.error) {
+      pastLoads = {
+        count: first.count ?? 0,
+        from: first.data?.[0]?.load_date ?? null,
+        to: last.data?.[0]?.load_date ?? null,
       };
     }
   }
@@ -60,7 +83,7 @@ export default async function ProfilePage() {
           Quick info about you and your operation. All optional. Helps us send
           tips that actually match what you haul.
         </p>
-        <ProfileForm initial={initial} email={email} />
+        <ProfileForm initial={initial} email={email} pastLoads={pastLoads} />
         <div className="mt-4">
           <FeedbackCard />
         </div>

@@ -40,6 +40,12 @@ export type LoadActualTotals = {
   totalMiles: number;
 };
 
+/**
+ * Deliberately what the loads PAID, not a leased driver's share after the
+ * carrier's cut. Whether a carrier's 1099 reports gross pay (and the cut is a
+ * deductible expense) or net pay is still unconfirmed — decision D4 in
+ * docs/phase0-carrier-pay.md. Change this only once that is answered.
+ */
 export function aggregateRevenue(loads: Load[]): RevenueTotals {
   let linehaul = 0;
   let fsc = 0;

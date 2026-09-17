@@ -269,6 +269,78 @@ export async function saveDriverProfileAction(
   return { ok: true };
 }
 
+/**
+ * The % a leased driver's carrier keeps, used as the default on new loads.
+ * null turns it off: an independent driver keeps 100%. Saved apart from the
+ * main profile so saving a phone number never depends on this column.
+ */
+export async function saveCarrierPctAction(
+  pct: number | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (pct != null && (!Number.isFinite(pct) || pct <= 0 || pct >= 100)) {
+    return { ok: false, error: "Carrier % must be between 1 and 99." };
+  }
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase.from("driver_profiles").upsert(
+    {
+      user_id: user.id,
+      carrier_pct: pct == null ? null : Math.round(pct * 100) / 100,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+  if (error) {
+    return {
+      ok: false,
+      error: "Couldn't save your carrier %. Try again, or tap Talk to a human.",
+    };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Settles every load logged before the driver told us their split. A
+ * driver who has always been leased applies their %; one who used to run
+ * independent passes 0, so those loads stay 100% theirs and they're never
+ * asked again.
+ */
+export async function applyCarrierPctToPastLoadsAction(
+  pct: number
+): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
+  if (!Number.isFinite(pct) || pct < 0 || pct >= 100) {
+    return { ok: false, error: "Carrier % must be under 100." };
+  }
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { data, error } = await supabase
+    .from("loads")
+    .update({
+      carrier_pct: Math.round(pct * 100) / 100,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", user.id)
+    .is("carrier_pct", null)
+    .select("id");
+  if (error) {
+    return {
+      ok: false,
+      error: "Couldn't update those loads. Try again, or tap Talk to a human.",
+    };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, updated: data?.length ?? 0 };
+}
+
 export async function saveWeekStartAction(
   weekStart: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -389,6 +461,14 @@ export async function saveLoadAction(
   if (load.loaded_miles < 0 || load.deadhead_miles < 0) {
     return { ok: false, error: "Miles can't be negative." };
   }
+  if (
+    load.carrier_pct != null &&
+    (!Number.isFinite(load.carrier_pct) ||
+      load.carrier_pct < 0 ||
+      load.carrier_pct >= 100)
+  ) {
+    return { ok: false, error: "Carrier % must be between 0 and 99." };
+  }
 
   const row = {
     user_id: user.id,
@@ -404,6 +484,11 @@ export async function saveLoadAction(
     fuel_actual: nullableNum(load.fuel_actual),
     tolls_actual: nullableNum(load.tolls_actual),
     lumpers_actual: nullableNum(load.lumpers_actual),
+    // Sent only when there is a split, so an independent driver's save never
+    // touches the column — and keeps working before migration 013 runs.
+    ...(load.carrier_pct != null
+      ? { carrier_pct: Math.round(load.carrier_pct * 100) / 100 }
+      : {}),
     notes: load.notes.trim() || null,
     updated_at: new Date().toISOString(),
   };

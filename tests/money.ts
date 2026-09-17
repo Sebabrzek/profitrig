@@ -22,6 +22,8 @@
  *   7. A past week re-priced silently — +$1,034 on the Friday, −$660 two
  *      weeks later — when the driver stopped logging. The week CSV also
  *      priced a week from that week's loads alone and disagreed with the tab.
+ *   8. Leased drivers were credited with 100% of every load. A $2,000 load at
+ *      80/20 showed $2,000 of revenue instead of $1,600.
  *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
@@ -32,9 +34,11 @@ import {
   buildMtdContext,
   computeLoadEconomics,
   describeMonthAllocation,
+  effectiveCarrierPct,
   endOfWeek,
   formatWeekLabel,
   isoDate,
+  loadFromRow,
   monthRangeForWeek,
   monthStatsByLoad,
   parseDateParam,
@@ -51,6 +55,7 @@ import {
 } from "../src/lib/roadExpenses";
 import {
   aggregateLoadActuals,
+  aggregateRevenue,
   buildScheduleCGroups,
 } from "../src/lib/tax/report";
 import type { CostProfile } from "../src/app/actions";
@@ -109,6 +114,7 @@ function load(over: Partial<Load> = {}): Load {
     fuel_actual: null,
     tolls_actual: null,
     lumpers_actual: null,
+    carrier_pct: null,
     notes: "",
     ...over,
   };
@@ -466,6 +472,78 @@ check(
     0,
     fridayNight
   ).profit === pricedFromMonth.profit
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("Leased drivers count their share, not the whole load");
+// ─────────────────────────────────────────────────────────────────────
+
+// The six loads on the real D. Lewis settlement for 9–15 Aug 2026, at 20%.
+const settlementC = [1940, 1100, 1800, 1000, 650, 5300].map((pay, i) =>
+  load({ load_date: `2026-08-1${i}`, linehaul_pay: pay, carrier_pct: 20 })
+);
+const independentLoad = computeLoadEconomics(load(), profile, earlyCtx);
+const firstC = computeLoadEconomics(settlementC[0], profile, earlyCtx);
+const firstCUnsplit = computeLoadEconomics({ ...settlementC[0], carrier_pct: null }, profile, earlyCtx);
+
+check(
+  "an independent keeps the whole load",
+  independentLoad.carrierCut === 0 && independentLoad.revenue === independentLoad.loadPay
+);
+check(
+  "$1,940 at 20% keeps exactly $1,552 — the settlement's own line",
+  firstC.revenue === 1552 && firstC.carrierCut === 388,
+  `$${firstC.revenue} kept, $${firstC.carrierCut} to carrier`
+);
+const july18 = computeLoadEconomics(load({ linehaul_pay: 1240, carrier_pct: 18 }), profile, earlyCtx);
+check("July's 18% split is exact too: $1,240 keeps $1,016.80", Math.abs(july18.revenue - 1016.8) < 1e-9, `$${july18.revenue}`);
+check(
+  "the carrier's cut comes off profit, never off costs",
+  firstC.totalCost === firstCUnsplit.totalCost && Math.abs(firstCUnsplit.profit - firstC.profit - 388) < 1e-9
+);
+
+const weekC = aggregateWeek(settlementC, profile, monthStatsByLoad(settlementC), 0, new Date(2026, 7, 21));
+check(
+  "the week's cut matches the real settlement's DLT fee total, $2,358",
+  Math.abs(weekC.carrierCut - 2358) < 1e-9 && Math.abs(weekC.loadPay - 11790) < 1e-9,
+  `$${weekC.carrierCut} of $${weekC.loadPay}`
+);
+check(
+  "and the driver's revenue is the $9,432 left after the fee",
+  Math.abs(weekC.revenue - 9432) < 1e-9,
+  `$${weekC.revenue}`
+);
+
+const leasedTrip = computeLoadEconomics(load({ carrier_pct: 20 }), profile, earlyCtx);
+check(
+  "rate per mile is on the driver's share: $2.73 becomes $2.18",
+  Math.abs(leasedTrip.rpm - 1200 / 550) < 1e-9,
+  `$${leasedTrip.rpm.toFixed(2)}/mi`
+);
+
+const detention = load({ load_date: "2026-08-12", linehaul_pay: 0, accessorials: 100, loaded_miles: 0, deadhead_miles: 0, carrier_pct: 0 });
+const weekWithDetention = aggregateWeek([...settlementC, detention], profile, monthStatsByLoad(settlementC), 0, new Date(2026, 7, 21));
+check(
+  "one load can pass through in full: $100 detention at 0% adds $100",
+  Math.abs(weekWithDetention.revenue - weekC.revenue - 100) < 1e-9
+);
+
+const dbRow = loadFromRow({ id: "x", load_date: "2026-08-10", linehaul_pay: "1940.00", carrier_pct: "20.00", loaded_miles: 500, deadhead_miles: 50 });
+check(
+  "a database row's carrier % is read, not dropped",
+  dbRow.carrier_pct === 20 && computeLoadEconomics(dbRow, profile, earlyCtx).revenue === 1552
+);
+check(
+  "a row saved before the setting existed counts 100%",
+  loadFromRow({ load_date: "2026-08-10", linehaul_pay: 1940 }).carrier_pct === null
+);
+check(
+  "a % outside 0–100 can't invent or destroy revenue",
+  [150, 100, -5, Number.NaN, "abc", null].every((bad) => effectiveCarrierPct(bad) === 0) && effectiveCarrierPct(20) === 20
+);
+check(
+  "the tax report still shows what the loads paid, until the 1099 question is settled",
+  aggregateRevenue(settlementC).linehaul === 11790
 );
 
 // ─────────────────────────────────────────────────────────────────────

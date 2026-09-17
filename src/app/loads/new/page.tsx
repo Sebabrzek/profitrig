@@ -14,6 +14,7 @@ import {
   type Load,
 } from "@/lib/loads";
 import { driverToday } from "@/lib/driverClock";
+import { fetchDriverSettings } from "@/lib/driverSettings";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadForm } from "../LoadForm";
 
@@ -56,7 +57,10 @@ export default async function NewLoadPage({
   // Default to the driver's today — not the UTC server's, which is already
   // tomorrow on a US evening. If the caller passed ?date=..., use that month
   // for MTD context instead so the form previews the right calendar month.
-  const { iso: today, now } = await driverToday();
+  const [{ iso: today, now }, settings] = await Promise.all([
+    driverToday(),
+    fetchDriverSettings(supabase, user.id),
+  ]);
   const newLoadDate = params.date ? new Date(params.date + "T12:00:00") : now;
   const monthFrom = startOfMonth(newLoadDate);
   const monthTo = endOfMonth(newLoadDate);
@@ -122,6 +126,8 @@ export default async function NewLoadPage({
   const initial: Load = {
     ...EMPTY_LOAD,
     load_date: params.date || today,
+    // A leased driver's split, filled in so they don't retype it per load.
+    carrier_pct: settings.carrierPct,
   };
 
   return (
@@ -152,6 +158,7 @@ export default async function NewLoadPage({
           costProfile={profile}
           otherMonthMiles={otherMonthMiles}
           monthFirstDay={monthFirstDay}
+          leased={settings.carrierPct != null}
         />
       </div>
       <BottomNav isPro />

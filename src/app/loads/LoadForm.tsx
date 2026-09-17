@@ -189,6 +189,7 @@ export function LoadForm({
   loadId,
   otherMonthMiles = 0,
   monthFirstDay = 1,
+  leased = false,
 }: {
   initial: Load;
   costProfile: CostProfile;
@@ -207,9 +208,14 @@ export function LoadForm({
    * charged as though they had been parked since the 1st.
    */
   monthFirstDay?: number;
+  /** The driver's profile says a carrier keeps a % of each load. */
+  leased?: boolean;
 }) {
   const router = useRouter();
   const [load, setLoad] = useState<Load>({ ...initial, id: loadId });
+  // Shown for leased drivers, and on any load that already carries a split
+  // — so a driver who later goes independent can still see and fix it.
+  const showCarrierPct = leased || (initial.carrier_pct ?? 0) > 0;
   const [pending, startTransition] = useTransition();
   const [deletePending, startDelete] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +235,13 @@ export function LoadForm({
 
   function save() {
     setError(null);
+    if (
+      load.carrier_pct != null &&
+      (load.carrier_pct < 0 || load.carrier_pct >= 100)
+    ) {
+      setError("Carrier % must be under 100.");
+      return;
+    }
     startTransition(async () => {
       const r = await saveLoadAction(load);
       if (!r.ok) {
@@ -311,6 +324,11 @@ export function LoadForm({
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Revenue</p>
             <p className="text-base font-bold">{moneyCompact(e.revenue)}</p>
+            {e.carrierCut > 0 && (
+              <p className="text-[11px] opacity-80">
+                after {moneyCompact(e.carrierCut)} to carrier
+              </p>
+            )}
           </div>
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Cost</p>
@@ -404,7 +422,14 @@ export function LoadForm({
         </div>
       </Section>
 
-      <Section title="Revenue" subtitle="What the broker paid you for this load.">
+      <Section
+        title="Revenue"
+        subtitle={
+          showCarrierPct
+            ? "What the load paid, and the share you keep."
+            : "What the broker paid you for this load."
+        }
+      >
         <NumInput
           label="Linehaul pay"
           hint="The flat rate on the rate confirmation."
@@ -424,10 +449,40 @@ export function LoadForm({
             onChange={setField("accessorials")}
           />
         </div>
-        <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
-          <span className="font-semibold">Total revenue</span>
-          <span className="font-bold">{money(e.revenue)}</span>
-        </div>
+        {showCarrierPct && (
+          <div className="sm:col-span-2">
+            <NumInput
+              label="Carrier keeps"
+              hint="Filled in from your Profile. Change it for a load paid differently — like detention your carrier passes through in full (0%)."
+              value={load.carrier_pct ?? 0}
+              onChange={setField("carrier_pct")}
+              suffix="%"
+            />
+          </div>
+        )}
+        {e.carrierPct > 0 ? (
+          <div className="sm:col-span-2 bg-gray-50 rounded-xl px-4 py-3 text-sm flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Load pay</span>
+              <span className="font-semibold">{money(e.loadPay)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">
+                Carrier keeps {Number(e.carrierPct.toFixed(2))}%
+              </span>
+              <span className="font-semibold">−{money(e.carrierCut)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-border pt-1.5">
+              <span className="font-semibold">You keep</span>
+              <span className="font-bold">{money(e.revenue)}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+            <span className="font-semibold">Total revenue</span>
+            <span className="font-bold">{money(e.revenue)}</span>
+          </div>
+        )}
       </Section>
 
       <Section

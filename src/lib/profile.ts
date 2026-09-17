@@ -9,6 +9,9 @@ export type DriverProfile = {
   authority_type: string;
   trailer_type: string;
   marketing_opt_in: boolean;
+  /** % a leased driver's carrier keeps; the default for new loads. Saved by
+   *  saveCarrierPctAction, separately from the rest of the profile. */
+  carrier_pct: number | null;
 };
 
 export const EMPTY_DRIVER_PROFILE: DriverProfile = {
@@ -22,6 +25,7 @@ export const EMPTY_DRIVER_PROFILE: DriverProfile = {
   authority_type: "",
   trailer_type: "",
   marketing_opt_in: false,
+  carrier_pct: null,
 };
 
 export function isProfileComplete(p: DriverProfile | null): boolean {

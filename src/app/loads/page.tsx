@@ -17,13 +17,15 @@ import {
   endOfWeek,
   formatWeekLabel,
   isoDate,
+  loadFromRow,
   loadMonthKey,
   monthRangeForWeek,
   monthStatsByLoad,
   parseDateParam,
   startOfWeek,
 } from "@/lib/loads";
-import { driverToday, fetchWeekStart } from "@/lib/driverClock";
+import { driverToday } from "@/lib/driverClock";
+import { fetchDriverSettings } from "@/lib/driverSettings";
 import { RoadExpenseCard } from "@/components/RoadExpenseCard";
 import { sumRoadExpenses, type RoadExpense } from "@/lib/roadExpenses";
 import { WeekStartToggle } from "./WeekStartToggle";
@@ -64,6 +66,11 @@ function moneyCents(n: number) {
 
 function profileIsConfigured(p: CostProfile): boolean {
   return p.monthly_miles > 0 && (p.mpg > 0 || p.maintenance_per_mile > 0);
+}
+
+/** 20 → "20%", 17.5 → "17.5%". */
+function pctLabel(n: number) {
+  return `${Number(n.toFixed(2))}%`;
 }
 
 function roundedMiles(n: number) {
@@ -111,10 +118,11 @@ export default async function LoadsPage({
   if (!isPro(sub)) redirect("/upgrade");
 
   // Resolve the target week on the DRIVER's calendar, in the week they chose.
-  const [{ iso: today, now }, weekStartsOn] = await Promise.all([
+  const [{ iso: today, now }, settings] = await Promise.all([
     driverToday(),
-    fetchWeekStart(supabase, user.id),
+    fetchDriverSettings(supabase, user.id),
   ]);
+  const weekStartsOn = settings.weekStart;
   const targetDate = params.week ? parseDateParam(params.week) : now;
   const weekStart = startOfWeek(targetDate, weekStartsOn);
   const weekEnd = endOfWeek(targetDate, weekStartsOn);
@@ -203,22 +211,7 @@ export default async function LoadsPage({
       }
     : EMPTY_PROFILE;
 
-  const loads: Load[] = (loadsRes.data ?? []).map((r) => ({
-    id: r.id,
-    load_date: r.load_date,
-    broker: r.broker ?? "",
-    origin: r.origin ?? "",
-    destination: r.destination ?? "",
-    loaded_miles: Number(r.loaded_miles) || 0,
-    deadhead_miles: Number(r.deadhead_miles) || 0,
-    linehaul_pay: Number(r.linehaul_pay) || 0,
-    fuel_surcharge: Number(r.fuel_surcharge) || 0,
-    accessorials: Number(r.accessorials) || 0,
-    fuel_actual: r.fuel_actual == null ? null : Number(r.fuel_actual),
-    tolls_actual: r.tolls_actual == null ? null : Number(r.tolls_actual),
-    lumpers_actual: r.lumpers_actual == null ? null : Number(r.lumpers_actual),
-    notes: r.notes ?? "",
-  }));
+  const loads: Load[] = (loadsRes.data ?? []).map((r) => loadFromRow(r));
 
   // Build map of YYYY-MM -> total miles using ALL loads in the broader
   // month range, so each load's allocation reflects its full month.
@@ -236,6 +229,7 @@ export default async function LoadsPage({
     fuel_actual: null,
     tolls_actual: null,
     lumpers_actual: null,
+    carrier_pct: null, // miles only — this list never prices revenue
     notes: "",
   }));
   const monthStats = monthStatsByLoad(monthLoads);
@@ -315,6 +309,33 @@ export default async function LoadsPage({
         </div>
         <WeekStartToggle value={weekStartsOn} />
 
+        {/* How this driver gets paid, kept in view where they check profit */}
+        {settings.carrierPct != null ? (
+          <p className="text-center text-xs text-muted -mt-1 mb-3">
+            Leased to{" "}
+            <span className="font-semibold text-foreground">
+              {settings.carrierName || "your carrier"}
+            </span>{" "}
+            · you keep {pctLabel(100 - settings.carrierPct)} ·{" "}
+            <Link
+              href="/profile"
+              className="font-semibold text-brand hover:text-brand-dark"
+            >
+              Change
+            </Link>
+          </p>
+        ) : settings.authorityType === "leased" ||
+          settings.authorityType === "both" ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-4 text-xs text-amber-900 leading-snug">
+            You&apos;re leased to a carrier, but ProfitRig doesn&apos;t know
+            what they keep — so every load here counts 100% of the pay as
+            yours.{" "}
+            <Link href="/profile" className="font-semibold underline">
+              Add your carrier&apos;s %
+            </Link>
+          </div>
+        ) : null}
+
         {/* Weekly summary */}
         <div
           className={`rounded-2xl p-5 mb-4 shadow-sm text-white ${
@@ -333,6 +354,11 @@ export default async function LoadsPage({
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Revenue</p>
               <p className="text-base font-bold">{money(totals.revenue)}</p>
+              {totals.carrierCut > 0 && (
+                <p className="text-xs opacity-80">
+                  after {money(totals.carrierCut)} to carrier
+                </p>
+              )}
             </div>
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Costs</p>
@@ -524,6 +550,11 @@ export default async function LoadsPage({
                     <div className="bg-gray-50 rounded-lg px-3 py-2">
                       <p className="text-muted">Revenue</p>
                       <p className="font-bold text-sm">{money(e.revenue)}</p>
+                      {e.carrierPct > 0 && (
+                        <p className="text-[10px] text-muted">
+                          {pctLabel(100 - e.carrierPct)} of {money(e.loadPay)}
+                        </p>
+                      )}
                       <p className="text-[10px] text-muted">
                         {moneyCents(e.rpm)} / mi
                       </p>

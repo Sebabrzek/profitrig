@@ -11,6 +11,7 @@ import { isProfileComplete, type DriverProfile } from "@/lib/profile";
 import {
   buildMtdContext,
   computeLoadEconomics,
+  loadFromRow,
   loadMonthKey,
   monthStatsByLoad,
   type Load,
@@ -107,23 +108,7 @@ export default async function HomePage() {
         .from("loads")
         .select("*")
         .eq("user_id", user.id);
-      const loads: Load[] = (allLoads ?? []).map((r) => ({
-        id: r.id,
-        load_date: r.load_date,
-        broker: r.broker ?? "",
-        origin: r.origin ?? "",
-        destination: r.destination ?? "",
-        loaded_miles: Number(r.loaded_miles) || 0,
-        deadhead_miles: Number(r.deadhead_miles) || 0,
-        linehaul_pay: Number(r.linehaul_pay) || 0,
-        fuel_surcharge: Number(r.fuel_surcharge) || 0,
-        accessorials: Number(r.accessorials) || 0,
-        fuel_actual: r.fuel_actual == null ? null : Number(r.fuel_actual),
-        tolls_actual: r.tolls_actual == null ? null : Number(r.tolls_actual),
-        lumpers_actual:
-          r.lumpers_actual == null ? null : Number(r.lumpers_actual),
-        notes: r.notes ?? "",
-      }));
+      const loads: Load[] = (allLoads ?? []).map((r) => loadFromRow(r));
       loggedLoadCount = loads.length;
       if (loggedLoadCount >= 5) {
         const monthStats = monthStatsByLoad(loads);
@@ -163,6 +148,10 @@ export default async function HomePage() {
         authority_type: driverRes.data.authority_type ?? "",
         trailer_type: driverRes.data.trailer_type ?? "",
         marketing_opt_in: Boolean(driverRes.data.marketing_opt_in),
+        carrier_pct:
+          driverRes.data.carrier_pct == null
+            ? null
+            : Number(driverRes.data.carrier_pct),
       };
     }
   }
