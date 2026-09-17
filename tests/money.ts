@@ -24,6 +24,9 @@
  *      priced a week from that week's loads alone and disagreed with the tab.
  *   8. Leased drivers were credited with 100% of every load. A $2,000 load at
  *      80/20 showed $2,000 of revenue instead of $1,600.
+ *   9. Both CSV exports passed a broker name straight through, so a broker
+ *      saved as =HYPERLINK("http://evil/","TQL") was a live formula when the
+ *      driver's accountant opened the file.
  *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
@@ -60,6 +63,7 @@ import {
 } from "../src/lib/tax/report";
 import type { CostProfile } from "../src/app/actions";
 import { computeFuelStats, isPlausibleMpg } from "../src/lib/fuel";
+import { csvEscape, csvRow } from "../src/lib/csv";
 
 let failures = 0;
 let checks = 0;
@@ -607,6 +611,49 @@ check(
   "normal semi MPG passes the sanity check, nonsense doesn't",
   isPlausibleMpg(6.5) && !isPlausibleMpg(25) && !isPlausibleMpg(1.2)
 );
+
+// ─────────────────────────────────────────────────────────────────────
+section("Exported CSVs can't run formulas in the accountant's spreadsheet");
+// ─────────────────────────────────────────────────────────────────────
+
+check(
+  "a broker name that is really a formula is neutralised",
+  csvEscape('=HYPERLINK("http://evil/","TQL")') ===
+    `"'=HYPERLINK(""http://evil/"",""TQL"")"`,
+  csvEscape('=HYPERLINK("http://evil/","TQL")')
+);
+check("a leading + is neutralised", csvEscape("+1+1") === "'+1+1");
+check("a leading @ is neutralised", csvEscape("@SUM(A1:A9)") === "'@SUM(A1:A9)");
+check("a leading tab is neutralised", csvEscape("\tcmd") === "'\tcmd");
+check(
+  "a note that starts with a dash is neutralised",
+  csvEscape("-2+3+cmd|' /c calc'!A0") === "'-2+3+cmd|' /c calc'!A0"
+);
+
+// Negative money must stay a number the accountant can sum, so plain
+// numbers are exempt from the quote prefix.
+check("a negative profit stays a number", csvEscape("-142.00") === "-142.00");
+check(
+  "a negative profit per mile stays a number",
+  csvEscape("-0.18") === "-0.18"
+);
+check("a positive number is untouched", csvEscape("2840.00") === "2840.00");
+
+check(
+  "an ordinary broker name is untouched",
+  csvEscape("TQL Logistics") === "TQL Logistics"
+);
+check(
+  "commas and quotes are still escaped the old way",
+  csvEscape('Chicago, IL "dock 4"') === `"Chicago, IL ""dock 4"""`
+);
+check(
+  "a row keeps its columns",
+  csvRow(["2026-09-14", "=cmd", -142, "TQL, Inc"]) ===
+    `2026-09-14,'=cmd,-142,"TQL, Inc"`,
+  csvRow(["2026-09-14", "=cmd", -142, "TQL, Inc"])
+);
+check("an empty cell stays empty", csvEscape(null) === "" && csvEscape(undefined) === "");
 
 // ─────────────────────────────────────────────────────────────────────
 

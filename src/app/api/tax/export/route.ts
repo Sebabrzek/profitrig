@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { csvRow } from "@/lib/csv";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { Load } from "@/lib/loads";
 import {
@@ -27,17 +28,6 @@ import {
   type TaxProfile,
   type TruckFinancing,
 } from "@/lib/tax/types";
-
-function csvEscape(v: unknown): string {
-  if (v == null) return "";
-  const s = String(v);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function csvRow(values: unknown[]): string {
-  return values.map(csvEscape).join(",");
-}
 
 function money(n: number): string {
   return n.toLocaleString("en-US", {

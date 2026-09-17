@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { csvRow } from "@/lib/csv";
 import {
   buildMtdContext,
   computeLoadEconomics,
@@ -76,17 +77,6 @@ const HEADERS = [
   "Profit/Mile",
   "Notes",
 ];
-
-function csvEscape(v: unknown): string {
-  if (v == null) return "";
-  const s = String(v);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function csvRow(values: unknown[]): string {
-  return values.map(csvEscape).join(",");
-}
 
 function num(n: number, decimals = 2): string {
   return Number.isFinite(n) ? n.toFixed(decimals) : "";

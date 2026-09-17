@@ -500,15 +500,17 @@ export function LoadForm({
         />
         <OptionalMoneyInput
           label="Tolls"
-          hint="Leave blank if none."
+          hint="Blank = estimated from your tolls/mile rate. Enter 0 if you paid none."
           value={load.tolls_actual}
-          estimate={0}
+          estimate={e.tollsIsEstimated ? e.tollsCost : 0}
           onChange={setField("tolls_actual")}
         />
         <div className="sm:col-span-2">
           <OptionalMoneyInput
-            label="Lumpers / parking / meals (not reimbursed)"
-            hint="Out-of-pocket trip costs you didn't get paid back for."
+            label="Lumpers / unloading fees"
+            hint={
+              'Unloading fees you weren’t paid back for. Food and parking go in "Other expenses this week" on the Loads tab — this box is reported to your accountant, and per diem already covers meals.'
+            }
             value={load.lumpers_actual}
             estimate={0}
             onChange={setField("lumpers_actual")}
