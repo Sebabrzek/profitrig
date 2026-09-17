@@ -9,6 +9,7 @@ import {
   setRealCpmOverrideAction,
   type CostProfile,
 } from "./actions";
+import { computeCalculatorTotals } from "@/lib/calculatorTotals";
 import { ProfileBanner } from "@/components/ProfileBanner";
 import { VisitorPitch } from "@/components/VisitorPitch";
 import {
@@ -184,50 +185,7 @@ export function Calculator({
     }
   }, [p, isAuthed]);
 
-  const totals = useMemo(() => {
-    const fixed =
-      p.truck_payment +
-      p.trailer_payment +
-      p.insurance +
-      p.eld_subscriptions +
-      p.permits_irp_ifta +
-      p.office_misc +
-      p.load_board_per_month +
-      p.other_monthly_bill;
-
-    const fuelPerMile = p.mpg > 0 ? p.fuel_price_per_gallon / p.mpg : 0;
-    const variablePerMile =
-      fuelPerMile +
-      p.maintenance_per_mile +
-      p.tires_per_mile +
-      p.def_per_mile +
-      p.driver_pay_per_mile +
-      p.tolls_misc_per_mile;
-
-    const fixedPerMile = p.monthly_miles > 0 ? fixed / p.monthly_miles : 0;
-    const computedCPM = fixedPerMile + variablePerMile;
-    // Phase 0.2: when the user has tapped "Update my estimate", we display
-    // and use the override instead of the freshly-computed total.
-    const totalCPM =
-      p.real_cpm_override != null && p.real_cpm_override > 0
-        ? p.real_cpm_override
-        : computedCPM;
-    const requiredRate = totalCPM + p.desired_profit_per_mile;
-    const breakEven = totalCPM * p.monthly_miles;
-    const projectedProfit = p.desired_profit_per_mile * p.monthly_miles;
-
-    return {
-      fixed,
-      fuelPerMile,
-      variablePerMile,
-      fixedPerMile,
-      computedCPM,
-      totalCPM,
-      requiredRate,
-      breakEven,
-      projectedProfit,
-    };
-  }, [p]);
+  const totals = useMemo(() => computeCalculatorTotals(p), [p]);
 
   function save() {
     if (!isAuthed) {
@@ -325,7 +283,7 @@ export function Calculator({
         <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
           Your true cost per mile
         </p>
-        <p className="text-5xl font-black mt-1 leading-none">
+        <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
           {cpm(totals.totalCPM)}
         </p>
         {overrideActive && (

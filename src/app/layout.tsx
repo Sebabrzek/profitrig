@@ -1,18 +1,39 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Orbitron } from "next/font/google";
+import localFont from "next/font/local";
 import { SupportChatMount } from "@/components/SupportChatMount";
 import { TimeZoneCookie } from "@/components/TimeZoneCookie";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// The three approved ProfitRig typefaces, self-hosted from src/fonts/ (see
+// the README there). All three are variable, so one file covers every weight
+// the design system asks for.
+//
+//   Satoshi        headings, navigation, buttons, card titles, UI emphasis
+//   Inter          body, descriptions, helper text, forms, tables
+//   JetBrains Mono important financial values only — never ordinary digits
+
+const satoshi = localFont({
+  src: "../fonts/Satoshi-Variable.ttf",
+  weight: "300 900",
+  display: "swap",
+  variable: "--font-satoshi",
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-const orbitron = Orbitron({
-  variable: "--font-orbitron",
-  subsets: ["latin"],
-  weight: ["500", "900"],
+const inter = localFont({
+  src: "../fonts/Inter.ttf",
+  weight: "100 900",
+  display: "swap",
+  variable: "--font-inter",
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
+});
+
+const jetBrainsMono = localFont({
+  src: "../fonts/JetBrainsMono.ttf",
+  weight: "100 800",
+  display: "swap",
+  variable: "--font-jetbrains-mono",
+  fallback: ["ui-monospace", "SFMono-Regular", "monospace"],
 });
 
 export const metadata: Metadata = {
@@ -31,7 +52,8 @@ export const viewport: Viewport = {
   themeColor: "#16a34a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale: a driver reading a rate confirmation in a dark cab has
+  // to be able to pinch-zoom. Locking the scale was a WCAG 1.4.4 failure.
 };
 
 export default function RootLayout({
@@ -42,7 +64,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${orbitron.variable} h-full antialiased`}
+      className={`${satoshi.variable} ${inter.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground">
         {children}

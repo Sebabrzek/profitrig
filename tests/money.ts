@@ -28,6 +28,10 @@
  *      saved as =HYPERLINK("http://evil/","TQL") was a live formula when the
  *      driver's accountant opened the file.
  *
+ *  10. The Calculator tab's own arithmetic had no test at all, and the
+ *      redesign rewrites the file it lives in. These lock today's numbers
+ *      so a visual phase cannot move them quietly.
+ *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
  */
@@ -63,6 +67,7 @@ import {
 } from "../src/lib/tax/report";
 import type { CostProfile } from "../src/app/actions";
 import { computeFuelStats, isPlausibleMpg } from "../src/lib/fuel";
+import { computeCalculatorTotals } from "../src/lib/calculatorTotals";
 import { csvEscape, csvRow } from "../src/lib/csv";
 
 let failures = 0;
@@ -610,6 +615,139 @@ check("no weeks yet means no average, not zero", computeFuelStats(500000, []).av
 check(
   "normal semi MPG passes the sanity check, nonsense doesn't",
   isPlausibleMpg(6.5) && !isPlausibleMpg(25) && !isPlausibleMpg(1.2)
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("The calculator's numbers, locked before the redesign touches them");
+// ─────────────────────────────────────────────────────────────────────
+
+// Same real driver as every other fixture here: $5,054.32 of monthly bills,
+// 10,000 mi, 6.5 MPG at $4.00/gal, and 50c/mi of wanted profit.
+const calc = computeCalculatorTotals(profile);
+
+check(
+  "monthly bills add up to $5,054.32",
+  calc.fixed === 5054.32,
+  `$${calc.fixed}`
+);
+check(
+  "fuel costs $0.6154/mi at 6.5 MPG and $4.00/gal",
+  Math.abs(calc.fuelPerMile - 4.0 / 6.5) < 1e-12
+);
+check(
+  "the fixed share is the month's bills over the month's miles",
+  calc.fixedPerMile === 5054.32 / 10000
+);
+check(
+  "true cost per mile is $2.1008166",
+  Math.abs(calc.computedCPM - 2.1008166153846153) < 1e-12,
+  `$${calc.computedCPM.toFixed(4)}`
+);
+check(
+  "the screen shows $2.10",
+  `$${calc.computedCPM.toFixed(2)}` === "$2.10"
+);
+check(
+  "target rate is cost plus the profit they asked for",
+  Math.abs(calc.requiredRate - 2.6008166153846153) < 1e-12,
+  `$${calc.requiredRate.toFixed(4)}`
+);
+check(
+  "break-even revenue is cost per mile times the month's miles",
+  Math.round(calc.breakEven) === 21008,
+  `$${calc.breakEven.toFixed(2)}`
+);
+check(
+  "projected profit is the wanted profit per mile times the miles",
+  calc.projectedProfit === 5000
+);
+check(
+  "with no override, the displayed cost is the computed cost",
+  calc.totalCPM === calc.computedCPM
+);
+check(
+  "the calculator and the Loads tab still price a mile identically",
+  Math.abs(calc.computedCPM - calculatorCPM(profile)) < 1e-12
+);
+
+// The override is what "Update my estimate to $X" writes. It replaces the
+// displayed cost, and everything downstream of it, but must never overwrite
+// what the line items compute — the driver has to be able to reset.
+const overridden = computeCalculatorTotals({ ...profile, real_cpm_override: 2.35 });
+check("an override becomes the cost per mile", overridden.totalCPM === 2.35);
+check(
+  "an override leaves the computed cost intact, so Reset still works",
+  Math.abs(overridden.computedCPM - 2.1008166153846153) < 1e-12
+);
+check(
+  "the target rate follows the override",
+  Math.abs(overridden.requiredRate - 2.85) < 1e-12
+);
+check("break-even follows the override", overridden.breakEven === 23500);
+check(
+  "projected profit does not, because it is profit per mile, not cost",
+  overridden.projectedProfit === 5000
+);
+check(
+  "a zero override is ignored, not treated as a $0.00 cost per mile",
+  computeCalculatorTotals({ ...profile, real_cpm_override: 0 }).totalCPM ===
+    calc.computedCPM
+);
+check(
+  "a negative override is ignored too",
+  computeCalculatorTotals({ ...profile, real_cpm_override: -1 }).totalCPM ===
+    calc.computedCPM
+);
+
+// Two edges a driver hits on their very first visit, before anything is
+// filled in. Neither may produce Infinity or NaN on screen.
+const noMiles = computeCalculatorTotals({ ...profile, monthly_miles: 0 });
+check(
+  "zero monthly miles does not divide by zero",
+  noMiles.fixedPerMile === 0 && Number.isFinite(noMiles.computedCPM)
+);
+check(
+  "zero monthly miles still charges the variable costs",
+  Math.abs(noMiles.computedCPM - 1.5953846153846154) < 1e-12
+);
+check(
+  "zero monthly miles means zero break-even and zero projected profit",
+  noMiles.breakEven === 0 && noMiles.projectedProfit === 0
+);
+
+const noMpg = computeCalculatorTotals({ ...profile, mpg: 0 });
+check(
+  "zero MPG does not divide by zero",
+  noMpg.fuelPerMile === 0 && Number.isFinite(noMpg.computedCPM)
+);
+check(
+  "zero MPG just leaves fuel out of the cost",
+  Math.abs(noMpg.computedCPM - (2.1008166153846153 - 4.0 / 6.5)) < 1e-12
+);
+
+const empty = computeCalculatorTotals({
+  ...profile,
+  truck_payment: 0,
+  trailer_payment: 0,
+  insurance: 0,
+  eld_subscriptions: 0,
+  permits_irp_ifta: 0,
+  office_misc: 0,
+  load_board_per_month: 0,
+  other_monthly_bill: 0,
+  monthly_miles: 0,
+  mpg: 0,
+  fuel_price_per_gallon: 0,
+  maintenance_per_mile: 0,
+  tires_per_mile: 0,
+  def_per_mile: 0,
+  driver_pay_per_mile: 0,
+  tolls_misc_per_mile: 0,
+  desired_profit_per_mile: 0,
+});
+check(
+  "an untouched calculator shows zeroes, never NaN",
+  Object.values(empty).every((v) => v === 0)
 );
 
 // ─────────────────────────────────────────────────────────────────────

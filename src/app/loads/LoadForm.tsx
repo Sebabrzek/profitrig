@@ -286,7 +286,7 @@ export function LoadForm({
         <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
           Profit this load
         </p>
-        <p className="text-5xl font-black mt-1 leading-none">
+        <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
           {money(e.profit)}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">

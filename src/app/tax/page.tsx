@@ -194,7 +194,7 @@ export default async function TaxPage({
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Gross revenue · {taxYear}
           </p>
-          <p className="text-5xl font-black mt-1 leading-none">
+          <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
             {money(revenue.total)}
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">

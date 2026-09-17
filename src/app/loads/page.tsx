@@ -347,7 +347,7 @@ export default async function LoadsPage({
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Week profit
           </p>
-          <p className="text-5xl font-black mt-1 leading-none">
+          <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
             {money(totals.profit)}
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">

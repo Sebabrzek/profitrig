@@ -1,17 +1,111 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   PROFITRIG DESIGN TOKENS
+   Implements docs/design/PROFITRIG_DESIGN_SYSTEM.md sections 2 and 4–7.
+   These hex values are approved. Do not add brand colours here without a
+   decision recorded in the design package.
+   =========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #0a1f14;
-  --brand: #16a34a;
-  --brand-dark: #15803d;
-  --brand-soft: #dcfce7;
-  --muted: #6b7280;
-  --card: #ffffff;
-  --border: #e5e7eb;
+  /* --- Brand ------------------------------------------------------------ */
+  --pr-rig-green: #173c2b;
+  --pr-profit-green: #16a34a;
+  --pr-sage: #8fae91;
+  --pr-off-white: #f6f7f4;
+  --pr-charcoal: #1f2937;
+  --pr-white: #ffffff;
+
+  /* --- Financial states -------------------------------------------------- */
+  --pr-loss: #b85c57;
+  --pr-loss-deep: #943f3b;
+  --pr-loss-wash: #f2deda;
+
+  /* --- Surfaces ---------------------------------------------------------- */
+  /* Dark Rig Green = intelligence and results. Light = work and input. */
+  --pr-bg: #f6f7f4;
+  --pr-surface: #ffffff;
+  --pr-surface-dark: #173c2b;
+  --pr-text: #1f2937;
+  --pr-text-dark-surface: #ffffff;
+  --pr-text-muted: #667085;
+
+  /* --- Borders ----------------------------------------------------------- */
+  --pr-border: rgba(31, 41, 55, 0.12);
+  --pr-border-dark: rgba(255, 255, 255, 0.12);
+
+  /* --- Semantic ---------------------------------------------------------- */
+  --pr-positive: #16a34a;
+  --pr-negative: #b85c57;
+  --pr-negative-strong: #943f3b;
+
+  /* --- Type scale (section 4) -------------------------------------------- */
+  --pr-text-xs: 12px;
+  --pr-text-sm: 14px;
+  --pr-text-base: 16px;
+  --pr-text-lg: 18px;
+  --pr-text-xl: 24px;
+  --pr-text-2xl: 32px;
+  --pr-text-3xl: 40px;
+
+  --pr-kpi-md: 32px;
+  --pr-kpi-lg: 48px;
+  --pr-kpi-xl: 64px;
+
+  /* --- Spacing, 8px-derived (section 5) ---------------------------------- */
+  --pr-space-1: 4px;
+  --pr-space-2: 8px;
+  --pr-space-3: 12px;
+  --pr-space-4: 16px;
+  --pr-space-5: 20px;
+  --pr-space-6: 24px;
+  --pr-space-8: 32px;
+  --pr-space-10: 40px;
+  --pr-space-12: 48px;
+  --pr-space-16: 64px;
+  --pr-space-24: 96px;
+
+  /* --- Radii (section 6). Strong and somewhat angular, not bubbly. ------- */
+  --pr-radius-sm: 6px;
+  --pr-radius-input: 10px;
+  --pr-radius-button: 10px;
+  --pr-radius-card: 14px;
+  --pr-radius-large: 18px;
+  --pr-radius-pill: 999px;
+
+  /* --- Shadow (section 7). Used sparingly; hierarchy comes from surface,
+         border, type and spacing — never from floating-card shadows. ------ */
+  --pr-shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 12px rgba(0, 0, 0, 0.05);
+
+  /* =========================================================================
+     COMPATIBILITY ALIASES — Phase 1 only
+     The existing pages are still written against these names. Pointing them
+     at the approved tokens repaints the whole application without touching
+     nineteen route files. Phase 2 and 3 move pages onto the --pr-* tokens
+     through shared components, and these aliases go away with the last
+     caller.
+     ========================================================================= */
+  --background: var(--pr-bg);
+  --foreground: var(--pr-text);
+
+  /* Primary action and positive financial performance. */
+  --brand: var(--pr-profit-green);
+  /* The only approved dark green: brand, navigation, structural UI, and the
+     pressed/active state of a primary action. */
+  --brand-dark: var(--pr-rig-green);
+  /* Supporting brand surface. A tint of approved Sage over Off White, not a
+     new colour; Phase 3 replaces every use with a real status chip. */
+  --brand-soft: color-mix(in srgb, var(--pr-sage) 35%, var(--pr-off-white));
+
+  --muted: var(--pr-text-muted);
+  --card: var(--pr-surface);
+  --border: var(--pr-border);
 }
 
 @theme inline {
+  /* Aliases the existing pages use. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-brand: var(--brand);
@@ -20,9 +114,26 @@
   --color-muted: var(--muted);
   --color-card: var(--card);
   --color-border: var(--border);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-orbitron);
+
+  /* The approved palette, as utilities, for the components Phase 2 and 3
+     build. Tailwind only emits the ones actually used. */
+  --color-pr-rig-green: var(--pr-rig-green);
+  --color-pr-profit-green: var(--pr-profit-green);
+  --color-pr-sage: var(--pr-sage);
+  --color-pr-off-white: var(--pr-off-white);
+  --color-pr-charcoal: var(--pr-charcoal);
+  --color-pr-loss: var(--pr-loss);
+  --color-pr-loss-deep: var(--pr-loss-deep);
+  --color-pr-loss-wash: var(--pr-loss-wash);
+  --color-pr-surface: var(--pr-surface);
+  --color-pr-surface-dark: var(--pr-surface-dark);
+
+  /* Inter carries body copy, so it is the default sans. Satoshi is reached
+     through font-display, JetBrains Mono through font-mono — and font-mono
+     is for financial instrumentation, not for every string with a digit. */
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-satoshi);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
 html,
@@ -33,6 +144,17 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Headings and card titles are Satoshi everywhere, so the type hierarchy
+   lands across all pages in this phase without editing any of them. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+}
+
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -41,4 +163,17 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* Motion is mechanical and restrained, and must respect the system setting
+   (design system sections 18 and F). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

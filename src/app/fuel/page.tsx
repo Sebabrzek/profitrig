@@ -96,7 +96,7 @@ export default async function FuelPage() {
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Your average
           </p>
-          <p className="text-5xl font-black mt-1 leading-none">
+          <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
             {stats.averageMpg == null ? "—" : stats.averageMpg.toFixed(1)}
             <span className="text-lg font-bold opacity-80"> MPG</span>
           </p>
