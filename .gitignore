@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Phase 0 source documents — real settlements. Contain driver names, emails,
+# bank account digits, and load details. Never commit these to a remote.
+/docs/phase0-source-documents/
