@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { formatMoney } from "@/lib/format";
 import {
   ROAD_CATEGORIES,
   roadCategoryMeta,
@@ -13,9 +14,6 @@ import {
   addRoadExpenseAction,
   deleteRoadExpenseAction,
 } from "@/app/actions";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 function shortDate(iso: string) {
   const [, m, d] = iso.split("-");
@@ -96,7 +94,7 @@ export function RoadExpenseCard({
         </div>
         <div className="text-right shrink-0">
           <p className="text-xl font-black leading-none text-foreground">
-            {money(total)}
+            {formatMoney(total)}
           </p>
           <p className="text-[11px] text-muted mt-0.5">
             {rows.length} {rows.length === 1 ? "item" : "items"}
@@ -131,7 +129,7 @@ export function RoadExpenseCard({
                   )}
                 </span>
                 <span className="font-bold tabular-nums shrink-0">
-                  {money(Number(r.amount))}
+                  {formatMoney(Number(r.amount))}
                 </span>
                 <button
                   type="button"
@@ -150,7 +148,7 @@ export function RoadExpenseCard({
 
       {untaxed > 0 && (
         <p className="text-[11px] text-muted mt-2 leading-snug">
-          {money(untaxed)} of this is food. It counts against your profit
+          {formatMoney(untaxed)} of this is food. It counts against your profit
           here, but it isn&apos;t sent to the tax report — your per-diem
           worksheet already covers meals.
         </p>

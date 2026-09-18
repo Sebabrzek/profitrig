@@ -373,6 +373,50 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
   outline-offset: 2px;
 }
 
+/* ===========================================================================
+   FINANCIAL INSTRUMENTS — src/components/instruments/Instruments.tsx
+   A Reading takes its colours from the surface it sits on: light by default,
+   Rig Green inside an InstrumentPanel. Every text pairing passes WCAG AA:
+   Sage label 5.0:1, Off White number 11.4:1, 80% Off White context 7.9:1 on
+   Rig Green; muted label 5.0:1 and Charcoal number 14.7:1 on white.
+   =========================================================================== */
+
+:root {
+  --pr-reading-label: var(--pr-text-muted);
+  --pr-reading-value: var(--pr-text);
+  --pr-reading-context: var(--pr-text-muted);
+  --pr-reading-rule: var(--pr-border);
+}
+/* A reading's number is as large as the design system asks (48px hero,
+   24px secondary; 20px in a phone's half-width column) and shrinks only if
+   it would not fit: JetBrains Mono digits are 0.6em wide, so the width a
+   number needs is its length x 0.6em. Every reading measures its own column,
+   so readings side by side share one size. */
+.pr-reading {
+  container-type: inline-size;
+}
+.pr-reading-value {
+  --pr-reading-size: 20px;
+  font-size: min(
+    var(--pr-reading-size),
+    calc(100cqi / (var(--pr-chars, 8) * 0.6))
+  );
+}
+.pr-reading-value.is-hero {
+  --pr-reading-size: var(--pr-kpi-lg);
+}
+@container (min-width: 168px) {
+  .pr-reading-value:not(.is-hero) {
+    --pr-reading-size: var(--pr-text-xl);
+  }
+}
+.pr-instrument {
+  --pr-reading-label: var(--pr-sage);
+  --pr-reading-value: var(--pr-off-white);
+  --pr-reading-context: rgb(246 247 244 / 0.8);
+  --pr-reading-rule: var(--pr-border-dark);
+}
+
 /* A financial figure: a number ProfitRig is presenting as an answer — a cost
    per mile, a rate, a profit, a break-even, an efficiency reading. This is
    the single place the JetBrains Mono rule is expressed, so it stays a

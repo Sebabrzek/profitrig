@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
+import {
+  InstrumentPanel,
+  Reading,
+  ReadingGrid,
+} from "@/components/instruments/Instruments";
 import {
   AnswerColumn,
   AnswerLayout,
@@ -54,18 +60,6 @@ const EMPTY_PROFILE: CostProfile = {
   desired_profit_per_mile: 0,
   real_cpm_override: null,
 };
-
-function money(n: number) {
-  return n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-}
-
-function moneyCents(n: number) {
-  return `$${n.toFixed(2)}`;
-}
 
 function profileIsConfigured(p: CostProfile): boolean {
   return p.monthly_miles > 0 && (p.mpg > 0 || p.maintenance_per_mile > 0);
@@ -337,66 +331,54 @@ export default async function LoadsPage({
         <AnswerLayout>
         <AnswerColumn>
         {/* Weekly summary */}
-        <div
-          className={`rounded-2xl p-5 mb-4 shadow-sm text-white ${
-            totals.profit >= 0
-              ? "bg-gradient-to-br from-brand to-brand-dark"
-              : "bg-gradient-to-br from-red-500 to-red-700"
-          }`}
-        >
-          <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
-            Week profit
-          </p>
-          <p className="text-5xl font-bold mt-1 leading-none pr-figure">
-            {money(totals.profit)}
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Revenue</p>
-              <p className="text-base font-bold pr-figure">{money(totals.revenue)}</p>
-              {totals.carrierCut > 0 && (
-                <p className="text-xs opacity-80">
-                  after {money(totals.carrierCut)} to carrier
-                </p>
-              )}
-            </div>
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Costs</p>
-              <p className="text-base font-bold pr-figure">{money(totals.totalCost)}</p>
-              {totals.roadExpenses > 0 && (
-                <p className="text-xs opacity-80">
-                  incl. {money(totals.roadExpenses)} other
-                </p>
-              )}
-            </div>
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Loads</p>
-              <p className="text-base font-bold">{totals.loads}</p>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Total miles</p>
-              <p className="text-base font-bold">
-                {totals.totalMiles.toLocaleString()}
-              </p>
-              <p className="text-xs opacity-80">
-                {totals.loadedMiles.toLocaleString()} loaded •{" "}
-                {totals.deadheadMiles.toLocaleString()} deadhead
-                {totals.totalMiles > 0
-                  ? ` (${totals.deadheadPct.toFixed(0)}%)`
-                  : ""}
-              </p>
-            </div>
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Avg rate / mile</p>
-              <p className="text-base font-bold pr-figure">{moneyCents(totals.rpm)}</p>
-              <p className="text-xs opacity-80">
-                cost {moneyCents(totals.cpm)}
-              </p>
-            </div>
-          </div>
-        </div>
+        <InstrumentPanel>
+          <Reading
+            size="hero"
+            label="Week profit"
+            value={formatMoney(totals.profit, { signed: true })}
+            outcome={outcomeOf(totals.profit)}
+          />
+          <ReadingGrid>
+            <Reading
+              label="Revenue"
+              value={formatMoney(totals.revenue)}
+              context={
+                totals.carrierCut > 0 && (
+                  <>after {formatMoney(totals.carrierCut)} to carrier</>
+                )
+              }
+            />
+            <Reading
+              label="Costs"
+              value={formatMoney(totals.totalCost)}
+              context={
+                totals.roadExpenses > 0 && (
+                  <>incl. {formatMoney(totals.roadExpenses)} other</>
+                )
+              }
+            />
+            <Reading label="Loads" figure={false} value={String(totals.loads)} />
+            <Reading
+              label="Total miles"
+              figure={false}
+              value={totals.totalMiles.toLocaleString()}
+              context={
+                <>
+                  {totals.loadedMiles.toLocaleString()} loaded •{" "}
+                  {totals.deadheadMiles.toLocaleString()} deadhead
+                  {totals.totalMiles > 0
+                    ? ` (${totals.deadheadPct.toFixed(0)}%)`
+                    : ""}
+                </>
+              }
+            />
+            <Reading
+              label="Avg rate / mile"
+              value={formatRate(totals.rpm)}
+              context={<>cost {formatRate(totals.cpm)}</>}
+            />
+          </ReadingGrid>
+        </InstrumentPanel>
 
         {/* Why this week's fixed-cost share is what it is */}
         {isConfigured && allocationNotes.length > 0 && (
@@ -535,8 +517,7 @@ export default async function LoadsPage({
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {isWin ? "+" : ""}
-                      {money(e.profit)}
+                      {formatMoney(e.profit, { signed: true })}
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -551,23 +532,23 @@ export default async function LoadsPage({
                     </div>
                     <div className="bg-gray-50 rounded-lg px-3 py-2">
                       <p className="text-muted">Revenue</p>
-                      <p className="font-bold text-sm">{money(e.revenue)}</p>
+                      <p className="font-bold text-sm">{formatMoney(e.revenue)}</p>
                       {e.carrierPct > 0 && (
                         <p className="text-[10px] text-muted">
-                          {pctLabel(100 - e.carrierPct)} of {money(e.loadPay)}
+                          {pctLabel(100 - e.carrierPct)} of {formatMoney(e.loadPay)}
                         </p>
                       )}
                       <p className="text-[10px] text-muted">
-                        {moneyCents(e.rpm)} / mi
+                        {formatRate(e.rpm)} / mi
                       </p>
                     </div>
                     <div className="bg-gray-50 rounded-lg px-3 py-2">
                       <p className="text-muted">Cost</p>
                       <p className="font-bold text-sm">
-                        {money(e.totalCost)}
+                        {formatMoney(e.totalCost)}
                       </p>
                       <p className="text-[10px] text-muted">
-                        {moneyCents(e.cpm)} / mi
+                        {formatRate(e.cpm)} / mi
                       </p>
                     </div>
                   </div>

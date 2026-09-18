@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { CapitalAsset } from "@/lib/tax/types";
 import { YearSelect } from "../YearSelect";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
 
 function thisYear(): number {
   return new Date().getFullYear();
@@ -78,7 +72,7 @@ export default async function AssetsPage({
               Total cost placed in service {taxYear}
             </p>
             <p className="text-2xl font-black leading-none">
-              {money(grandTotal)}
+              {formatMoney(grandTotal)}
             </p>
             <p className="text-[10px] text-muted">
               Listed separately — never added to expense totals.
@@ -117,7 +111,7 @@ export default async function AssetsPage({
                     <p className="font-bold text-base truncate">
                       {a.description}
                     </p>
-                    <p className="font-black text-lg">{money(a.cost)}</p>
+                    <p className="font-black text-lg">{formatMoney(a.cost)}</p>
                   </div>
                   <p className="text-xs text-muted">
                     Placed in service{" "}

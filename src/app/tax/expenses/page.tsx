@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -7,13 +8,6 @@ import { fetchSubscription, isPro } from "@/lib/subscription";
 import { CATEGORIES, categoryMeta } from "@/lib/tax/categories";
 import type { Expense, ExpenseCategory } from "@/lib/tax/types";
 import { YearSelect } from "../YearSelect";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
 
 function thisYear(): number {
   return new Date().getFullYear();
@@ -96,7 +90,7 @@ export default async function ExpensesPage({
               Total {taxYear}
             </p>
             <p className="text-2xl font-black leading-none">
-              {money(grandTotal)}
+              {formatMoney(grandTotal)}
             </p>
           </div>
           <Link
@@ -135,7 +129,7 @@ export default async function ExpensesPage({
                   <div className="flex items-baseline justify-between mb-1">
                     <p className="font-bold text-sm">{cat.label}</p>
                     <p className="font-black text-base">
-                      {money(totalByCat.get(cat.key) ?? 0)}
+                      {formatMoney(totalByCat.get(cat.key) ?? 0)}
                     </p>
                   </div>
                   <p className="text-[11px] text-muted mb-3">
@@ -159,7 +153,7 @@ export default async function ExpensesPage({
                               })}
                             </span>
                             <span className="font-bold text-sm">
-                              {money(e.amount)}
+                              {formatMoney(e.amount)}
                             </span>
                           </div>
                           {(e.vendor || e.note) && (

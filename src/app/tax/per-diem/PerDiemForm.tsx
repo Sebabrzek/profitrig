@@ -1,17 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { formatMoney } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { savePerDiemSummaryAction } from "@/lib/tax/actions";
 import { computePerDiem } from "@/lib/tax/perDiem";
 import type { PerDiemRate, PerDiemSummary } from "@/lib/tax/types";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
 
 function NightsInput({
   label,
@@ -151,18 +145,18 @@ export function PerDiemForm({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <p className="font-semibold">{p.label}</p>
-                <p className="font-bold">{money(p.deductible)}</p>
+                <p className="font-bold">{formatMoney(p.deductible)}</p>
               </div>
               <p className="text-xs text-muted">
                 {p.nights} nights × ${p.rate.toFixed(0)}/day × 80% ={" "}
-                {money(p.deductible)}{" "}
+                {formatMoney(p.deductible)}{" "}
                 <span className="ml-1">({p.notice})</span>
               </p>
             </div>
           ))}
           <div className="border-t border-border pt-3 mt-1 flex items-baseline justify-between">
             <p className="font-semibold">Total deductible per-diem</p>
-            <p className="text-xl font-black">{money(computed.totalDeductible)}</p>
+            <p className="text-xl font-black">{formatMoney(computed.totalDeductible)}</p>
           </div>
           <p className="text-[11px] text-muted">
             Schedule C line 24b — Meals (80%). CPA-confirmable.

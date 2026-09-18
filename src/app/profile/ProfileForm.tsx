@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { formatMoney } from "@/lib/format";
 import {
   applyCarrierPctToPastLoadsAction,
   saveCarrierPctAction,
@@ -14,13 +15,6 @@ export type PastLoadsWithoutSplit = {
   from: string | null;
   to: string | null;
 };
-
-const usd = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
 
 const pctLabel = (n: number) => `${Number(n.toFixed(2))}%`;
 
@@ -313,7 +307,7 @@ export function ProfileForm({
                   <span className="font-bold">{pctLabel(100 - typedPct)}</span>
                   : a $2,000 load pays you{" "}
                   <span className="font-bold">
-                    {usd((2000 * (100 - typedPct)) / 100)}
+                    {formatMoney((2000 * (100 - typedPct)) / 100)}
                   </span>
                   . New loads use this, and you can change it on any single
                   load.

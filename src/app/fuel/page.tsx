@@ -1,6 +1,11 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/shell/AppShell";
 import {
+  InstrumentPanel,
+  Reading,
+  ReadingGrid,
+} from "@/components/instruments/Instruments";
+import {
   AnswerColumn,
   AnswerLayout,
   WorkColumn,
@@ -16,27 +21,6 @@ import {
 } from "@/lib/fuel";
 import { RigCard } from "./RigCard";
 import { FuelLogCard } from "./FuelLogCard";
-
-function Stat({
-  label,
-  value,
-  figure = false,
-}: {
-  label: string;
-  value: string;
-  /** True when the value is a financial/efficiency reading rather than a
-      raw count — see .pr-figure in globals.css. */
-  figure?: boolean;
-}) {
-  return (
-    <div className="bg-white/15 rounded-xl p-3">
-      <p className="opacity-80 text-xs">{label}</p>
-      <p className={`text-base font-bold${figure ? " pr-figure" : ""}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
 
 export default async function FuelPage() {
   const supabase = await createSupabaseServerClient();
@@ -103,38 +87,36 @@ export default async function FuelPage() {
 
         <AnswerLayout>
         <AnswerColumn>
-        <div className="rounded-2xl p-5 mb-4 shadow-sm text-white bg-gradient-to-br from-brand to-brand-dark">
-          <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
-            Your average
-          </p>
-          <p className="text-5xl font-bold mt-1 leading-none pr-figure">
-            {stats.averageMpg == null ? "—" : stats.averageMpg.toFixed(1)}
-            <span className="text-lg font-bold opacity-80"> MPG</span>
-          </p>
-          {stats.averageMpg == null ? (
-            <p className="mt-3 text-sm opacity-90">{nextStep}</p>
-          ) : (
-            <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-              <Stat
-                figure
+        <InstrumentPanel>
+          <Reading
+            size="hero"
+            label="Your average"
+            value={stats.averageMpg == null ? "—" : stats.averageMpg.toFixed(1)}
+            unit="MPG"
+            context={stats.averageMpg == null ? nextStep : undefined}
+          />
+          {stats.averageMpg != null && (
+            <ReadingGrid>
+              <Reading
                 label="Latest week"
                 value={
-                  stats.latestMpg == null
-                    ? "—"
-                    : `${stats.latestMpg.toFixed(1)} MPG`
+                  stats.latestMpg == null ? "—" : stats.latestMpg.toFixed(1)
                 }
+                unit={stats.latestMpg == null ? undefined : "MPG"}
               />
-              <Stat
+              <Reading
                 label="Miles tracked"
+                figure={false}
                 value={Math.round(stats.milesTracked).toLocaleString("en-US")}
               />
-              <Stat
+              <Reading
                 label="Gallons"
+                figure={false}
                 value={Math.round(stats.gallonsTracked).toLocaleString("en-US")}
               />
-            </div>
+            </ReadingGrid>
           )}
-        </div>
+        </InstrumentPanel>
 
         </AnswerColumn>
         <WorkColumn>

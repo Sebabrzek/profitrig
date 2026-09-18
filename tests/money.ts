@@ -36,6 +36,11 @@
  *      the desktop links — and could drift. There is now one list, and
  *      these checks hold every screen to it.
  *
+ *  12. Money was formatted by eleven hand-copied helpers, three of which
+ *      quietly rounded a week's profit or a load's revenue to whole dollars.
+ *      On screen, ProfitRig now drops only a meaningless ".00" — it never
+ *      rounds a real cent away.
+ *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
  */
@@ -74,6 +79,7 @@ import { computeFuelStats, isPlausibleMpg } from "../src/lib/fuel";
 import { computeCalculatorTotals } from "../src/lib/calculatorTotals";
 import { csvEscape, csvRow } from "../src/lib/csv";
 import { UPGRADE_PATH, activeNavKey, navItems } from "../src/lib/nav";
+import { MINUS, formatMoney, formatRate, outcomeOf } from "../src/lib/format";
 
 let failures = 0;
 let checks = 0;
@@ -866,6 +872,44 @@ check(
   lit("/upgrade") === null && lit("/admin") === null && lit("/login") === null
 );
 check("no pathname yet reads as the home page", activeNavKey(null) === "calc");
+
+// ─────────────────────────────────────────────────────────────────────
+section("Money on screen: cents only when they mean something");
+// ─────────────────────────────────────────────────────────────────────
+
+const m = (n: number, signed = false) => formatMoney(n, { signed });
+check("a meaningless .00 is dropped", m(9454) === "$9,454" && m(9454.0) === "$9,454");
+check("real cents are kept", m(2150.5) === "$2,150.50" && m(0.5) === "$0.50");
+check(
+  "cents are never rounded away",
+  m(1074.37) === "$1,074.37" && m(148210.37) === "$148,210.37",
+  `${m(1074.37)} · ${m(148210.37)}`
+);
+check("a profit is signed +", m(987, true) === "+$987" && m(624.18, true) === "+$624.18");
+check("a loss is signed with a true minus", m(-142) === `${MINUS}$142` && m(-142, true) === `${MINUS}$142`);
+check("the minus is U+2212, not a hyphen", !m(-142).includes("-"));
+check("zero carries no sign either way", m(0) === "$0" && m(0, true) === "$0" && m(-0.004, true) === "$0");
+check("thousands separators", m(1234567.89) === "$1,234,567.89");
+check("an unfinished number shows a dash, not $NaN", m(Number.NaN) === "—" && m(Infinity) === "—");
+
+check("a rate always shows cents", formatRate(2) === "$2.00" && formatRate(2.4) === "$2.40");
+check("a rate rounds to the cent like the screen always has", formatRate(2.456) === "$2.46");
+check("a rate can carry its unit", formatRate(2.46, { unit: "mi" }) === "$2.46 / mi");
+check(
+  "a per-mile profit is signed",
+  formatRate(0.42, { signed: true, unit: "mi" }) === "+$0.42 / mi" &&
+    formatRate(-0.42, { signed: true }) === `${MINUS}$0.42`
+);
+check(
+  "the calculator's $2.10 still reads $2.10",
+  formatRate(calc.computedCPM) === "$2.10" && formatRate(calc.requiredRate) === "$2.60"
+);
+
+check(
+  "profit, loss and break-even-to-the-cent are told apart",
+  outcomeOf(0.01) === "profit" && outcomeOf(-0.01) === "loss" &&
+    outcomeOf(0) === undefined && outcomeOf(0.004) === undefined
+);
 
 // ─────────────────────────────────────────────────────────────────────
 

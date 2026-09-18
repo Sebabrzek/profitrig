@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { formatRate } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { deleteSnapshotAction, loadSnapshotAction } from "../actions";
 
@@ -28,13 +29,6 @@ function carrierLine(s: Snapshot): string | null {
   return null;
 }
 
-const money = (n: number) =>
-  Number.isFinite(n)
-    ? `$${Number(n).toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
-    : "$0.00";
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -110,7 +104,7 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
             <div className="text-right shrink-0">
               <p className="text-xs text-muted">Cost / mile</p>
               <p className="text-xl font-black text-brand-dark leading-none">
-                {money(Number(s.total_cpm))}
+                {formatRate(Number(s.total_cpm))}
               </p>
             </div>
           </div>
@@ -118,7 +112,7 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
             <div className="bg-gray-50 rounded-lg px-3 py-2">
               <p className="text-muted">Target rate</p>
               <p className="font-bold text-sm">
-                {money(Number(s.required_rate))}
+                {formatRate(Number(s.required_rate))}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2">
@@ -130,7 +124,7 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
             <div className="bg-gray-50 rounded-lg px-3 py-2">
               <p className="text-muted">Profit / mi</p>
               <p className="font-bold text-sm">
-                {money(Number(s.desired_profit_per_mile))}
+                {formatRate(Number(s.desired_profit_per_mile))}
               </p>
             </div>
           </div>

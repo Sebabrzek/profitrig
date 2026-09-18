@@ -1,5 +1,13 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { formatMoney } from "@/lib/format";
+import {
+  InstrumentPanel,
+  PanelNote,
+  Reading,
+  ReadingGrid,
+  StatTile,
+} from "@/components/instruments/Instruments";
 import {
   AnswerColumn,
   AnswerLayout,
@@ -24,20 +32,6 @@ import {
 } from "@/lib/tax/report";
 import type { Load } from "@/lib/loads";
 import { YearSelect } from "./YearSelect";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-
-const moneyCents = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
 
 function thisYear(): number {
   return new Date().getFullYear();
@@ -189,73 +183,64 @@ export default async function TaxPage({
         <AnswerLayout>
         <AnswerColumn>
         {/* Headline summary card */}
-        <section className="bg-gradient-to-br from-brand to-brand-dark text-white rounded-2xl p-5 mb-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
-            Gross revenue · {taxYear}
-          </p>
-          <p className="text-5xl font-bold mt-1 leading-none pr-figure">
-            {money(revenue.total)}
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Linehaul</p>
-              <p className="text-base font-bold pr-figure">{money(revenue.linehaul)}</p>
-            </div>
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">FSC</p>
-              <p className="text-base font-bold pr-figure">
-                {money(revenue.fuel_surcharge)}
-              </p>
-            </div>
-            <div className="bg-white/15 rounded-xl p-3">
-              <p className="opacity-80 text-xs">Accessorials</p>
-              <p className="text-base font-bold pr-figure">
-                {money(revenue.accessorials)}
-              </p>
-            </div>
-          </div>
-          <p className="text-xs opacity-90 mt-3">
+        <InstrumentPanel>
+          <Reading
+            size="hero"
+            label={<>Gross revenue · {taxYear}</>}
+            value={formatMoney(revenue.total)}
+          />
+          <ReadingGrid>
+            <Reading label="Linehaul" value={formatMoney(revenue.linehaul)} />
+            <Reading label="FSC" value={formatMoney(revenue.fuel_surcharge)} />
+            <Reading
+              label="Accessorials"
+              value={formatMoney(revenue.accessorials)}
+            />
+          </ReadingGrid>
+          <PanelNote>
             {loads.length.toLocaleString()} loads ·{" "}
             {loadActuals.totalMiles.toLocaleString()} total miles (
             {loadActuals.loadedMiles.toLocaleString()} loaded +{" "}
             {loadActuals.deadheadMiles.toLocaleString()} deadhead)
-          </p>
-        </section>
+          </PanelNote>
+        </InstrumentPanel>
 
         </AnswerColumn>
         <WorkColumn>
         {/* Stat tiles */}
         <section className="grid grid-cols-2 gap-3 mb-4">
-          <StatCard
+          <StatTile
             href={`/tax/expenses?year=${taxYear}`}
             label="Expenses (non-load)"
-            value={money(expenseTotal)}
-            subtitle="Categorized actuals"
+            value={formatMoney(expenseTotal)}
+            context="Categorized actuals"
           />
-          <StatCard
+          <StatTile
             href={`/tax/assets?year=${taxYear}`}
             label="Capital assets"
-            value={money(assetTotal)}
-            subtitle="Listed separately — CPA depreciates"
+            value={formatMoney(assetTotal)}
+            context="Listed separately — CPA depreciates"
           />
-          <StatCard
+          <StatTile
             href={`/tax/per-diem?year=${taxYear}`}
             label="Per-diem"
+            figure={false}
             value={`${perDiemNights} nights`}
-            subtitle="× rate × 80% (DOT)"
+            context="× rate × 80% (DOT)"
           />
-          <StatCard
+          <StatTile
             href={`/tax/profile`}
             label="Tax Profile"
+            figure={false}
             value={entityTypeLabel(profile.entity_type)}
-            subtitle={`${truckFinancingLabel(profile.truck_financing)} · ${
+            context={`${truckFinancingLabel(profile.truck_financing)} · ${
               profile.has_hired_driver ? "Has hired driver" : "Owner-driver"
             }`}
           />
         </section>
 
         {/* Load-derived actuals snapshot (tax view) */}
-        <section className="bg-white border border-border rounded-2xl p-5 mb-4">
+        <section className="@container bg-white border border-border rounded-2xl p-5 mb-4">
           <p className="text-xs uppercase tracking-wider text-muted font-semibold">
             From your loads · {taxYear}
           </p>
@@ -263,21 +248,21 @@ export default async function TaxPage({
             Only actual receipts entered on each load. Estimates and reserves
             from the Calculator never appear here.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-            <Stat
+          <ReadingGrid>
+            <Reading
               label="Fuel actual"
-              value={money(loadActuals.fuelActualTotal)}
-              subtitle={`${loadActuals.fuelLoadsWithActual} of ${loadActuals.fuelLoadsTotal} loads`}
+              value={formatMoney(loadActuals.fuelActualTotal)}
+              context={`${loadActuals.fuelLoadsWithActual} of ${loadActuals.fuelLoadsTotal} loads`}
             />
-            <Stat
+            <Reading
               label="Tolls actual"
-              value={money(loadActuals.tollsActualTotal)}
+              value={formatMoney(loadActuals.tollsActualTotal)}
             />
-            <Stat
+            <Reading
               label="Lumpers actual"
-              value={money(loadActuals.lumpersActualTotal)}
+              value={formatMoney(loadActuals.lumpersActualTotal)}
             />
-          </div>
+          </ReadingGrid>
         </section>
 
         {/* Driver pay treatment note */}
@@ -345,62 +330,17 @@ export default async function TaxPage({
 
         {/* Below: tiny totals for audit feel */}
         <p className="text-[10px] text-muted mt-4">
-          Audit: revenue {moneyCents(revenue.total)} · load-actuals (fuel +
-          tolls + lumpers) {moneyCents(
+          Audit: revenue {formatMoney(revenue.total)} · load-actuals (fuel +
+          tolls + lumpers) {formatMoney(
             loadActuals.fuelActualTotal +
               loadActuals.tollsActualTotal +
               loadActuals.lumpersActualTotal
           )}{" "}
-          · non-load expenses {moneyCents(expenseTotal)} · capital assets{" "}
-          {moneyCents(assetTotal)} (excluded from expense totals)
+          · non-load expenses {formatMoney(expenseTotal)} · capital assets{" "}
+          {formatMoney(assetTotal)} (excluded from expense totals)
         </p>
         </WorkColumn>
         </AnswerLayout>
     </AppShell>
-  );
-}
-
-function StatCard({
-  href,
-  label,
-  value,
-  subtitle,
-}: {
-  href: string;
-  label: string;
-  value: string;
-  subtitle: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="bg-white border border-border rounded-2xl p-4 hover:border-brand transition"
-    >
-      <p className="text-xs uppercase tracking-wider text-muted font-semibold">
-        {label}
-      </p>
-      <p className="text-xl font-black mt-1 leading-none text-brand-dark">
-        {value}
-      </p>
-      <p className="text-[11px] text-muted mt-1">{subtitle}</p>
-    </Link>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  subtitle,
-}: {
-  label: string;
-  value: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="bg-gray-50 rounded-xl p-3">
-      <p className="text-muted text-xs">{label}</p>
-      <p className="text-sm font-bold">{value}</p>
-      {subtitle && <p className="text-[10px] text-muted">{subtitle}</p>}
-    </div>
   );
 }

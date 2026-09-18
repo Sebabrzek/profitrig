@@ -10,6 +10,12 @@ import {
   type CostProfile,
 } from "./actions";
 import { computeCalculatorTotals } from "@/lib/calculatorTotals";
+import { formatMoney, formatRate } from "@/lib/format";
+import {
+  InstrumentPanel,
+  Reading,
+  ReadingGrid,
+} from "@/components/instruments/Instruments";
 import { ProfileBanner } from "@/components/ProfileBanner";
 import {
   AnswerColumn,
@@ -23,14 +29,6 @@ import {
   saveVisitorProfile,
   clearVisitorProfile,
 } from "@/lib/visitorProfile";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-
-const cpm = (n: number) =>
-  Number.isFinite(n) && n > 0
-    ? `$${n.toFixed(2)}`
-    : "$0.00";
 
 type NumKey = keyof CostProfile;
 
@@ -258,10 +256,10 @@ export function Calculator({
             Your real cost/mile from{" "}
             <span className="font-bold">{loggedLoadCount} logged loads</span>:{" "}
             <span className="font-bold text-brand-dark">
-              ${realCPMFromLoads!.toFixed(2)}
+              {formatRate(realCPMFromLoads!)}
             </span>{" "}
             <span className="text-muted">
-              (you estimated ${totals.computedCPM.toFixed(2)})
+              (you estimated {formatRate(totals.computedCPM)})
             </span>
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -274,8 +272,8 @@ export function Calculator({
               {overridePending
                 ? "Updating…"
                 : overrideActive
-                ? `Refresh override to $${realCPMFromLoads!.toFixed(2)}`
-                : `Update my estimate to $${realCPMFromLoads!.toFixed(2)}`}
+                ? `Refresh override to ${formatRate(realCPMFromLoads!)}`
+                : `Update my estimate to ${formatRate(realCPMFromLoads!)}`}
             </button>
             {overrideJustSet != null && (
               <span className="text-xs text-brand-dark font-semibold">
@@ -286,60 +284,53 @@ export function Calculator({
         </div>
       )}
       {/* Big result card */}
-      <div className="bg-gradient-to-br from-brand to-brand-dark text-white rounded-2xl p-5 mb-4 shadow-sm">
-        <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
-          Your true cost per mile
-        </p>
-        <p className="text-5xl font-bold mt-1 leading-none pr-figure">
-          {cpm(totals.totalCPM)}
-        </p>
-        {overrideActive && (
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-            <span
-              className="inline-flex items-center gap-1 bg-amber-300 text-amber-950 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
-              title="You set this value manually from your logged loads. Editing the line items below will not change this number until you reset."
-            >
-              Manual
-            </span>
-            <button
-              type="button"
-              onClick={() => applyRealCpmOverride(null)}
-              disabled={overridePending}
-              className="underline underline-offset-2 text-white/90 hover:text-white font-semibold disabled:opacity-60"
-            >
-              Reset to computed (${totals.computedCPM.toFixed(2)})
-            </button>
-          </div>
-        )}
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Minimum target rate</p>
-            <p className="text-xl font-bold pr-figure">{cpm(totals.requiredRate)}</p>
-            <p className="text-xs opacity-80 mt-0.5">
-              (cost + {cpm(p.desired_profit_per_mile)} profit)
-            </p>
-          </div>
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Break-even monthly revenue</p>
-            <p className="text-xl font-bold pr-figure">
-              {money(Math.round(totals.breakEven))}
-            </p>
-            <p className="text-xs opacity-80 mt-0.5">
-              at {p.monthly_miles.toLocaleString()} mi
-            </p>
-          </div>
-        </div>
-        {totals.projectedProfit > 0 && (
-          <div className="mt-3 bg-white/15 rounded-xl p-3 text-sm">
-            <p className="opacity-80 text-xs">
-              Projected monthly profit at target rate
-            </p>
-            <p className="text-xl font-bold pr-figure">
-              {money(Math.round(totals.projectedProfit))}
-            </p>
-          </div>
-        )}
-      </div>
+      <InstrumentPanel>
+        <Reading
+          size="hero"
+          label="Your true cost per mile"
+          value={formatRate(totals.totalCPM)}
+        >
+          {overrideActive && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              <span
+                className="inline-flex items-center rounded-full border border-[var(--pr-border-dark)] bg-white/10 px-2 py-0.5 font-display font-bold uppercase tracking-wider text-[var(--pr-off-white)]"
+                title="You set this value manually from your logged loads. Editing the line items below will not change this number until you reset."
+              >
+                Manual
+              </span>
+              <button
+                type="button"
+                onClick={() => applyRealCpmOverride(null)}
+                disabled={overridePending}
+                className="underline underline-offset-2 text-white/90 hover:text-white font-semibold disabled:opacity-60"
+              >
+                Reset to computed ({formatRate(totals.computedCPM)})
+              </button>
+            </div>
+          )}
+        </Reading>
+        <ReadingGrid>
+          <Reading
+            label="Minimum target rate"
+            value={formatRate(totals.requiredRate)}
+            context={<>(cost + {formatRate(p.desired_profit_per_mile)} profit)</>}
+          />
+          <Reading
+            label="Break-even monthly revenue"
+            value={formatMoney(Math.round(totals.breakEven))}
+            context={<>at {p.monthly_miles.toLocaleString()} mi</>}
+          />
+          {totals.projectedProfit > 0 && (
+            <Reading
+              fullRowWhenNarrow
+              label="Projected monthly profit at target rate"
+              value={formatMoney(Math.round(totals.projectedProfit), {
+                signed: true,
+              })}
+            />
+          )}
+        </ReadingGrid>
+      </InstrumentPanel>
 
       </AnswerColumn>
       <WorkColumn>
@@ -413,7 +404,7 @@ export function Calculator({
         </div>
         <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
           <span className="font-semibold">Total Fixed Costs</span>
-          <span className="font-bold">{money(totals.fixed)}</span>
+          <span className="font-bold">{formatMoney(totals.fixed)}</span>
         </div>
       </Section>
 
@@ -451,7 +442,7 @@ export function Calculator({
         />
         <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
           <span className="font-semibold">Fuel Cost Per Mile</span>
-          <span className="font-bold">{cpm(totals.fuelPerMile)}</span>
+          <span className="font-bold">{formatRate(totals.fuelPerMile)}</span>
         </div>
       </Section>
 
@@ -491,7 +482,7 @@ export function Calculator({
         </div>
         <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
           <span className="font-semibold">Total Variable / mile</span>
-          <span className="font-bold">{cpm(totals.variablePerMile)}</span>
+          <span className="font-bold">{formatRate(totals.variablePerMile)}</span>
         </div>
       </Section>
 

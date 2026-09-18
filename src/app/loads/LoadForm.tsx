@@ -11,25 +11,18 @@ import {
 } from "@/lib/loads";
 import type { CostProfile } from "../actions";
 import { deleteLoadAction, saveLoadAction } from "../actions";
+import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
+import {
+  InstrumentPanel,
+  PanelNote,
+  Reading,
+  ReadingGrid,
+} from "@/components/instruments/Instruments";
 import {
   AnswerColumn,
   AnswerLayout,
   WorkColumn,
 } from "@/components/shell/AnswerLayout";
-
-const money = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
-
-const moneyCompact = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
 
 function textForValue(v: number) {
   return v === 0 ? "" : String(v);
@@ -155,7 +148,7 @@ function OptionalMoneyInput({
       {usingEstimate ? (
         <div className="h-12 px-4 rounded-xl border border-dashed border-border bg-gray-50 flex items-center justify-between">
           <span className="text-muted text-sm">Estimated</span>
-          <span className="font-semibold text-sm">{money(estimate)}</span>
+          <span className="font-semibold text-sm">{formatMoney(estimate)}</span>
         </div>
       ) : (
         <NumInput
@@ -282,71 +275,57 @@ export function LoadForm({
     <AnswerLayout>
       <AnswerColumn>
       {/* Live profit result */}
-      <div
-        className={`rounded-2xl p-5 mb-4 shadow-sm text-white ${
-          e.profit >= 0
-            ? "bg-gradient-to-br from-brand to-brand-dark"
-            : "bg-gradient-to-br from-red-500 to-red-700"
-        }`}
-      >
-        <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
-          Profit this load
-        </p>
-        <p className="text-5xl font-bold mt-1 leading-none pr-figure">
-          {money(e.profit)}
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Rate achieved</p>
-            <p className="text-xl font-bold leading-none pr-figure">
-              {e.totalMiles > 0 ? `$${e.rpm.toFixed(2)}` : "—"}
-              <span className="text-xs font-bold opacity-80"> /mi</span>
-            </p>
-            {e.totalMiles > 0 && (
-              <p
-                className={`text-[11px] font-semibold mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
-                  e.rpm >= e.cpm
-                    ? "bg-white/25 text-white"
-                    : "bg-red-100/90 text-red-900"
-                }`}
-              >
-                {e.rpm >= e.cpm ? "↑" : "↓"} {`$${e.cpm.toFixed(2)}`} cost
-              </p>
-            )}
-          </div>
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Miles</p>
-            <p className="text-xl font-black leading-none">
-              {e.totalMiles.toLocaleString()}
-            </p>
-            {e.totalMiles > 0 && (
-              <p className="text-[11px] opacity-80 mt-1">
-                {e.deadheadPct.toFixed(0)}% deadhead
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Revenue</p>
-            <p className="text-base font-bold pr-figure">{moneyCompact(e.revenue)}</p>
-            {e.carrierCut > 0 && (
-              <p className="text-[11px] opacity-80">
-                after {moneyCompact(e.carrierCut)} to carrier
-              </p>
-            )}
-          </div>
-          <div className="bg-white/15 rounded-xl p-3">
-            <p className="opacity-80 text-xs">Cost</p>
-            <p className="text-base font-bold pr-figure">{moneyCompact(e.totalCost)}</p>
-          </div>
-        </div>
+      <InstrumentPanel>
+        <Reading
+          size="hero"
+          label="Profit this load"
+          value={formatMoney(e.profit, { signed: true })}
+          outcome={outcomeOf(e.profit)}
+        />
+        <ReadingGrid wideColumns={2}>
+          <Reading
+            label="Rate achieved"
+            value={e.totalMiles > 0 ? formatRate(e.rpm) : "—"}
+            unit={e.totalMiles > 0 ? "/ mi" : undefined}
+            context={
+              e.totalMiles > 0 && (
+                <>
+                  <span aria-hidden="true">
+                    {e.rpm >= e.cpm ? "↑" : "↓"}{" "}
+                  </span>
+                  <span className="sr-only">
+                    {e.rpm >= e.cpm ? "at or above" : "below"}{" "}
+                  </span>
+                  {formatRate(e.cpm)} cost
+                </>
+              )
+            }
+          />
+          <Reading
+            label="Miles"
+            figure={false}
+            value={e.totalMiles.toLocaleString()}
+            context={
+              e.totalMiles > 0 && <>{e.deadheadPct.toFixed(0)}% deadhead</>
+            }
+          />
+          <Reading
+            label="Revenue"
+            value={formatMoney(e.revenue)}
+            context={
+              e.carrierCut > 0 && (
+                <>after {formatMoney(e.carrierCut)} to carrier</>
+              )
+            }
+          />
+          <Reading label="Cost" value={formatMoney(e.totalCost)} />
+        </ReadingGrid>
         {e.totalMiles > 0 && (
-          <div className="mt-2 text-xs opacity-90">
-            Net {`$${e.profitPerMile.toFixed(2)}`}/mi
-          </div>
+          <PanelNote>
+            Net {formatRate(e.profitPerMile, { signed: true, unit: "mi" })}
+          </PanelNote>
         )}
-      </div>
+      </InstrumentPanel>
 
       </AnswerColumn>
       <WorkColumn>
@@ -472,23 +451,23 @@ export function LoadForm({
           <div className="sm:col-span-2 bg-gray-50 rounded-xl px-4 py-3 text-sm flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-muted">Load pay</span>
-              <span className="font-semibold">{money(e.loadPay)}</span>
+              <span className="font-semibold">{formatMoney(e.loadPay)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted">
                 Carrier keeps {Number(e.carrierPct.toFixed(2))}%
               </span>
-              <span className="font-semibold">−{money(e.carrierCut)}</span>
+              <span className="font-semibold">−{formatMoney(e.carrierCut)}</span>
             </div>
             <div className="flex items-center justify-between border-t border-border pt-1.5">
               <span className="font-semibold">You keep</span>
-              <span className="font-bold">{money(e.revenue)}</span>
+              <span className="font-bold">{formatMoney(e.revenue)}</span>
             </div>
           </div>
         ) : (
           <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
             <span className="font-semibold">Total revenue</span>
-            <span className="font-bold">{money(e.revenue)}</span>
+            <span className="font-bold">{formatMoney(e.revenue)}</span>
           </div>
         )}
       </Section>
@@ -501,7 +480,7 @@ export function LoadForm({
           label="Fuel"
           hint={`Estimate uses ${
             costProfile.mpg > 0 ? `${costProfile.mpg} MPG @ ` : ""
-          }$${costProfile.fuel_price_per_gallon.toFixed(2)}/gal.`}
+          }${formatRate(costProfile.fuel_price_per_gallon)}/gal.`}
           value={load.fuel_actual}
           estimate={e.fuelIsEstimated ? e.fuelCost : 0}
           onChange={setField("fuel_actual")}
@@ -532,25 +511,25 @@ export function LoadForm({
         <div className="sm:col-span-2 grid grid-cols-2 gap-3 text-sm">
           <div className="bg-gray-50 rounded-xl px-3 py-2">
             <p className="text-muted text-xs">Driver pay</p>
-            <p className="font-bold">{money(e.driverPayCost)}</p>
+            <p className="font-bold">{formatMoney(e.driverPayCost)}</p>
           </div>
           <div className="bg-gray-50 rounded-xl px-3 py-2">
             <p className="text-muted text-xs">Maintenance reserve</p>
-            <p className="font-bold">{money(e.maintenanceCost)}</p>
+            <p className="font-bold">{formatMoney(e.maintenanceCost)}</p>
           </div>
           <div className="bg-gray-50 rounded-xl px-3 py-2">
             <p className="text-muted text-xs">Tires</p>
-            <p className="font-bold">{money(e.tiresCost)}</p>
+            <p className="font-bold">{formatMoney(e.tiresCost)}</p>
           </div>
           <div className="bg-gray-50 rounded-xl px-3 py-2">
             <p className="text-muted text-xs">DEF</p>
-            <p className="font-bold">{money(e.defCost)}</p>
+            <p className="font-bold">{formatMoney(e.defCost)}</p>
           </div>
           <div className="col-span-2 bg-gray-50 rounded-xl px-3 py-2">
             <p className="text-muted text-xs">
               Fixed costs allocated (truck/trailer/insurance/permits/overhead)
             </p>
-            <p className="font-bold">{money(e.allocatedFixedCost)}</p>
+            <p className="font-bold">{formatMoney(e.allocatedFixedCost)}</p>
             <p className="text-xs text-muted mt-0.5">
               {e.allocationBasis === "actual_mtd" ? (
                 <>

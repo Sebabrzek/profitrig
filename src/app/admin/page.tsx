@@ -1,5 +1,7 @@
 import "server-only";
 import { AppShell } from "@/components/shell/AppShell";
+import { formatRate } from "@/lib/format";
+import { StatTile } from "@/components/instruments/Instruments";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -62,28 +64,6 @@ function formatDate(iso: string | null) {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function StatCard({
-  label,
-  value,
-  sublabel,
-}: {
-  label: string;
-  value: string | number;
-  sublabel?: string;
-}) {
-  return (
-    <div className="bg-white border border-border rounded-2xl p-4">
-      <p className="text-xs uppercase tracking-wider text-muted font-semibold">
-        {label}
-      </p>
-      <p className="text-3xl font-black mt-1 leading-none text-brand-dark">
-        {value}
-      </p>
-      {sublabel && <p className="text-xs text-muted mt-1">{sublabel}</p>}
-    </div>
-  );
 }
 
 function Bar({
@@ -312,47 +292,54 @@ ADMIN_EMAILS = ${user.email}`}
         </div>
 
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard label="Total signups" value={users.length} />
-          <StatCard label="Last 7 days" value={last7} />
-          <StatCard label="Last 30 days" value={last30} />
-          <StatCard
+          <StatTile figure={false} label="Total signups" value={String(users.length)} />
+          <StatTile figure={false} label="Last 7 days" value={String(last7)} />
+          <StatTile figure={false} label="Last 30 days" value={String(last30)} />
+          <StatTile
+            figure={false}
             label="Email confirmed"
-            value={confirmed}
-            sublabel={`${users.length - confirmed} pending`}
+            value={String(confirmed)}
+            context={`${users.length - confirmed} pending`}
           />
-          <StatCard
+          <StatTile
+            figure={false}
             label="Profile filled"
-            value={profileFilled}
-            sublabel={`of ${users.length}`}
+            value={String(profileFilled)}
+            context={`of ${users.length}`}
           />
-          <StatCard
+          <StatTile
+            figure={false}
             label="Marketing opt-in"
-            value={optIn}
-            sublabel={`of ${profiles.length} profiles`}
+            value={String(optIn)}
+            context={`of ${profiles.length} profiles`}
           />
         </section>
 
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard
+          <StatTile
+            figure={false}
             label="Cost profiles saved"
-            value={usersWithCPM}
-            sublabel={`of ${users.length} users`}
+            value={String(usersWithCPM)}
+            context={`of ${users.length} users`}
           />
-          <StatCard
+          <StatTile
+            figure={false}
             label="Tracking loads"
-            value={usersWithLoads}
-            sublabel={`of ${users.length} users`}
+            value={String(usersWithLoads)}
+            context={`of ${users.length} users`}
           />
-          <StatCard
+          <StatTile
+            figure={false}
             label="History snapshots"
-            value={snapshotsCountRes.count ?? 0}
+            value={String(snapshotsCountRes.count ?? 0)}
           />
-          <StatCard
+          <StatTile
+            figure={false}
             label="Total loads logged"
-            value={Array.from(loadCountByUser.values()).reduce(
+            value={String(Array.from(loadCountByUser.values()).reduce(
               (a, b) => a + b,
               0
-            )}
+            ))}
           />
         </section>
 
@@ -411,7 +398,7 @@ ADMIN_EMAILS = ${user.email}`}
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap font-semibold">
                         {cpm
-                          ? `$${cpm.totalCPM.toFixed(2)}`
+                          ? formatRate(cpm.totalCPM)
                           : "—"}
                         {cpm?.hasOverride && (
                           <span className="ml-1 text-[9px] uppercase tracking-wider bg-amber-200 text-amber-900 px-1 rounded-full font-bold">
@@ -420,7 +407,7 @@ ADMIN_EMAILS = ${user.email}`}
                         )}
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap font-semibold text-brand-dark">
-                        {cpm ? `$${cpm.requiredRate.toFixed(2)}` : "—"}
+                        {cpm ? formatRate(cpm.requiredRate) : "—"}
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap">
                         {cpm && cpm.monthlyMiles > 0
