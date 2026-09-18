@@ -272,7 +272,7 @@ export default async function TaxPage({
               <>
                 You have a hired driver. Enter their actual{" "}
                 <strong>wages (W-2)</strong> or{" "}
-                <strong>contract pay (1099)</strong> as Expenses (use the
+                <strong>contract pay (1099)</strong>{" "}as Expenses (use the
                 &quot;Other&quot; category with a clear note). Your CPA will
                 place them on the right Schedule C line. Your own
                 owner&apos;s pay stays excluded.
