@@ -73,7 +73,7 @@ export default async function ExpensesPage({
 
   return (
     <AppShell
-      width="standard"
+      width="form"
       account={{
         email: user.email ?? "",
         isPro: true,

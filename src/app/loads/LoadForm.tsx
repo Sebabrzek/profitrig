@@ -11,6 +11,11 @@ import {
 } from "@/lib/loads";
 import type { CostProfile } from "../actions";
 import { deleteLoadAction, saveLoadAction } from "../actions";
+import {
+  AnswerColumn,
+  AnswerLayout,
+  WorkColumn,
+} from "@/components/shell/AnswerLayout";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", {
@@ -274,7 +279,8 @@ export function LoadForm({
   }
 
   return (
-    <div>
+    <AnswerLayout>
+      <AnswerColumn>
       {/* Live profit result */}
       <div
         className={`rounded-2xl p-5 mb-4 shadow-sm text-white ${
@@ -342,6 +348,8 @@ export function LoadForm({
         )}
       </div>
 
+      </AnswerColumn>
+      <WorkColumn>
       <Section title="Trip info">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">Date</span>
@@ -613,6 +621,7 @@ export function LoadForm({
           {pending ? "Saving..." : loadId ? "Save changes" : "Save load"}
         </button>
       </div>
-    </div>
+      </WorkColumn>
+    </AnswerLayout>
   );
 }

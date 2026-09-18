@@ -1,5 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/shell/AppShell";
+import {
+  AnswerColumn,
+  AnswerLayout,
+  WorkColumn,
+} from "@/components/shell/AnswerLayout";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { driverToday } from "@/lib/driverClock";
@@ -96,6 +101,8 @@ export default async function FuelPage() {
           works out the miles per gallon your truck really gets.
         </p>
 
+        <AnswerLayout>
+        <AnswerColumn>
         <div className="rounded-2xl p-5 mb-4 shadow-sm text-white bg-gradient-to-br from-brand to-brand-dark">
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Your average
@@ -129,12 +136,16 @@ export default async function FuelPage() {
           )}
         </div>
 
+        </AnswerColumn>
+        <WorkColumn>
         <RigCard initial={rig} />
         <FuelLogCard
           entries={stats.entries}
           lastOdometer={stats.lastOdometer}
           today={today}
         />
+        </WorkColumn>
+        </AnswerLayout>
     </AppShell>
   );
 }

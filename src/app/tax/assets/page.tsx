@@ -55,7 +55,7 @@ export default async function AssetsPage({
 
   return (
     <AppShell
-      width="standard"
+      width="form"
       account={{
         email: user.email ?? "",
         isPro: true,

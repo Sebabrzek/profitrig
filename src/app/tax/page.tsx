@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import {
+  AnswerColumn,
+  AnswerLayout,
+  WorkColumn,
+} from "@/components/shell/AnswerLayout";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -181,6 +186,8 @@ export default async function TaxPage({
           </div>
         )}
 
+        <AnswerLayout>
+        <AnswerColumn>
         {/* Headline summary card */}
         <section className="bg-gradient-to-br from-brand to-brand-dark text-white rounded-2xl p-5 mb-4 shadow-sm">
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
@@ -215,6 +222,8 @@ export default async function TaxPage({
           </p>
         </section>
 
+        </AnswerColumn>
+        <WorkColumn>
         {/* Stat tiles */}
         <section className="grid grid-cols-2 gap-3 mb-4">
           <StatCard
@@ -345,6 +354,8 @@ export default async function TaxPage({
           · non-load expenses {moneyCents(expenseTotal)} · capital assets{" "}
           {moneyCents(assetTotal)} (excluded from expense totals)
         </p>
+        </WorkColumn>
+        </AnswerLayout>
     </AppShell>
   );
 }

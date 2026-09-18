@@ -457,6 +457,10 @@ ADMIN_EMAILS = ${user.email}`}
           </p>
         </section>
 
+        {/* The two feedback lists sit side by side once there is room,
+            in their existing order: latest feedback, then questions. */}
+        <div className="@container">
+        <div className="grid gap-6 items-start @min-[960px]:grid-cols-2">
         <section className="bg-white border border-border rounded-2xl p-5">
           <h2 className="text-lg font-bold mb-3">
             Latest feedback{" "}
@@ -560,6 +564,8 @@ ADMIN_EMAILS = ${user.email}`}
             </p>
           )}
         </section>
+        </div>
+        </div>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="bg-white border border-border rounded-2xl p-5">

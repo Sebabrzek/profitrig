@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import {
+  AnswerColumn,
+  AnswerLayout,
+  WorkColumn,
+} from "@/components/shell/AnswerLayout";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -328,6 +333,9 @@ export default async function LoadsPage({
           </div>
         ) : null}
 
+        {/* The weekly scoreboard: the result and why it is what it is. */}
+        <AnswerLayout>
+        <AnswerColumn>
         {/* Weekly summary */}
         <div
           className={`rounded-2xl p-5 mb-4 shadow-sm text-white ${
@@ -408,6 +416,8 @@ export default async function LoadsPage({
           </div>
         )}
 
+        </AnswerColumn>
+        <WorkColumn>
         {/* Other expenses this week (not tied to a single load) */}
         <RoadExpenseCard
           rows={roadExpenses}
@@ -566,6 +576,8 @@ export default async function LoadsPage({
             })}
           </div>
         )}
+        </WorkColumn>
+        </AnswerLayout>
     </AppShell>
   );
 }

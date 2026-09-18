@@ -11,6 +11,11 @@ import {
 } from "./actions";
 import { computeCalculatorTotals } from "@/lib/calculatorTotals";
 import { ProfileBanner } from "@/components/ProfileBanner";
+import {
+  AnswerColumn,
+  AnswerLayout,
+  WorkColumn,
+} from "@/components/shell/AnswerLayout";
 import { VisitorPitch } from "@/components/VisitorPitch";
 import {
   VISITOR_PROFILE_KEY,
@@ -242,6 +247,8 @@ export function Calculator({
   return (
     <div>
       {isAuthed && <ProfileBanner profileComplete={profileComplete} />}
+      <AnswerLayout>
+      <AnswerColumn>
       {realInsightVisible && (
         <div className="bg-white border border-border rounded-2xl p-4 mb-4">
           <p className="text-xs uppercase tracking-wider text-muted font-semibold">
@@ -334,6 +341,8 @@ export function Calculator({
         )}
       </div>
 
+      </AnswerColumn>
+      <WorkColumn>
       <Section
         title="Fixed Costs (Monthly)"
         subtitle="Bills you pay whether you run 5,000 miles or 12,000."
@@ -564,6 +573,9 @@ export function Calculator({
 
       {/* Visitors: after they've seen their own number, pitch the tracker. */}
       {!isAuthed && <VisitorPitch />}
+
+      </WorkColumn>
+      </AnswerLayout>
 
       {/* Save bar */}
       <div

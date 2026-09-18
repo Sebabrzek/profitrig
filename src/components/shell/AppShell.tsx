@@ -15,11 +15,13 @@ import { SidebarNav } from "./SidebarNav";
  * them to navigate to yet.
  *
  * A page chooses how wide its content column is:
- *   form      narrow workflows — settings, profile, single-record forms
- *   standard  the normal application page
- *   wide      dashboards and data-heavy pages
- * The widths are tokens in globals.css (--pr-content-*), so Phase 2b can
- * widen them without touching this file or any page.
+ *   form      focused forms, settings and short lists — 640px at every size
+ *   standard  the normal application page — one 720px column until the
+ *             content area can reach 960px, then up to 1120px so a
+ *             work/answer page (AnswerLayout) can sit side by side
+ *   wide      data-heavy pages — up to 1360px
+ * The widths are tokens in globals.css (--pr-content-*). Signed in on a
+ * desktop the column is left-aligned beside the sidebar; visitors centre.
  *
  * A page with a sticky action bar marks it with `pr-action-bar`; the shell
  * reserves room for it and keeps it clear of the bottom nav and sidebar.

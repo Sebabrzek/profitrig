@@ -168,13 +168,19 @@ h6 {
   /* Room reserved above the bottom edge for a page's sticky action bar. */
   --pr-action-bar-h: 72px;
 
-  /* Content column widths, gutters excluded. `standard` is TRANSITIONAL:
-     it matches the old 672px page (640px of content inside 16px gutters)
-     so this phase changes the frame only. Phase 2b widens it and
-     recomposes the pages that use it. */
+  /* Content column widths, gutters excluded.
+     form      focused forms and settings — narrow at every size
+     reading   a standard page while it is still ONE column: wide enough to
+               use a tablet, never so wide that a card stretches
+     standard  a standard page once work and answer sit side by side
+     wide      data pages (Admin) */
   --pr-content-form: 640px;
-  --pr-content-standard: 640px;
-  --pr-content-wide: 992px;
+  --pr-content-reading: 720px;
+  --pr-content-standard: 1120px;
+  --pr-content-wide: 1360px;
+
+  /* The financial-answer column on a wide work/answer page. */
+  --pr-answer-w: 420px;
 }
 
 .pr-shell {
@@ -182,7 +188,7 @@ h6 {
   --pr-shell-inset-left: 0px;
   --pr-shell-inset-bottom: 0px;
   --pr-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
-  --pr-content-max: var(--pr-content-standard);
+  --pr-content-max: var(--pr-content-reading);
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--pr-bg);
@@ -192,6 +198,20 @@ h6 {
 }
 .pr-shell[data-width="wide"] {
   --pr-content-max: var(--pr-content-wide);
+}
+/* A standard page opens up to 1120px only once its content area can reach
+   960px — the width at which work and answer fit side by side. Visitors have
+   no sidebar: 1024 - 2x32 gutters = 960. Signed in, the 240px sidebar moves
+   that point to 1264px. Below it the page stays one 720px column. */
+@media (min-width: 1024px) {
+  .pr-shell[data-nav="visitor"][data-width="standard"] {
+    --pr-content-max: var(--pr-content-standard);
+  }
+}
+@media (min-width: 1264px) {
+  .pr-shell[data-nav="app"][data-width="standard"] {
+    --pr-content-max: var(--pr-content-standard);
+  }
 }
 /* Signed in, narrow: the bottom nav sits over the safe area. */
 .pr-shell[data-nav="app"] {
@@ -236,6 +256,14 @@ h6 {
   max-width: var(--pr-content-max);
   margin-inline: auto;
 }
+/* Signed in on a desktop, every page starts at the same edge beside the
+   sidebar, so titles don't jump when switching between a 640px form and a
+   1120px page. Visitors, with no sidebar to anchor to, stay centred. */
+@media (min-width: 1024px) {
+  .pr-shell[data-nav="app"] .pr-shell-column {
+    margin-inline: 0;
+  }
+}
 
 /* A page's sticky save/update bar. Sits on the bottom nav on a phone, and
    beside the sidebar — not under it — on a desktop. Its own look is the
@@ -248,8 +276,56 @@ h6 {
   padding-bottom: calc(var(--pr-space-3) + var(--pr-shell-safe-bottom, 0px));
 }
 .pr-action-bar-inner {
-  max-width: var(--pr-content-max, var(--pr-content-standard));
+  max-width: var(--pr-content-max, var(--pr-content-reading));
   margin-inline: auto;
+}
+/* Keep the bar's contents on the page's left edge too: the bar has 16px of
+   its own padding, the workspace a 32px gutter. */
+@media (min-width: 1024px) {
+  .pr-shell[data-nav="app"] .pr-action-bar-inner {
+    margin-left: calc(var(--pr-shell-gutter) - var(--pr-space-4));
+    margin-right: auto;
+    /* …and never past the column's right edge when the window, not the
+       token, is what limits the width. */
+    max-width: min(
+      var(--pr-content-max),
+      calc(100% - 2 * (var(--pr-shell-gutter) - var(--pr-space-4)))
+    );
+  }
+}
+
+/* ===========================================================================
+   WORK / ANSWER LAYOUT — src/components/shell/AnswerLayout.tsx
+   The answer comes first in the page, exactly as phones read it. Only when
+   the content area reaches 960px does it move into a right-hand column,
+   with the work on the left. Nothing is reordered: reading, screen-reader
+   and keyboard order stay the phone order at every width.
+   =========================================================================== */
+
+.pr-answer-layout-container {
+  container-type: inline-size;
+}
+@container (min-width: 960px) {
+  .pr-answer-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--pr-answer-w);
+    column-gap: var(--pr-space-6);
+    align-items: start;
+  }
+  .pr-answer-layout-answer {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .pr-answer-layout-work {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+  /* Pinned only when PinnedAnswer has measured that the whole answer fits
+     between the top of the window and anything fixed along the bottom. */
+  .pr-answer-layout-answer[data-pinned] {
+    position: sticky;
+  }
 }
 
 /* The support chat lives outside the shell (root layout), so it reads the
