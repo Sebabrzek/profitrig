@@ -5,6 +5,8 @@ import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
+import { RecordDeleteButton } from "@/components/ui/Records";
+import { roadExpenseDeleteLabel } from "@/lib/records";
 import { AffixInput, Field, TextInput } from "@/components/ui/Field";
 import { digitsAndDots } from "@/lib/numericInput";
 import { formatMoney } from "@/lib/format";
@@ -113,12 +115,12 @@ export function RoadExpenseCard({
             return (
               <li
                 key={r.id}
-                className="flex items-center gap-3 py-2 text-sm"
+                className="flex items-center gap-3 py-1 text-sm"
               >
                 <span className="text-muted text-xs w-10 shrink-0 tabular-nums">
                   {shortDate(r.spent_on)}
                 </span>
-                <span className="flex-1 min-w-0">
+                <span className="flex-1 min-w-0 leading-snug">
                   <span className="font-semibold">{meta.label}</span>
                   {r.note && (
                     <span className="text-muted"> — {r.note}</span>
@@ -131,18 +133,19 @@ export function RoadExpenseCard({
                     </span>
                   )}
                 </span>
-                <span className="font-bold tabular-nums shrink-0">
+                <span className="pr-figure shrink-0 font-semibold">
                   {formatMoney(Number(r.amount))}
                 </span>
-                <button
-                  type="button"
+                <RecordDeleteButton
+                  className="-mr-3"
                   onClick={() => r.id && remove(r.id)}
                   disabled={pending}
-                  aria-label="Delete expense"
-                  className="text-muted hover:text-red-600 disabled:opacity-40 shrink-0 p-1"
-                >
-                  <TrashIcon />
-                </button>
+                  aria-label={roadExpenseDeleteLabel(
+                    meta.label,
+                    Number(r.amount),
+                    shortDate(r.spent_on)
+                  )}
+                />
               </li>
             );
           })}
@@ -257,23 +260,5 @@ export function RoadExpenseCard({
         </div>
       )}
     </Card>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
   );
 }

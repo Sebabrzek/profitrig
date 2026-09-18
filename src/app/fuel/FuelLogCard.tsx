@@ -5,6 +5,8 @@ import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
+import { RecordDeleteButton } from "@/components/ui/Records";
+import { fuelEntryPresentation } from "@/lib/records";
 import { AffixInput, Field, TextInput } from "@/components/ui/Field";
 import { digitsAndDots } from "@/lib/numericInput";
 import { addFuelLogAction, deleteFuelLogAction } from "../actions";
@@ -17,32 +19,6 @@ function shortDate(iso: string) {
     month: "short",
     day: "numeric",
   });
-}
-
-function StatusBadge({ entry }: { entry: FuelEntry }) {
-  switch (entry.status) {
-    case "ok":
-      return (
-        <Chip>{entry.mpg!.toFixed(1)} MPG</Chip>
-      );
-    case "check":
-      return (
-        <Chip
-          tone="loss"
-          title="No semi gets this MPG. Check the odometer and gallons — or it was a partial fill, which evens out in your average."
-        >
-          {entry.mpg!.toFixed(1)} MPG · check
-        </Chip>
-      );
-    case "baseline":
-      return (
-        <Chip>Starting point</Chip>
-      );
-    case "odometer":
-      return (
-        <Chip tone="loss">Odometer too low</Chip>
-      );
-  }
 }
 
 export function FuelLogCard({
@@ -168,35 +144,52 @@ export function FuelLogCard({
 
       {entries.length > 0 && (
         <ul className="mt-5 divide-y divide-border border-t border-border">
-          {entries.map((entry) => (
-            <li key={entry.id ?? `${entry.logged_on}-${entry.odometer}`} className="py-3 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">
-                  {shortDate(entry.logged_on)}{" "}
-                  <span className="font-normal text-muted">· {miles(entry.odometer)} mi</span>
-                </p>
-                <p className="text-xs text-muted tabular-nums">
-                  {entry.miles != null ? `${miles(entry.miles)} miles · ` : ""}
-                  {entry.gallons.toLocaleString("en-US")} gal
-                </p>
-              </div>
-              <StatusBadge entry={entry} />
-              {entry.id && (
-                <button
-                  type="button"
-                  onClick={() => remove(entry.id!)}
-                  disabled={pending}
-                  aria-label={`Delete week of ${shortDate(entry.logged_on)}`}
-                  className="shrink-0 p-1 text-muted hover:text-red-600 disabled:opacity-40"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                </button>
-              )}
-            </li>
-          ))}
+          {entries.map((entry) => {
+            const shown = fuelEntryPresentation(entry);
+            return (
+              <li
+                key={entry.id ?? `${entry.logged_on}-${entry.odometer}`}
+                className="flex items-center gap-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">
+                    {shortDate(entry.logged_on)}{" "}
+                    <span className="font-normal text-muted tabular-nums">
+                      · {miles(entry.odometer)} mi
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted tabular-nums">
+                    {entry.miles != null ? `${miles(entry.miles)} miles · ` : ""}
+                    {entry.gallons.toLocaleString("en-US")} gal
+                  </p>
+                </div>
+                {/* The week's reading, and its state in words when it has one. */}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {shown.mpg && (
+                    <p className="whitespace-nowrap leading-none">
+                      <span className="pr-figure text-[15px] font-semibold">
+                        {shown.mpg}
+                      </span>{" "}
+                      <span className="text-xs font-semibold text-muted">MPG</span>
+                    </p>
+                  )}
+                  {shown.state && (
+                    <Chip tone={shown.state.tone} title={shown.state.title}>
+                      {shown.state.label}
+                    </Chip>
+                  )}
+                </div>
+                {entry.id && (
+                  <RecordDeleteButton
+                    className="-mr-3"
+                    onClick={() => remove(entry.id!)}
+                    disabled={pending}
+                    aria-label={`Delete week of ${shortDate(entry.logged_on)}`}
+                  />
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>

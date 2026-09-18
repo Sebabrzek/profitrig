@@ -46,6 +46,7 @@ import { fetchDriverSettings } from "@/lib/driverSettings";
 import { RoadExpenseCard } from "@/components/RoadExpenseCard";
 import { sumRoadExpenses, type RoadExpense } from "@/lib/roadExpenses";
 import { WeekStartToggle } from "./WeekStartToggle";
+import { LoadLedger, LoadRecord } from "./LoadRecord";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -468,7 +469,7 @@ export default async function LoadsPage({
             after every trip to track your real profit.
           </EmptyState>
         ) : (
-          <div className="flex flex-col gap-3">
+          <LoadLedger>
             {loads.map((load) => {
               const ownMiles =
                 Number(load.loaded_miles || 0) +
@@ -491,72 +492,20 @@ export default async function LoadsPage({
                 month: "short",
                 day: "numeric",
               });
-              const isWin = e.profit >= 0;
               return (
-                <Link
+                <LoadRecord
                   key={load.id}
+                  id={String(load.id)}
                   href={`/loads/${load.id}`}
-                  className="bg-white border border-border rounded-2xl p-4 hover:border-brand transition"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted">{dateLabel}</p>
-                      <p className="font-bold text-base truncate">
-                        {load.broker || "Untitled load"}
-                      </p>
-                      {(load.origin || load.destination) && (
-                        <p className="text-xs text-muted truncate">
-                          {load.origin || "—"} →{" "}
-                          {load.destination || "—"}
-                        </p>
-                      )}
-                    </div>
-                    <div
-                      className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-bold ${
-                        isWin
-                          ? "bg-brand-soft text-brand-dark"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {formatMoney(e.profit, { signed: true })}
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                    <div className="bg-gray-50 rounded-lg px-3 py-2">
-                      <p className="text-muted">Miles</p>
-                      <p className="font-bold text-sm">
-                        {e.totalMiles.toLocaleString()}
-                      </p>
-                      <p className="text-[10px] text-muted">
-                        {e.deadheadPct.toFixed(0)}% DH
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg px-3 py-2">
-                      <p className="text-muted">Revenue</p>
-                      <p className="font-bold text-sm">{formatMoney(e.revenue)}</p>
-                      {e.carrierPct > 0 && (
-                        <p className="text-[10px] text-muted">
-                          {pctLabel(100 - e.carrierPct)} of {formatMoney(e.loadPay)}
-                        </p>
-                      )}
-                      <p className="text-[10px] text-muted">
-                        {formatRate(e.rpm)} / mi
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg px-3 py-2">
-                      <p className="text-muted">Cost</p>
-                      <p className="font-bold text-sm">
-                        {formatMoney(e.totalCost)}
-                      </p>
-                      <p className="text-[10px] text-muted">
-                        {formatRate(e.cpm)} / mi
-                      </p>
-                    </div>
-                  </div>
-                </Link>
+                  dateLabel={dateLabel}
+                  broker={load.broker}
+                  origin={load.origin}
+                  destination={load.destination}
+                  economics={e}
+                />
               );
             })}
-          </div>
+          </LoadLedger>
         )}
         </WorkColumn>
         </AnswerLayout>

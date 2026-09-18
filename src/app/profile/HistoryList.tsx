@@ -85,49 +85,55 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
         <Notice tone="error">{error}</Notice>
       )}
       {snapshots.map((s) => (
-        <div
+        <section
           key={s.id}
-          className="bg-white border border-border rounded-2xl p-4"
+          aria-labelledby={`snapshot-${s.id}`}
+          className="pr-record p-4"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-bold text-base truncate">
+              <h3
+                id={`snapshot-${s.id}`}
+                className="truncate font-display text-base font-bold"
+              >
                 {s.label || "Untitled save"}
-              </p>
+              </h3>
               <p className="text-xs text-muted">{formatDate(s.created_at)}</p>
               {carrierLine(s) && (
-                <p className="text-xs font-semibold text-foreground/80 mt-0.5">
+                <p className="mt-0.5 text-[13px] text-foreground/80">
                   {carrierLine(s)}
                 </p>
               )}
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs text-muted">Cost / mile</p>
-              <p className="text-xl font-black text-brand-dark leading-none">
+            {/* The number this snapshot is kept for. */}
+            <div className="shrink-0 text-right">
+              <p className="pr-record-label">Cost / mile</p>
+              <p className="pr-figure mt-1 text-2xl font-bold leading-none">
                 {formatRate(Number(s.total_cpm))}
               </p>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              <p className="text-muted">Target rate</p>
-              <p className="font-bold text-sm">
+          {/* Supporting readings: no tiles, a hairline above them. */}
+          <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-border pt-3">
+            <div className="min-w-0">
+              <dt className="pr-record-label">Target rate</dt>
+              <dd className="pr-figure mt-1 text-[15px] font-semibold">
                 {formatRate(Number(s.required_rate))}
-              </p>
+              </dd>
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              <p className="text-muted">Miles / mo</p>
-              <p className="font-bold text-sm">
+            <div className="min-w-0">
+              <dt className="pr-record-label">Miles / mo</dt>
+              <dd className="mt-1 text-[15px] font-semibold tabular-nums">
                 {Number(s.monthly_miles).toLocaleString()}
-              </p>
+              </dd>
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              <p className="text-muted">Profit / mi</p>
-              <p className="font-bold text-sm">
+            <div className="min-w-0">
+              <dt className="pr-record-label">Profit / mi</dt>
+              <dd className="pr-figure mt-1 text-[15px] font-semibold">
                 {formatRate(Number(s.desired_profit_per_mile))}
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
           <div className="mt-3 flex gap-2">
             <Button
               variant="secondary"
@@ -147,7 +153,7 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
               Delete
             </Button>
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );

@@ -89,7 +89,7 @@ function Bar({
       </div>
       <div className="h-2 rounded-full bg-pr-surface-muted overflow-hidden">
         <div
-          className="h-full bg-brand"
+          className="h-full bg-[var(--pr-sage)]"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -351,22 +351,31 @@ ADMIN_EMAILS = ${user.email}`}
             title="User activity — every signup"
             description="CPM = computed cost/mile from the user's saved cost profile (override applied if they set one). Target = CPM + their desired profit/mile."
           />
-          <div className="overflow-x-auto">
+          {/* Scrolls sideways on a phone; focusable so a keyboard can too. */}
+          <div
+            role="region"
+            aria-label="User activity table"
+            tabIndex={0}
+            className="relative overflow-x-auto rounded-[var(--pr-radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pr-rig-green)]"
+          >
             <table className="w-full text-sm">
+              <caption className="sr-only">
+                Every signup, newest first
+              </caption>
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-border">
-                  <th className="py-2 pr-3 font-semibold">Signed up</th>
-                  <th className="py-2 pr-3 font-semibold">Email</th>
-                  <th className="py-2 pr-3 font-semibold">Name</th>
-                  <th className="py-2 pr-3 font-semibold">State</th>
-                  <th className="py-2 pr-3 font-semibold">Trailer</th>
-                  <th className="py-2 pr-3 font-semibold">CPM</th>
-                  <th className="py-2 pr-3 font-semibold">Target rate</th>
-                  <th className="py-2 pr-3 font-semibold">Mo. miles</th>
-                  <th className="py-2 pr-3 font-semibold"># Loads</th>
-                  <th className="py-2 pr-3 font-semibold">Last save</th>
-                  <th className="py-2 pr-3 font-semibold">Opt-in</th>
-                  <th className="py-2 pr-3 font-semibold">Conf.</th>
+                <tr className="border-b border-border text-left">
+                  <th scope="col" className="pr-record-label py-2 pr-4">Signed up</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">Email</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">Name</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">State</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">Trailer</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4 text-right">CPM</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4 text-right">Target rate</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4 text-right">Mo. miles</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4 text-right"># Loads</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">Last save</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">Opt-in</th>
+                  <th scope="col" className="pr-record-label py-2">Conf.</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,20 +391,22 @@ ADMIN_EMAILS = ${user.email}`}
                       key={u.id}
                       className="border-b border-border last:border-0"
                     >
-                      <td className="py-2 pr-3 whitespace-nowrap text-muted">
+                      <td className="py-2.5 pr-4 whitespace-nowrap text-muted">
                         {formatDate(u.created_at)}
                       </td>
-                      <td className="py-2 pr-3 break-all">{u.email}</td>
-                      <td className="py-2 pr-3">{name || "—"}</td>
-                      <td className="py-2 pr-3">
+                      <th scope="row" className="py-2.5 pr-4 text-left font-medium break-all">
+                        {u.email}
+                      </th>
+                      <td className="py-2.5 pr-4">{name || "—"}</td>
+                      <td className="py-2.5 pr-4">
                         {p?.domicile_state || "—"}
                       </td>
-                      <td className="py-2 pr-3">
+                      <td className="py-2.5 pr-4">
                         {p?.trailer_type
                           ? TRAILER_LABELS[p.trailer_type] ?? p.trailer_type
                           : "—"}
                       </td>
-                      <td className="py-2 pr-3 whitespace-nowrap font-semibold">
+                      <td className="pr-figure py-2.5 pr-4 text-right whitespace-nowrap font-semibold">
                         {cpm
                           ? formatRate(cpm.totalCPM)
                           : "—"}
@@ -405,25 +416,42 @@ ADMIN_EMAILS = ${user.email}`}
                           </span>
                         )}
                       </td>
-                      <td className="py-2 pr-3 whitespace-nowrap font-semibold text-brand-dark">
+                      <td className="pr-figure py-2.5 pr-4 text-right whitespace-nowrap font-semibold text-[var(--pr-rig-green)]">
                         {cpm ? formatRate(cpm.requiredRate) : "—"}
                       </td>
-                      <td className="py-2 pr-3 whitespace-nowrap">
+                      <td className="py-2.5 pr-4 text-right whitespace-nowrap tabular-nums">
                         {cpm && cpm.monthlyMiles > 0
                           ? cpm.monthlyMiles.toLocaleString()
                           : "—"}
                       </td>
-                      <td className="py-2 pr-3 whitespace-nowrap">
+                      <td className="py-2.5 pr-4 text-right whitespace-nowrap tabular-nums">
                         {loads > 0 ? loads : "—"}
                       </td>
-                      <td className="py-2 pr-3 whitespace-nowrap text-muted text-xs">
+                      <td className="py-2.5 pr-4 whitespace-nowrap text-muted text-xs">
                         {cpm?.updatedAt ? formatDate(cpm.updatedAt) : "—"}
                       </td>
-                      <td className="py-2 pr-3">
-                        {p?.marketing_opt_in ? "✓" : ""}
+                      <td className="py-2.5 pr-4">
+                        {p?.marketing_opt_in ? (
+                          <>
+                            <span aria-hidden="true">✓</span>
+                            <span className="sr-only">Yes</span>
+                          </>
+                        ) : (
+                          <span className="sr-only">No</span>
+                        )}
                       </td>
-                      <td className="py-2 pr-3">
-                        {u.email_confirmed_at ? "✓" : "—"}
+                      <td className="py-2.5">
+                        {u.email_confirmed_at ? (
+                          <>
+                            <span aria-hidden="true">✓</span>
+                            <span className="sr-only">Confirmed</span>
+                          </>
+                        ) : (
+                          <>
+                            <span aria-hidden="true">—</span>
+                            <span className="sr-only">Not confirmed</span>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
@@ -461,12 +489,9 @@ ADMIN_EMAILS = ${user.email}`}
           {feedback.length === 0 ? (
             <EmptyState title="No feedback yet." />
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="divide-y divide-border border-t border-border">
               {feedback.slice(0, 20).map((f) => (
-                <li
-                  key={f.id}
-                  className="border border-border rounded-xl p-3"
-                >
+                <li key={f.id} className="py-3">
                   <div className="flex items-center justify-between gap-3 text-xs text-muted mb-1">
                     <span>
                       {f.user_id
@@ -509,7 +534,7 @@ ADMIN_EMAILS = ${user.email}`}
               ) : null}
             </EmptyState>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="divide-y divide-border border-t border-border">
               {chatQuestions.slice(0, 25).map((q) => {
                 // Newest-first list: the answer is the oldest assistant row
                 // from the same user that is still newer than the question.
@@ -522,7 +547,7 @@ ADMIN_EMAILS = ${user.email}`}
                       a.created_at > q.created_at
                   );
                 return (
-                  <li key={q.id} className="border border-border rounded-xl p-3">
+                  <li key={q.id} className="py-3">
                     <div className="flex items-center justify-between gap-3 text-xs text-muted mb-1">
                       <span>
                         {emailByUser.get(q.user_id) ?? "Unknown user"}
@@ -533,8 +558,8 @@ ADMIN_EMAILS = ${user.email}`}
                       {q.content}
                     </p>
                     {answer && (
-                      <details className="mt-1.5">
-                        <summary className="text-xs text-brand-dark cursor-pointer select-none">
+                      <details className="mt-1">
+                        <summary className="pr-link inline-flex min-h-11 cursor-pointer select-none items-center text-xs">
                           AI answer
                         </summary>
                         <p className="text-sm text-muted whitespace-pre-wrap mt-1">
