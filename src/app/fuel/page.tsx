@@ -1,7 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Wordmark } from "@/components/Wordmark";
-import { HeaderNav } from "@/components/HeaderNav";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/shell/AppShell";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import { driverToday } from "@/lib/driverClock";
@@ -84,20 +82,14 @@ export default async function FuelPage() {
       : "Log one more week and your MPG shows up — your first reading is the starting point.";
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav
-            variant="fuel"
-            email={user.email ?? ""}
-            isAdmin={isAdminEmail(user.email)}
-            isPro={isPro(sub)}
-          />
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-28 md:pb-8">
+    <AppShell
+      width="standard"
+      account={{
+        email: user.email ?? "",
+        isPro: isPro(sub),
+        isAdmin: isAdminEmail(user.email),
+      }}
+    >
         <h1 className="text-2xl font-black mb-1">Fuel Economy</h1>
         <p className="text-sm text-muted mb-5">
           Each week, log your odometer and the gallons you bought. ProfitRig
@@ -143,8 +135,6 @@ export default async function FuelPage() {
           lastOdometer={stats.lastOdometer}
           today={today}
         />
-      </div>
-      <BottomNav isPro={isPro(sub)} />
-    </main>
+    </AppShell>
   );
 }

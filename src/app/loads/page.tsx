@@ -1,11 +1,9 @@
 import Link from "next/link";
+import { AppShell } from "@/components/shell/AppShell";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Wordmark } from "@/components/Wordmark";
-import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
-import { BottomNav } from "@/components/BottomNav";
 import { type CostProfile } from "../actions";
 import {
   type Load,
@@ -255,20 +253,14 @@ export default async function LoadsPage({
     });
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav
-            variant="loads"
-            email={user.email ?? ""}
-            isAdmin={isAdminEmail(user.email)}
-            isPro
-          />
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-28 md:pb-8">
+    <AppShell
+      width="standard"
+      account={{
+        email: user.email ?? "",
+        isPro: true,
+        isAdmin: isAdminEmail(user.email),
+      }}
+    >
         {!isConfigured && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
             <p className="font-bold text-sm">Set up your cost per mile first</p>
@@ -574,8 +566,6 @@ export default async function LoadsPage({
             })}
           </div>
         )}
-      </div>
-      <BottomNav isPro />
-    </main>
+    </AppShell>
   );
 }

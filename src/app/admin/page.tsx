@@ -1,13 +1,10 @@
 import "server-only";
-import Link from "next/link";
+import { AppShell } from "@/components/shell/AppShell";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { Wordmark } from "@/components/Wordmark";
 import { isAdminEmail, adminEmails } from "@/lib/admin";
 import { signOutAction } from "../actions";
-import { HeaderNav } from "@/components/HeaderNav";
-import { BottomNav } from "@/components/BottomNav";
 
 export const dynamic = "force-dynamic";
 
@@ -130,16 +127,10 @@ export default async function AdminPage() {
 
   if (!admin) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <header className="sticky top-0 z-10 bg-white border-b border-border">
-          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <Wordmark size="md" />
-            <Link href="/" className="text-sm font-semibold text-brand">
-              ← App
-            </Link>
-          </div>
-        </header>
-        <div className="max-w-3xl mx-auto px-4 py-8">
+      <AppShell
+        width="form"
+        account={{ email: user.email ?? "", isPro: true, isAdmin: true }}
+      >
           <h1 className="text-2xl font-black mb-4">Admin — setup needed</h1>
           <div className="bg-white border border-border rounded-2xl p-6 space-y-3">
             <p>
@@ -156,8 +147,7 @@ ADMIN_EMAILS = ${user.email}`}
               prefix it with NEXT_PUBLIC_.
             </p>
           </div>
-        </div>
-      </main>
+      </AppShell>
     );
   }
 
@@ -303,15 +293,11 @@ ADMIN_EMAILS = ${user.email}`}
   const emailByUser = new Map(users.map((u) => [u.id, u.email ?? ""]));
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav variant="calculator" email={user.email ?? ""} isAdmin />
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto px-4 py-6 pb-28 md:pb-8 space-y-6">
+    <AppShell
+      width="wide"
+      account={{ email: user.email ?? "", isPro: true, isAdmin: true }}
+    >
+      <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-black">ProfitRig Admin</h1>
           <p className="text-sm text-muted mt-1">
@@ -621,7 +607,6 @@ ADMIN_EMAILS = ${user.email}`}
           </div>
         </section>
       </div>
-      <BottomNav isPro />
-    </main>
+    </AppShell>
   );
 }

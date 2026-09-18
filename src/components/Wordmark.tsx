@@ -22,10 +22,11 @@ import { Montserrat } from "next/font/google";
  * not reproduce the approved custom geometry and must never be exported as
  * an SVG or treated as a production asset.
  *
- * TO REPLACE IT: swap the inner markup for the supplied <svg>, keep the
- * `size` prop and the same block dimensions, delete the Montserrat import
- * and this comment. No caller changes — every header, and the login page,
- * already go through here.
+ * TO REPLACE IT: swap the inner markup for the supplied <svg> (and its
+ * white variant for tone="dark" — both are listed in wordmark/PENDING.md),
+ * keep the `size` and `tone` props and the same block dimensions, delete the
+ * Montserrat import and this comment. No caller changes — the top bar, the
+ * sidebar and the login page already go through here.
  */
 
 const montserrat = Montserrat({
@@ -36,6 +37,9 @@ const montserrat = Montserrat({
 
 type Props = {
   size?: "sm" | "md" | "lg";
+  /** "dark" is for Rig Green surfaces: PROFIT in Off White, RIG stays Sage
+      (design system, Appendix A — logo colours on Rig Green). */
+  tone?: "light" | "dark";
 };
 
 const SIZES: Record<NonNullable<Props["size"]>, string> = {
@@ -44,7 +48,7 @@ const SIZES: Record<NonNullable<Props["size"]>, string> = {
   lg: "text-4xl",
 };
 
-export function Wordmark({ size = "md" }: Props) {
+export function Wordmark({ size = "md", tone = "light" }: Props) {
   return (
     <div
       className={`${montserrat.className} ${SIZES[size]} uppercase leading-none select-none`}
@@ -52,7 +56,14 @@ export function Wordmark({ size = "md" }: Props) {
       aria-label="ProfitRig"
       role="img"
     >
-      <span style={{ color: "var(--pr-rig-green)" }}>Profit</span>
+      <span
+        style={{
+          color:
+            tone === "dark" ? "var(--pr-off-white)" : "var(--pr-rig-green)",
+        }}
+      >
+        Profit
+      </span>
       <span style={{ color: "var(--pr-sage)" }}>Rig</span>
     </div>
   );

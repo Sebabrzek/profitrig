@@ -167,7 +167,7 @@ export function SupportChat() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Ask ProfitRig"
-          className="fixed right-4 bottom-24 md:bottom-6 z-40 flex items-center gap-2 rounded-full bg-brand hover:bg-brand-dark text-white pl-3 pr-4 py-3 shadow-lg shadow-black/20 transition"
+          className="pr-chat-launcher fixed right-4 z-40 flex items-center gap-2 rounded-full bg-brand hover:bg-brand-dark text-white pl-3 pr-4 py-3 shadow-lg shadow-black/20 transition"
         >
           <ChatIcon />
           <span className="text-sm font-bold">Ask ProfitRig</span>
@@ -175,7 +175,7 @@ export function SupportChat() {
       )}
 
       {open && (
-        <div className="fixed inset-x-0 bottom-0 md:inset-x-auto md:right-6 md:bottom-6 z-50 md:w-[380px]">
+        <div className="fixed inset-x-0 bottom-0 lg:inset-x-auto lg:right-6 lg:bottom-6 z-50 lg:w-[380px]">
           <div className="flex flex-col bg-white md:rounded-2xl rounded-t-2xl border border-border shadow-2xl shadow-black/25 overflow-hidden h-[75dvh] md:h-[560px]">
             {/* Header */}
             <div className="flex items-center justify-between bg-brand text-white px-4 py-3">

@@ -32,6 +32,10 @@
  *      redesign rewrites the file it lives in. These lock today's numbers
  *      so a visual phase cannot move them quietly.
  *
+ *  11. The Pro locks were written twice — once for the phone nav, once for
+ *      the desktop links — and could drift. There is now one list, and
+ *      these checks hold every screen to it.
+ *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
  */
@@ -69,6 +73,7 @@ import type { CostProfile } from "../src/app/actions";
 import { computeFuelStats, isPlausibleMpg } from "../src/lib/fuel";
 import { computeCalculatorTotals } from "../src/lib/calculatorTotals";
 import { csvEscape, csvRow } from "../src/lib/csv";
+import { UPGRADE_PATH, activeNavKey, navItems } from "../src/lib/nav";
 
 let failures = 0;
 let checks = 0;
@@ -792,6 +797,75 @@ check(
   csvRow(["2026-09-14", "=cmd", -142, "TQL, Inc"])
 );
 check("an empty cell stays empty", csvEscape(null) === "" && csvEscape(undefined) === "");
+
+// ─────────────────────────────────────────────────────────────────────
+section("Navigation: one list, the same locks on every screen");
+// ─────────────────────────────────────────────────────────────────────
+
+const free = navItems(false);
+const pro = navItems(true);
+
+check(
+  "the five destinations, in the product's order",
+  free.map((n) => n.shortLabel).join(",") === "Calc,Loads,Tax,Fuel,Profile" &&
+    pro.map((n) => n.label).join(",") === "Calculator,Loads,Tax,Fuel,Profile"
+);
+check(
+  "a free driver's Loads and Tax go to the upgrade page, locked",
+  ["loads", "tax"].every((k) => {
+    const n = free.find((i) => i.key === k)!;
+    return n.href === UPGRADE_PATH && n.locked;
+  })
+);
+check(
+  "a free driver's Calc, Fuel and Profile open normally",
+  ["calc", "fuel", "profile"].every((k) => {
+    const n = free.find((i) => i.key === k)!;
+    return !n.locked && n.href !== UPGRADE_PATH;
+  })
+);
+check(
+  "a Pro driver's Loads and Tax open the real pages, unlocked",
+  pro.find((i) => i.key === "loads")!.href === "/loads" &&
+    pro.find((i) => i.key === "tax")!.href === "/tax" &&
+    pro.every((i) => !i.locked)
+);
+
+const lit = (path: string) => activeNavKey(path);
+check("/ lights up Calc", lit("/") === "calc");
+check(
+  "Calc does not light up everywhere just because every path starts with /",
+  ["/loads", "/tax", "/fuel", "/profile", "/upgrade", "/admin"].every(
+    (p) => lit(p) !== "calc"
+  )
+);
+check(
+  "every Loads page lights up Loads",
+  ["/loads", "/loads/new", "/loads/3f2a9c1e-77b0-4d1a-9e1f-5a0c2b7d8e41"].every(
+    (p) => lit(p) === "loads"
+  )
+);
+check(
+  "every Tax page lights up Tax",
+  [
+    "/tax",
+    "/tax/expenses",
+    "/tax/expenses/new",
+    "/tax/assets/abc",
+    "/tax/per-diem",
+    "/tax/profile",
+  ].every((p) => lit(p) === "tax")
+);
+check("Fuel and Profile light up themselves", lit("/fuel") === "fuel" && lit("/profile") === "profile");
+check(
+  "a path that only shares the letters does not count",
+  lit("/loadsheet") === null && lit("/taxes") === null
+);
+check(
+  "pages outside the five light up nothing",
+  lit("/upgrade") === null && lit("/admin") === null && lit("/login") === null
+);
+check("no pathname yet reads as the home page", activeNavKey(null) === "calc");
 
 // ─────────────────────────────────────────────────────────────────────
 

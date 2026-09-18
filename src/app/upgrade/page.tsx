@@ -1,10 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Wordmark } from "@/components/Wordmark";
-import { HeaderNav } from "@/components/HeaderNav";
+import { AppShell } from "@/components/shell/AppShell";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription } from "@/lib/subscription";
 import { isPro } from "@/lib/subscription";
-import { BottomNav } from "@/components/BottomNav";
 import { UpgradeCard } from "./UpgradeCard";
 
 export const dynamic = "force-dynamic";
@@ -25,20 +23,14 @@ export default async function UpgradePage({
   const alreadyPro = isPro(sub);
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav
-            variant="upgrade"
-            email={user.email ?? ""}
-            isAdmin={isAdminEmail(user.email)}
-            isPro={alreadyPro}
-          />
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-28 md:pb-8">
+    <AppShell
+      width="form"
+      account={{
+        email: user.email ?? "",
+        isPro: alreadyPro,
+        isAdmin: isAdminEmail(user.email),
+      }}
+    >
         {canceled && !alreadyPro && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-4 text-sm">
             Checkout canceled — no charges made.
@@ -71,9 +63,7 @@ export default async function UpgradePage({
             <UpgradeCard hasExistingCustomer={Boolean(sub?.stripe_customer_id)} />
           </>
         )}
-      </div>
-      <BottomNav isPro={alreadyPro} />
-    </main>
+    </AppShell>
   );
 }
 

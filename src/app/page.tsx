@@ -1,8 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Calculator } from "./Calculator";
-import { Wordmark } from "@/components/Wordmark";
-import { HeaderNav } from "@/components/HeaderNav";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/shell/AppShell";
 import { VisitorHero } from "@/components/VisitorHero";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
@@ -158,19 +156,14 @@ export default async function HomePage() {
   const profileComplete = isProfileComplete(driverProfile);
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav
-            variant="calculator"
-            email={email}
-            isAdmin={isAdminEmail(email)}
-            isPro={userIsPro}
-            isAuthed={Boolean(user)}
-          />
-        </div>
-      </header>
+    <AppShell
+      width="standard"
+      account={
+        user
+          ? { email, isPro: userIsPro, isAdmin: isAdminEmail(email) }
+          : null
+      }
+    >
       {!user && <VisitorHero />}
       <Calculator
         initial={initial}
@@ -180,7 +173,6 @@ export default async function HomePage() {
         isAuthed={Boolean(user)}
         hasSavedProfile={hasSavedProfile}
       />
-      {user && <BottomNav isPro={userIsPro} />}
-    </main>
+    </AppShell>
   );
 }

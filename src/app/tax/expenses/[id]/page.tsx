@@ -1,9 +1,7 @@
 import Link from "next/link";
+import { AppShell } from "@/components/shell/AppShell";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Wordmark } from "@/components/Wordmark";
-import { HeaderNav } from "@/components/HeaderNav";
-import { BottomNav } from "@/components/BottomNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { Expense, ExpenseCategory } from "@/lib/tax/types";
@@ -43,19 +41,14 @@ export default async function EditExpensePage({
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav
-            variant="tax"
-            email={user.email ?? ""}
-            isAdmin={isAdminEmail(user.email)}
-            isPro
-          />
-        </div>
-      </header>
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-28 md:pb-8">
+    <AppShell
+      width="form"
+      account={{
+        email: user.email ?? "",
+        isPro: true,
+        isAdmin: isAdminEmail(user.email),
+      }}
+    >
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-2xl font-black">Edit expense</h1>
           <Link
@@ -66,8 +59,6 @@ export default async function EditExpensePage({
           </Link>
         </div>
         <ExpenseForm initial={initial} expenseId={id} />
-      </div>
-      <BottomNav isPro />
-    </main>
+    </AppShell>
   );
 }

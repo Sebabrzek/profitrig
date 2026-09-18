@@ -1,10 +1,8 @@
 import Link from "next/link";
+import { AppShell } from "@/components/shell/AppShell";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Wordmark } from "@/components/Wordmark";
-import { HeaderNav } from "@/components/HeaderNav";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
-import { BottomNav } from "@/components/BottomNav";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm, type PastLoadsWithoutSplit } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
@@ -86,19 +84,14 @@ export default async function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Wordmark size="md" />
-          <HeaderNav
-            variant="profile"
-            email={email}
-            isAdmin={isAdminEmail(email)}
-            isPro={userIsPro}
-          />
-        </div>
-      </header>
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-44 md:pb-28">
+    <AppShell
+      width="form"
+      account={{
+        email: email,
+        isPro: userIsPro,
+        isAdmin: isAdminEmail(email),
+      }}
+    >
         <h1 className="text-2xl font-black mb-1">Your Profile</h1>
         <p className="text-sm text-muted mb-5">
           Quick info about you and your operation. All optional. Helps us send
@@ -134,8 +127,6 @@ export default async function ProfilePage() {
             <HistoryList snapshots={snapshots} />
           )}
         </section>
-      </div>
-      <BottomNav isPro={userIsPro} />
-    </main>
+    </AppShell>
   );
 }

@@ -155,6 +155,148 @@ h6 {
   font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
 }
 
+/* ===========================================================================
+   APPLICATION SHELL — src/components/shell/AppShell.tsx
+   One breakpoint, 1024px. Below it: top bar + bottom nav. At and above it:
+   the Rig Green sidebar. The shell publishes where its fixed navigation is,
+   so anything fixed inside a page (the save bars) can stay clear of it.
+   =========================================================================== */
+
+:root {
+  --pr-sidebar-w: 240px;
+  --pr-bottom-nav-h: 64px;
+  /* Room reserved above the bottom edge for a page's sticky action bar. */
+  --pr-action-bar-h: 72px;
+
+  /* Content column widths, gutters excluded. `standard` is TRANSITIONAL:
+     it matches the old 672px page (640px of content inside 16px gutters)
+     so this phase changes the frame only. Phase 2b widens it and
+     recomposes the pages that use it. */
+  --pr-content-form: 640px;
+  --pr-content-standard: 640px;
+  --pr-content-wide: 992px;
+}
+
+.pr-shell {
+  --pr-shell-gutter: var(--pr-space-4);
+  --pr-shell-inset-left: 0px;
+  --pr-shell-inset-bottom: 0px;
+  --pr-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --pr-content-max: var(--pr-content-standard);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--pr-bg);
+}
+.pr-shell[data-width="form"] {
+  --pr-content-max: var(--pr-content-form);
+}
+.pr-shell[data-width="wide"] {
+  --pr-content-max: var(--pr-content-wide);
+}
+/* Signed in, narrow: the bottom nav sits over the safe area. */
+.pr-shell[data-nav="app"] {
+  --pr-shell-inset-bottom: calc(
+    var(--pr-bottom-nav-h) + env(safe-area-inset-bottom, 0px)
+  );
+  --pr-shell-safe-bottom: 0px;
+}
+@media (min-width: 1024px) {
+  .pr-shell {
+    --pr-shell-gutter: var(--pr-space-8);
+  }
+  /* Signed in, wide: the sidebar takes the left edge instead. */
+  .pr-shell[data-nav="app"] {
+    --pr-shell-inset-left: var(--pr-sidebar-w);
+    --pr-shell-inset-bottom: 0px;
+    --pr-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+.pr-shell-main {
+  padding-top: var(--pr-shell-gutter);
+  padding-right: var(--pr-shell-gutter);
+  padding-left: calc(var(--pr-shell-inset-left) + var(--pr-shell-gutter));
+  padding-bottom: calc(
+    var(--pr-shell-inset-bottom) + var(--pr-shell-safe-bottom) +
+      var(--pr-space-8)
+  );
+}
+.pr-shell-main:focus {
+  outline: none;
+}
+/* A page with a sticky action bar gets room for it automatically. */
+.pr-shell-main:has(.pr-action-bar) {
+  padding-bottom: calc(
+    var(--pr-shell-inset-bottom) + var(--pr-shell-safe-bottom) +
+      var(--pr-action-bar-h) + var(--pr-space-8)
+  );
+}
+
+.pr-shell-column {
+  max-width: var(--pr-content-max);
+  margin-inline: auto;
+}
+
+/* A page's sticky save/update bar. Sits on the bottom nav on a phone, and
+   beside the sidebar — not under it — on a desktop. Its own look is the
+   page's business; only its position belongs to the shell. */
+.pr-action-bar {
+  position: fixed;
+  left: var(--pr-shell-inset-left, 0px);
+  right: 0;
+  bottom: var(--pr-shell-inset-bottom, 0px);
+  padding-bottom: calc(var(--pr-space-3) + var(--pr-shell-safe-bottom, 0px));
+}
+.pr-action-bar-inner {
+  max-width: var(--pr-content-max, var(--pr-content-standard));
+  margin-inline: auto;
+}
+
+/* The support chat lives outside the shell (root layout), so it reads the
+   shell's state from the page: above the bottom nav on a phone, above any
+   action bar everywhere, and in the corner otherwise. */
+.pr-chat-launcher {
+  bottom: calc(var(--pr-space-6) + env(safe-area-inset-bottom, 0px));
+}
+body:has(.pr-shell[data-nav="app"]) .pr-chat-launcher {
+  bottom: calc(
+    var(--pr-bottom-nav-h) + env(safe-area-inset-bottom, 0px) +
+      var(--pr-space-4)
+  );
+}
+body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
+  bottom: calc(
+    var(--pr-bottom-nav-h) + env(safe-area-inset-bottom, 0px) +
+      var(--pr-action-bar-h) + var(--pr-space-4)
+  );
+}
+@media (min-width: 1024px) {
+  body:has(.pr-shell[data-nav="app"]) .pr-chat-launcher {
+    bottom: var(--pr-space-6);
+  }
+  body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
+    bottom: calc(var(--pr-action-bar-h) + var(--pr-space-4));
+  }
+}
+
+.pr-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: var(--pr-space-4);
+  z-index: 60;
+  padding: var(--pr-space-3) var(--pr-space-4);
+  border-radius: var(--pr-radius-button);
+  background: var(--pr-rig-green);
+  color: var(--pr-white);
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+  font-weight: 700;
+}
+.pr-skip-link:focus {
+  left: var(--pr-space-4);
+  outline: 2px solid var(--pr-sage);
+  outline-offset: 2px;
+}
+
 /* A financial figure: a number ProfitRig is presenting as an answer — a cost
    per mile, a rate, a profit, a break-even, an efficiency reading. This is
    the single place the JetBrains Mono rule is expressed, so it stays a

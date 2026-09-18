@@ -6,7 +6,7 @@
  */
 export function VisitorHero() {
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-5 pb-1">
+    <div className="pt-1 pb-5">
       <h1 className="text-2xl sm:text-3xl font-black leading-tight tracking-tight">
         Free Rate Per Mile Calculator
         <span className="block text-brand">for Owner Operators</span>

@@ -240,7 +240,7 @@ export function Calculator({
     p.real_cpm_override != null && p.real_cpm_override > 0;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 pb-44 md:pb-28">
+    <div>
       {isAuthed && <ProfileBanner profileComplete={profileComplete} />}
       {realInsightVisible && (
         <div className="bg-white border border-border rounded-2xl p-4 mb-4">
@@ -567,9 +567,9 @@ export function Calculator({
 
       {/* Save bar */}
       <div
-        className="fixed inset-x-0 bg-white border-t border-border px-4 py-3 z-20 bottom-[calc(64px+env(safe-area-inset-bottom))] md:bottom-0"
+        className="pr-action-bar bg-white border-t border-border px-4 pt-3 z-20"
       >
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+        <div className="pr-action-bar-inner flex items-center gap-3">
           <div className="flex-1 text-xs text-muted">
             {saved === "ok"
               ? "✓ Costs updated"
