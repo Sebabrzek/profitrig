@@ -32,7 +32,9 @@ export function Notice({
     tone === "error"
       ? "bg-[var(--pr-loss-wash)] text-[var(--pr-loss-deep)]"
       : "border border-border border-l-[3px] border-l-[var(--pr-sage)] bg-white text-[var(--pr-text)]";
-  const spacing = size === "sm" ? "px-3 py-2.5 text-xs" : "p-4 text-sm";
+  // Tighter than a Card on purpose: a notice is a strip beside the work,
+  // not another section of it.
+  const spacing = size === "sm" ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm";
   return (
     <div
       // An error appears after the driver does something; say it aloud.
@@ -49,7 +51,7 @@ export function Notice({
         </p>
       )}
       {children != null && children !== false && (
-        <div className={title ? "mt-1" : ""}>{children}</div>
+        <div className={title ? "mt-0.5" : ""}>{children}</div>
       )}
     </div>
   );

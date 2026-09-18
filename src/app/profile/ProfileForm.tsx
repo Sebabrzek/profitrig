@@ -343,7 +343,7 @@ export function ProfileForm({
               Did your carrier keep {pctLabel(savedPct)} of{" "}
               {pastCount === 1 ? "that one" : "those"} too?
             </p>
-            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+            <div className="mt-2 flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={() => applyToPast(savedPct)}

@@ -280,7 +280,7 @@ export default async function TaxPage({
             )}
             {driverPay === "owner_w2_wages" && (
               <>
-                S-corp: enter your <strong>actual W-2 wages</strong> as an
+                S-corp: enter your <strong>actual W-2 wages</strong>{" "}as an
                 Expense (Other category, note &quot;owner W-2 wages&quot;).
                 Your CPA will place them correctly. The Calculator&apos;s
                 &quot;driver pay per mile&quot; is for load decisions only and

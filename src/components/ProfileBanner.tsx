@@ -48,7 +48,7 @@ export function ProfileBanner({ profileComplete }: { profileComplete: boolean })
           Later
         </button>
       </div>
-      <div className="mt-3">
+      <div className="mt-2">
         <Link
           href="/profile"
           className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold text-sm"
