@@ -13,10 +13,10 @@ import type { CSSProperties, ReactNode } from "react";
  *                     by a hairline rather than by boxes.
  *   StatTile          a single reading on a white tile (Tax, Admin).
  *
- * Colour never carries the meaning alone. A profit is "+$987" with "↑ PROFIT";
- * a loss is "−$142" with "↓ LOSS" and a Loss Red bar, while the panel stays
- * Rig Green and the number stays Off White (Loss Red on Rig Green fails
- * contrast; see LOGO_AND_COMPONENT_GUIDE.md).
+ * Colour never carries the meaning alone. A profit is its signed number,
+ * "+$987.33", and nothing more. A loss is "−$142" with "↓ LOSS" and a Loss
+ * Red bar, while the panel stays Rig Green and the number stays Off White
+ * (Loss Red on Rig Green fails contrast; see LOGO_AND_COMPONENT_GUIDE.md).
  *
  * JetBrains Mono (`figure`) is for financial answers — money, rates, MPG.
  * Counts and miles are readings too, but stay in Inter.
@@ -116,12 +116,12 @@ export function Reading({
           </span>
         )}
       </p>
-      {(outcome || context) && (
+      {(outcome === "loss" || context) && (
         <p
           className={`${hero ? "mt-2.5 text-[14px]" : "mt-1.5 text-[13px]"} leading-snug text-[var(--pr-reading-context)]`}
         >
-          {outcome && <OutcomeTag outcome={outcome} />}
-          {outcome && context ? " · " : null}
+          {outcome === "loss" && <LossTag />}
+          {outcome === "loss" && context ? " · " : null}
           {context}
         </p>
       )}
@@ -136,11 +136,12 @@ export function Reading({
   );
 }
 
-function OutcomeTag({ outcome }: { outcome: Outcome }) {
+// A profit needs no tag: its "+" sign says it. A loss says it three ways.
+function LossTag() {
   return (
     <span className="font-display font-bold uppercase tracking-[0.06em]">
-      <span aria-hidden="true">{outcome === "profit" ? "↑" : "↓"} </span>
-      {outcome === "profit" ? "Profit" : "Loss"}
+      <span aria-hidden="true">↓ </span>
+      Loss
     </span>
   );
 }
