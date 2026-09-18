@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/components/ui/Button";
 import { formatRate } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { deleteSnapshotAction, loadSnapshotAction } from "../actions";
@@ -128,20 +129,23 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
             </div>
           </div>
           <div className="mt-3 flex gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1"
               onClick={() => load(s.id)}
-              disabled={pendingId === s.id}
-              className="flex-1 h-10 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold text-sm disabled:opacity-60"
+              pending={pendingId === s.id}
             >
-              {pendingId === s.id ? "Loading..." : "Load into Calculator"}
-            </button>
-            <button
+              {pendingId === s.id ? "Loading…" : "Load into Calculator"}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={() => remove(s.id)}
               disabled={pendingId === s.id}
-              className="h-10 px-4 rounded-xl border border-border text-sm text-muted hover:text-red-600 hover:border-red-300 disabled:opacity-60"
             >
               Delete
-            </button>
+            </Button>
           </div>
         </div>
       ))}

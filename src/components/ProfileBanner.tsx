@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { Notice } from "@/components/ui/Notice";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "profitrig.profileBannerDismissed";
@@ -29,32 +29,20 @@ export function ProfileBanner({ profileComplete }: { profileComplete: boolean })
 
   return (
     <Notice className="mb-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-display font-bold text-[var(--pr-rig-green)]">
-            Finish your profile in 30 seconds
-          </p>
-          <p className="text-xs mt-0.5">
-            Add your name, phone, and what you haul so ProfitRig can send
-            tips matched to your operation.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="shrink-0 text-xs text-muted hover:text-foreground px-2"
-          aria-label="Dismiss"
-        >
-          Later
-        </button>
-      </div>
-      <div className="mt-2">
-        <Link
-          href="/profile"
-          className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold text-sm"
-        >
+      <p className="font-display font-bold text-[var(--pr-rig-green)]">
+        Finish your profile in 30 seconds
+      </p>
+      <p className="text-xs mt-0.5">
+        Add your name, phone, and what you haul so ProfitRig can send tips
+        matched to your operation.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <ButtonLink href="/profile" variant="dark" size="sm">
           Open profile
-        </Link>
+        </ButtonLink>
+        <Button variant="secondary" size="sm" onClick={dismiss}>
+          Later
+        </Button>
       </div>
     </Notice>
   );

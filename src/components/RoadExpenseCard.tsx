@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
 import { Chip } from "@/components/ui/Chip";
+import { Button } from "@/components/ui/Button";
+import { AffixInput, Field, TextInput } from "@/components/ui/Field";
+import { digitsAndDots } from "@/lib/numericInput";
 import { formatMoney } from "@/lib/format";
 import {
   ROAD_CATEGORIES,
@@ -42,6 +45,7 @@ export function RoadExpenseCard({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const kindLabelId = useId();
 
   const total = sumRoadExpenses(rows);
   const untaxed = sumUntaxedRoadExpenses(rows);
@@ -154,29 +158,31 @@ export function RoadExpenseCard({
       )}
 
       {!open ? (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          block
+          className="mt-3"
           onClick={() => setOpen(true)}
-          className="mt-3 w-full h-12 rounded-xl border-2 border-dashed border-border hover:border-brand hover:text-brand-dark font-bold text-sm text-muted transition"
         >
           + Add an expense
-        </button>
+        </Button>
       ) : (
         <div className="mt-3 border border-border rounded-xl p-3">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted mb-2">
+          <p id={kindLabelId} className="pr-field-label mb-2">
             What was it?
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div
+            role="group"
+            aria-labelledby={kindLabelId}
+            className="flex flex-wrap gap-1.5"
+          >
             {ROAD_CATEGORIES.map((c) => (
               <button
                 key={c.key}
                 type="button"
+                aria-pressed={category === c.key}
                 onClick={() => setCategory(c.key)}
-                className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                  category === c.key
-                    ? "bg-brand text-white border-brand"
-                    : "bg-white text-foreground border-border hover:border-brand"
-                }`}
+                className="pr-choice"
               >
                 {c.chip}
               </button>
@@ -190,53 +196,44 @@ export function RoadExpenseCard({
           )}
 
           <div className="mt-3 flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs font-semibold block mb-1">
-                Amount
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                  $
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) =>
-                    setAmount(e.target.value.replace(/[^0-9.]/g, ""))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submit();
-                  }}
-                  placeholder="0.00"
-                  autoFocus
-                  className="w-full h-12 pl-7 pr-3 rounded-xl border border-border text-base font-semibold focus:outline-none focus:ring-2 focus:ring-brand"
-                />
-              </div>
-            </div>
-            <div className="w-36">
-              <label className="text-xs font-semibold block mb-1">Date</label>
-              <input
+            <Field label="Amount" className="flex-1">
+              <AffixInput
+                prefix="$"
+                numeric
+                type="text"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(digitsAndDots(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+                placeholder="0.00"
+                autoFocus
+              />
+            </Field>
+            <Field label="Date" className="w-36 shrink-0">
+              <TextInput
                 type="date"
                 value={date}
                 min={weekStartIso}
                 max={weekEndIso}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full h-12 px-2 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                className="px-2"
               />
-            </div>
+            </Field>
           </div>
 
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
-            placeholder="Note (optional) — where, or what for"
-            className="mt-2 w-full h-11 px-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-          />
+          <Field label="Note (optional)" className="mt-3">
+            <TextInput
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+              }}
+              placeholder="Where, or what for"
+            />
+          </Field>
 
           {error && (
             <Notice tone="error" size="sm" className="mt-2">
@@ -245,22 +242,17 @@ export function RoadExpenseCard({
           )}
 
           <div className="mt-3 flex gap-2">
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              className="flex-1 sm:flex-none"
               onClick={submit}
-              disabled={pending}
-              className="flex-1 h-12 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-60 text-white font-bold transition"
+              pending={pending}
             >
               {pending ? "Adding…" : "Add expense"}
-            </button>
-            <button
-              type="button"
-              onClick={reset}
-              disabled={pending}
-              className="h-12 px-4 rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground transition"
-            >
+            </Button>
+            <Button variant="secondary" onClick={reset} disabled={pending}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}

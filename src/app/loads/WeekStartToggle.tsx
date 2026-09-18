@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { saveWeekStartAction } from "../actions";
 import type { WeekStart } from "@/lib/loads";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const OPTIONS: { value: WeekStart; label: string }[] = [
   { value: "monday", label: "Mon–Sun" },
@@ -32,24 +33,13 @@ export function WeekStartToggle({ value }: { value: WeekStart }) {
     <div className="mb-3 text-center">
       <div className="inline-flex items-center gap-2 text-xs">
         <span className="text-muted">Your week runs</span>
-        <div className="inline-flex rounded-lg border border-border bg-white p-0.5">
-          {OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              aria-pressed={selected === o.value}
-              disabled={pending}
-              onClick={() => choose(o.value)}
-              className={`px-2.5 py-1 rounded-md font-semibold transition disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                selected === o.value
-                  ? "bg-brand text-white"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Your week runs"
+          options={OPTIONS}
+          value={selected}
+          onChange={choose}
+          disabled={pending}
+        />
       </div>
       <p className="text-[11px] text-muted mt-1">
         {error ? (

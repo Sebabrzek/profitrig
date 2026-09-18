@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ui/Button";
 import { AppShell } from "@/components/shell/AppShell";
 import { Card, EmptyState, PageHeader } from "@/components/ui/Surfaces";
 import { Reading } from "@/components/instruments/Instruments";
@@ -72,18 +73,16 @@ export default async function AssetsPage({
               context="Listed separately — never added to expense totals."
             />
           </div>
-          <Link
+          <ButtonLink
             href={`/tax/assets/new?year=${taxYear}`}
-            className="inline-flex items-center justify-center h-12 px-5 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold"
+            variant="primary"
+            className="shrink-0"
           >
             + Add asset
-          </Link>
+          </ButtonLink>
         </Card>
 
-        <Link
-          href="/tax"
-          className="text-sm font-semibold text-brand hover:text-brand-dark"
-        >
+        <Link href="/tax" className="pr-link pr-hit text-sm">
           ← Tax Pack
         </Link>
 

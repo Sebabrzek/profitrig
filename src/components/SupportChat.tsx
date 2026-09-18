@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { submitFeedbackAction } from "@/app/actions";
+import { Button } from "@/components/ui/Button";
+import { TextArea } from "@/components/ui/Field";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -161,16 +163,18 @@ export function SupportChat() {
 
   return (
     <>
-      {/* Floating launcher — sits above the mobile bottom nav */}
+      {/* Floating launcher — sits above the mobile bottom nav. Rig Green:
+          help is a neutral action, so it never competes with a page's
+          Profit Green save. */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Ask ProfitRig"
-          className="pr-chat-launcher fixed right-4 z-40 flex items-center gap-2 rounded-full bg-brand hover:bg-brand-dark text-white pl-3 pr-4 py-3 shadow-lg shadow-black/20 transition"
+          className="pr-chat-launcher fixed right-4 z-40 flex min-h-11 items-center gap-2 rounded-full bg-[var(--pr-rig-green)] hover:bg-[var(--pr-action-dark-hover)] text-white pl-3 pr-4 py-3 shadow-lg shadow-black/20 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pr-rig-green)]"
         >
           <ChatIcon />
-          <span className="text-sm font-bold">Ask ProfitRig</span>
+          <span className="font-display text-sm font-bold">Ask ProfitRig</span>
         </button>
       )}
 
@@ -178,11 +182,11 @@ export function SupportChat() {
         <div className="fixed inset-x-0 bottom-0 lg:inset-x-auto lg:right-6 lg:bottom-6 z-50 lg:w-[380px]">
           <div className="flex flex-col bg-white md:rounded-2xl rounded-t-2xl border border-border shadow-2xl shadow-black/25 overflow-hidden h-[75dvh] md:h-[560px]">
             {/* Header */}
-            <div className="flex items-center justify-between bg-brand text-white px-4 py-3">
+            <div className="flex items-center justify-between bg-[var(--pr-rig-green)] text-white px-4 py-2">
               <div className="flex items-center gap-2">
                 <ChatIcon />
                 <div>
-                  <div className="text-sm font-bold leading-tight">
+                  <div className="font-display text-sm font-bold leading-tight">
                     Ask ProfitRig
                   </div>
                   <div className="text-[11px] text-white/80 leading-tight">
@@ -194,7 +198,7 @@ export function SupportChat() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close chat"
-                className="p-1.5 rounded-lg hover:bg-white/15 transition"
+                className="-mr-2 flex h-11 w-11 items-center justify-center rounded-[var(--pr-radius-button)] hover:bg-white/15 transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white"
               >
                 <CloseIcon />
               </button>
@@ -235,7 +239,7 @@ export function SupportChat() {
                         setHumanMode(false);
                         setHumanStatus("idle");
                       }}
-                      className="ml-2 text-muted underline font-normal"
+                      className="pr-link ml-2 font-normal"
                     >
                       Back to chat
                     </button>
@@ -245,34 +249,36 @@ export function SupportChat() {
                     <div className="text-xs font-semibold text-foreground">
                       Message a human (goes straight to the founder)
                     </div>
-                    <textarea
+                    <TextArea
                       value={humanText}
                       onChange={(e) => setHumanText(e.target.value)}
                       rows={3}
+                      aria-label="Message to a human"
                       placeholder="What do you need help with?"
-                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                     />
                     {humanStatus === "error" && (
-                      <div className="text-xs text-red-600">
+                      <div role="alert" className="text-xs text-[var(--pr-loss-deep)]">
                         Couldn&apos;t send — try again.
                       </div>
                     )}
                     <div className="flex gap-2">
-                      <button
-                        type="button"
+                      <Button
+                        variant="dark"
+                        size="sm"
+                        className="flex-1"
                         onClick={sendToHuman}
-                        disabled={humanStatus === "sending" || !humanText.trim()}
-                        className="flex-1 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-50 text-white text-sm font-bold py-2 transition"
+                        pending={humanStatus === "sending"}
+                        disabled={!humanText.trim()}
                       >
                         {humanStatus === "sending" ? "Sending…" : "Send"}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setHumanMode(false)}
-                        className="rounded-xl border border-border text-sm font-semibold px-3 py-2 text-muted hover:text-foreground transition"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}
@@ -286,7 +292,7 @@ export function SupportChat() {
                   }}
                   className="flex items-end gap-2 px-3 pt-2.5"
                 >
-                  <textarea
+                  <TextArea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -296,23 +302,27 @@ export function SupportChat() {
                       }
                     }}
                     rows={1}
+                    aria-label="Your question"
                     placeholder="Type a question…"
-                    className="flex-1 resize-none rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                    className="flex-1 resize-none"
                   />
-                  <button
+                  <Button
                     type="submit"
-                    disabled={busy || !input.trim()}
+                    variant="dark"
+                    size="sm"
+                    className="w-11 shrink-0 px-0"
+                    pending={busy}
+                    disabled={!input.trim()}
                     aria-label="Send"
-                    className="rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-50 text-white p-2.5 transition"
                   >
                     <SendIcon />
-                  </button>
+                  </Button>
                 </form>
                 <div className="px-3 pb-2.5 pt-1.5">
                   <button
                     type="button"
                     onClick={() => setHumanMode(true)}
-                    className="text-[11px] text-muted hover:text-foreground underline"
+                    className="pr-link text-xs"
                   >
                     Talk to a human
                   </button>
@@ -339,7 +349,7 @@ function Bubble({
       <div
         className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
           isUser
-            ? "bg-brand text-white rounded-br-sm"
+            ? "bg-[var(--pr-rig-green)] text-white rounded-br-sm"
             : "bg-white border border-border text-foreground rounded-bl-sm"
         }`}
       >

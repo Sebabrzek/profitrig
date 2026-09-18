@@ -4,13 +4,12 @@ import { useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
 import { Chip } from "@/components/ui/Chip";
+import { Button } from "@/components/ui/Button";
+import { AffixInput, Field, TextInput } from "@/components/ui/Field";
+import { digitsAndDots } from "@/lib/numericInput";
 import { addFuelLogAction, deleteFuelLogAction } from "../actions";
 import { isPlausibleMpg, type FuelEntry } from "@/lib/fuel";
 
-const inputClass =
-  "w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand";
-
-const digitsOnly = (v: string) => v.replace(/[^0-9.]/g, "");
 const miles = (n: number) => Math.round(n).toLocaleString("en-US");
 
 function shortDate(iso: string) {
@@ -121,48 +120,36 @@ export function FuelLogCard({
         description="Your odometer now, and every gallon you bought since your last reading."
       />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Date</span>
-          <input
+        <Field label="Date">
+          <TextInput
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className={inputClass}
           />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Odometer</span>
-          <div className="relative">
-            <input
-              inputMode="decimal"
-              value={odometerText}
-              placeholder={lastOdometer != null ? String(Math.round(lastOdometer) + 2500) : "514800"}
-              onChange={(e) => setOdometerText(digitsOnly(e.target.value))}
-              className={`${inputClass} pr-10`}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
-              mi
-            </span>
-          </div>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Gallons</span>
-          <div className="relative">
-            <input
-              inputMode="decimal"
-              value={gallonsText}
-              placeholder="400"
-              onChange={(e) => setGallonsText(digitsOnly(e.target.value))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") add();
-              }}
-              className={`${inputClass} pr-12`}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
-              gal
-            </span>
-          </div>
-        </label>
+        </Field>
+        <Field label="Odometer">
+          <AffixInput
+            suffix="mi"
+            numeric
+            inputMode="decimal"
+            value={odometerText}
+            placeholder={lastOdometer != null ? String(Math.round(lastOdometer) + 2500) : "514800"}
+            onChange={(e) => setOdometerText(digitsAndDots(e.target.value))}
+          />
+        </Field>
+        <Field label="Gallons">
+          <AffixInput
+            suffix="gal"
+            numeric
+            inputMode="decimal"
+            value={gallonsText}
+            placeholder="400"
+            onChange={(e) => setGallonsText(digitsAndDots(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") add();
+            }}
+          />
+        </Field>
       </div>
       {preview && <p className="text-sm text-foreground/80 mt-3">{preview}</p>}
       {error && (
@@ -170,14 +157,14 @@ export function FuelLogCard({
           {error}
         </Notice>
       )}
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        className="mt-4 w-full sm:w-auto"
         onClick={add}
-        disabled={pending}
-        className="mt-4 w-full h-12 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-60 transition"
+        pending={pending}
       >
         {pending ? "Saving…" : "Add week"}
-      </button>
+      </Button>
 
       {entries.length > 0 && (
         <ul className="mt-5 divide-y divide-border border-t border-border">

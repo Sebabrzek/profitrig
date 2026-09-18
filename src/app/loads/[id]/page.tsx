@@ -143,7 +143,7 @@ export default async function EditLoadPage({
           action={
             <Link
               href="/loads"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
+              className="pr-link pr-hit text-sm"
             >
               ← Back
             </Link>

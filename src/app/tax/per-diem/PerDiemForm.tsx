@@ -3,6 +3,9 @@
 import { useMemo, useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/components/ui/Button";
+import { AffixInput, Field } from "@/components/ui/Field";
+import { digitsOnly, fieldTextFor, wholeNumberOf } from "@/lib/numericInput";
 import { formatMoney } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { savePerDiemSummaryAction } from "@/lib/tax/actions";
@@ -20,30 +23,23 @@ function NightsInput({
   value: number;
   onChange: (n: number) => void;
 }) {
-  const [text, setText] = useState(value === 0 ? "" : String(value));
+  const [text, setText] = useState(fieldTextFor(value));
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold">{label}</span>
-      {hint && <span className="text-xs text-muted -mt-1">{hint}</span>}
-      <div className="relative">
-        <input
-          type="text"
-          inputMode="numeric"
-          value={text}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => {
-            const clean = e.target.value.replace(/[^0-9]/g, "");
-            setText(clean);
-            const parsed = clean === "" ? 0 : parseInt(clean, 10);
-            onChange(Number.isFinite(parsed) ? parsed : 0);
-          }}
-          className="w-full h-12 px-4 pr-16 rounded-xl border border-border bg-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-brand"
-        />
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
-          nights
-        </span>
-      </div>
-    </label>
+    <Field label={label} hint={hint}>
+      <AffixInput
+        suffix="nights"
+        numeric
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => {
+          const clean = digitsOnly(e.target.value);
+          setText(clean);
+          onChange(wholeNumberOf(clean));
+        }}
+      />
+    </Field>
   );
 }
 
@@ -107,13 +103,9 @@ export function PerDiemForm({
               {suggestedNights.periodBNights} nights Oct 1 – Dec 31 (loads with
               250+ loaded miles). Confirm and override if needed.
             </p>
-            <button
-              type="button"
-              onClick={useSuggested}
-              className="text-xs font-semibold text-brand hover:text-brand-dark"
-            >
+            <Button variant="secondary" size="sm" onClick={useSuggested}>
               Use suggested nights
-            </button>
+            </Button>
           </Notice>
         )}
 
@@ -176,14 +168,14 @@ export function PerDiemForm({
         <Notice tone="error">{`Error: ${saved}`}</Notice>
       )}
 
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        className="sm:self-start"
         onClick={save}
-        disabled={pending}
-        className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-60"
+        pending={pending}
       >
         {pending ? "Saving…" : "Save per-diem worksheet"}
-      </button>
+      </Button>
     </div>
   );
 }

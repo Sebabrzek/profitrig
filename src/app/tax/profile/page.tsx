@@ -53,7 +53,7 @@ export default async function TaxProfilePage() {
           action={
             <Link
               href="/tax"
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
+              className="pr-link pr-hit text-sm"
             >
               ← Tax Pack
             </Link>

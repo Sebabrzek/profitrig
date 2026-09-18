@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   saveProfileAction,
   saveSnapshotAction,
@@ -18,6 +18,9 @@ import {
 } from "@/components/instruments/Instruments";
 import { ProfileBanner } from "@/components/ProfileBanner";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { ActionBar } from "@/components/ui/ActionBar";
+import { Button } from "@/components/ui/Button";
+import { Field, NumberField, TextInput } from "@/components/ui/Field";
 import {
   AnswerColumn,
   AnswerLayout,
@@ -32,20 +35,6 @@ import {
 } from "@/lib/visitorProfile";
 
 type NumKey = keyof CostProfile;
-
-function textForValue(value: number) {
-  return value === 0 ? "" : String(value);
-}
-
-function cleanInput(raw: string) {
-  const onlyAllowed = raw.replace(/[^0-9.]/g, "");
-  const firstDot = onlyAllowed.indexOf(".");
-  if (firstDot === -1) return onlyAllowed;
-  return (
-    onlyAllowed.slice(0, firstDot + 1) +
-    onlyAllowed.slice(firstDot + 1).replace(/\./g, "")
-  );
-}
 
 function MoneyInput({
   label,
@@ -62,66 +51,15 @@ function MoneyInput({
   prefix?: string;
   suffix?: string;
 }) {
-  const [text, setText] = useState(() => textForValue(value));
-  const lastExternalValueRef = useRef(value);
-
-  // Resync only when parent value changes externally (e.g., snapshot load),
-  // not while the user is typing intermediate states like "." or "0.4".
-  useEffect(() => {
-    if (value !== lastExternalValueRef.current) {
-      const ours = text === "" || text === "." ? 0 : parseFloat(text);
-      if (value !== ours) setText(textForValue(value));
-      lastExternalValueRef.current = value;
-    }
-  }, [value, text]);
-
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-foreground">{label}</span>
-      {hint && <span className="text-xs text-muted -mt-1">{hint}</span>}
-      <div className="relative">
-        {prefix && (
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold pointer-events-none">
-            {prefix}
-          </span>
-        )}
-        <input
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          value={text}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => {
-            const next = cleanInput(e.target.value);
-            setText(next);
-            const parsed = next === "" || next === "." ? 0 : parseFloat(next);
-            const v = Number.isFinite(parsed) ? parsed : 0;
-            lastExternalValueRef.current = v;
-            onChange(v);
-          }}
-          onBlur={() => {
-            // Tidy up trailing dot or empty on blur: "0." -> "0", "." -> "0"
-            if (text === "." || text === "") {
-              setText("");
-              return;
-            }
-            if (text.endsWith(".")) {
-              setText(text.slice(0, -1));
-            }
-          }}
-          className={`w-full h-12 ${
-            prefix ? "pl-8" : "pl-4"
-          } ${
-            suffix ? "pr-12" : "pr-4"
-          } rounded-xl border border-border bg-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-brand`}
-        />
-        {suffix && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
-            {suffix}
-          </span>
-        )}
-      </div>
-    </label>
+    <Field label={label} hint={hint}>
+      <NumberField
+        value={value}
+        onChange={onChange}
+        prefix={prefix || undefined}
+        suffix={suffix}
+      />
+    </Field>
   );
 }
 
@@ -259,18 +197,18 @@ export function Calculator({
             </span>
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="dark"
+              size="sm"
               onClick={() => applyRealCpmOverride(realCPMFromLoads!)}
-              disabled={overridePending}
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold disabled:opacity-60"
+              pending={overridePending}
             >
               {overridePending
                 ? "Updating…"
                 : overrideActive
                 ? `Refresh override to ${formatRate(realCPMFromLoads!)}`
                 : `Update my estimate to ${formatRate(realCPMFromLoads!)}`}
-            </button>
+            </Button>
             {overrideJustSet != null && (
               <span className="text-xs text-brand-dark font-semibold">
                 ✓ Updated
@@ -372,24 +310,19 @@ export function Calculator({
           onChange={set("load_board_per_month")}
         />
         <div className="sm:col-span-2">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-semibold text-foreground">
-              Other Monthly Bill
-            </span>
-            <span className="text-xs text-muted -mt-1">
-              Anything else: Skool, lawyer, accounting, board load, etc. Name
-              it so you remember.
-            </span>
-            <input
+          <Field
+            label="Other Monthly Bill"
+            hint="Anything else: Skool, lawyer, accounting, board load, etc. Name it so you remember."
+          >
+            <TextInput
               type="text"
               value={p.other_label}
               onChange={(e) =>
                 setP((s) => ({ ...s, other_label: e.target.value.slice(0, 60) }))
               }
               placeholder="What is it? (e.g. Skool)"
-              className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
             />
-          </label>
+          </Field>
           <div className="mt-3">
             <MoneyInput
               label="Amount per month"
@@ -503,38 +436,41 @@ export function Calculator({
         />
         {showSnapshot ? (
           <div className="flex flex-col gap-2">
-            <input
+            <TextInput
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder='e.g. "Carrier XYZ" or "Aug 2026"'
+              aria-label="Snapshot name"
               maxLength={80}
               autoFocus
-              className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
             />
-            <div className="flex gap-2">
-              <button
+            <div className="flex gap-2 sm:justify-end">
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setShowSnapshot(false);
                   setLabel("");
                 }}
                 disabled={pending}
-                className="h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:bg-gray-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1 sm:flex-none"
                 onClick={saveSnapshot}
-                disabled={pending || !label.trim() || !isAuthed}
-                className="flex-1 h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold text-sm disabled:opacity-50"
+                pending={pending}
+                disabled={!label.trim() || !isAuthed}
               >
                 {pending ? "Saving…" : "Save a dated snapshot"}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               if (!isAuthed) {
                 setShowSignupCTA(true);
@@ -542,16 +478,12 @@ export function Calculator({
               }
               setShowSnapshot(true);
             }}
-            className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
           >
             + Save a dated snapshot
-          </button>
+          </Button>
         )}
         <div className="mt-3 text-right">
-          <Link
-            href="/profile#history"
-            className="text-sm font-semibold text-brand hover:text-brand-dark"
-          >
+          <Link href="/profile#history" className="pr-link pr-hit text-sm">
             View save history →
           </Link>
         </div>
@@ -564,34 +496,39 @@ export function Calculator({
       </AnswerLayout>
 
       {/* Save bar */}
-      <div
-        className="pr-action-bar bg-white border-t border-border px-4 pt-3 z-20"
+      <ActionBar
+        tone={
+          saved === "ok" || saved === "snapshot"
+            ? "success"
+            : saved
+            ? "error"
+            : "default"
+        }
+        status={
+          saved === "ok"
+            ? "✓ Costs updated"
+            : saved === "snapshot"
+            ? "✓ Snapshot saved to History"
+            : saved && saved !== "ok"
+            ? `Error: ${saved}`
+            : isAuthed
+            ? "Changes your current numbers. No dated copy."
+            : "Free to play with — sign up to save your numbers."
+        }
       >
-        <div className="pr-action-bar-inner flex items-center gap-3">
-          <div className="flex-1 text-xs text-muted">
-            {saved === "ok"
-              ? "✓ Costs updated"
-              : saved === "snapshot"
-              ? "✓ Snapshot saved to History"
-              : saved && saved !== "ok"
-              ? `Error: ${saved}`
-              : isAuthed
-              ? "Changes your current numbers. No dated copy."
-              : "Free to play with — sign up to save your numbers."}
-          </div>
-          <button
-            onClick={save}
-            disabled={pending}
-            className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold transition disabled:opacity-60"
-          >
-            {pending && !showSnapshot
-              ? "Saving..."
-              : isAuthed
-              ? "Update my costs"
-              : "Save my numbers"}
-          </button>
-        </div>
-      </div>
+        <Button
+          variant="primary"
+          onClick={save}
+          pending={pending && !showSnapshot}
+          disabled={pending}
+        >
+          {pending && !showSnapshot
+            ? "Saving…"
+            : isAuthed
+            ? "Update my costs"
+            : "Save my numbers"}
+        </Button>
+      </ActionBar>
 
       {showSignupCTA && (
         <div

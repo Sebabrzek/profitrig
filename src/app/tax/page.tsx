@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/format";
 import {
   InstrumentPanel,
@@ -164,12 +164,14 @@ export default async function TaxPage({
               for sole props/SMLLCs; financed truck payments are not
               deductible — only interest is).
             </p>
-            <Link
+            <ButtonLink
               href="/tax/profile"
-              className="mt-3 inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold"
+              variant="dark"
+              size="sm"
+              className="mt-3"
             >
               Open Tax Profile
-            </Link>
+            </ButtonLink>
           </Notice>
         )}
 
@@ -299,7 +301,7 @@ export default async function TaxPage({
           <div className="flex flex-wrap gap-2">
             <a
               href={`/api/tax/export?year=${taxYear}&format=csv`}
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold"
+              className={buttonClass({ variant: "dark", size: "sm" })}
             >
               Download Tax Pack (CSV)
             </a>
@@ -307,7 +309,7 @@ export default async function TaxPage({
               href={`/api/tax/export?year=${taxYear}&format=html`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand"
+              className={buttonClass({ variant: "secondary", size: "sm" })}
             >
               Printable summary
             </a>

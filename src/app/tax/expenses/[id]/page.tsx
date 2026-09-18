@@ -55,7 +55,7 @@ export default async function EditExpensePage({
           action={
             <Link
               href={`/tax/expenses?year=${initial.expense_date.slice(0, 4)}`}
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
+              className="pr-link pr-hit text-sm"
             >
               ← Back
             </Link>

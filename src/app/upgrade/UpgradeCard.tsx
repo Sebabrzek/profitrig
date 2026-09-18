@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/components/ui/Button";
+import { Field, TextInput } from "@/components/ui/Field";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { createCheckoutAction, createPortalAction } from "../actions";
 
 type Plan = "monthly" | "yearly";
@@ -41,29 +44,24 @@ export function UpgradeCard({
 
   return (
     <Card as="div" className="mb-4">
-      <div className="flex gap-2 bg-gray-100 rounded-full p-1 mb-5">
-        <button
-          type="button"
-          onClick={() => setPlan("monthly")}
-          className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
-            plan === "monthly"
-              ? "bg-white shadow text-foreground"
-              : "text-muted"
-          }`}
-        >
-          Monthly
-        </button>
-        <button
-          type="button"
-          onClick={() => setPlan("yearly")}
-          className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
-            plan === "yearly"
-              ? "bg-white shadow text-foreground"
-              : "text-muted"
-          }`}
-        >
-          Yearly <span className="text-brand-dark">(save 17%)</span>
-        </button>
+      <div className="mb-5">
+        <SegmentedControl
+          label="Billing period"
+          block
+          value={plan}
+          onChange={setPlan}
+          options={[
+            { value: "monthly", label: "Monthly" },
+            {
+              value: "yearly",
+              label: (
+                <>
+                  Yearly <span className="ml-1 font-medium">(save 17%)</span>
+                </>
+              ),
+            },
+          ]}
+        />
       </div>
 
       <div className="text-center mb-4">
@@ -73,19 +71,16 @@ export function UpgradeCard({
         </p>
       </div>
 
-      <div className="mb-4">
-        <label className="text-xs font-semibold text-muted">
-          Have a code? (optional)
-        </label>
-        <input
+      <Field label="Have a code? (optional)" className="mb-4">
+        <TextInput
           type="text"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="Enter promo code"
           autoCapitalize="characters"
-          className="mt-1 w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand uppercase placeholder:normal-case placeholder:lowercase"
+          className="uppercase placeholder:normal-case placeholder:lowercase"
         />
-      </div>
+      </Field>
 
       {error && (
         <Notice tone="error" className="mb-3">
@@ -93,14 +88,9 @@ export function UpgradeCard({
         </Notice>
       )}
 
-      <button
-        type="button"
-        onClick={go}
-        disabled={pending}
-        className="w-full h-14 rounded-2xl bg-brand hover:bg-brand-dark text-white font-bold text-base disabled:opacity-60 transition"
-      >
+      <Button variant="primary" size="lg" block onClick={go} pending={pending}>
         {pending ? "Opening checkout…" : "Start 7-Day Free Trial"}
-      </button>
+      </Button>
 
       <p className="text-[11px] text-muted text-center mt-3 leading-snug">
         Card billed only after the 7-day trial. Cancel anytime. Secured by
@@ -128,14 +118,9 @@ export function ProActiveControls() {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={go}
-        disabled={pending}
-        className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-60 transition"
-      >
+      <Button variant="dark" onClick={go} pending={pending}>
         {pending ? "Opening…" : "Manage subscription"}
-      </button>
+      </Button>
       {error && (
         <Notice tone="error" className="mt-3">
           {error}

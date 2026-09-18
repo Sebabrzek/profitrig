@@ -110,7 +110,7 @@ export default async function ProfilePage() {
           {snapshots.length === 0 ? (
             <EmptyState title="No snapshots yet.">
               On the{" "}
-              <Link href="/" className="text-brand font-semibold">
+              <Link href="/" className="pr-link">
                 calculator
               </Link>
               , tap{" "}

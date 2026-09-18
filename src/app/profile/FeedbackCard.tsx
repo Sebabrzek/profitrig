@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Button } from "@/components/ui/Button";
+import { TextArea } from "@/components/ui/Field";
 import { submitFeedbackAction } from "../actions";
 
 const MAX_LEN = 5000;
@@ -34,12 +36,12 @@ export function FeedbackCard() {
         title="Send Feedback"
         description="Hit a bug? Have an idea? Want a feature that would save you time on the road? Type away — every message gets read."
       />
-      <textarea
+      <TextArea
         value={message}
         onChange={(e) => setMessage(e.target.value.slice(0, MAX_LEN))}
         rows={5}
+        aria-label="Your feedback"
         placeholder="What's on your mind?"
-        className="w-full p-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand resize-y"
       />
       <div className="mt-3 flex items-center gap-3">
         <div className="flex-1 text-xs text-muted">
@@ -57,13 +59,14 @@ export function FeedbackCard() {
             </span>
           )}
         </div>
-        <button
+        <Button
+          variant="primary"
           onClick={send}
+          pending={pending}
           disabled={!canSend}
-          className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-50 transition"
         >
-          {pending ? "Sending..." : "Send"}
-        </button>
+          {pending ? "Sending…" : "Send"}
+        </Button>
       </div>
     </Card>
   );

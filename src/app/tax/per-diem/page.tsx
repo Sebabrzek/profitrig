@@ -91,10 +91,7 @@ export default async function PerDiemPage({
           action={<YearSelect taxYear={taxYear} years={years} />}
         />
 
-        <Link
-          href="/tax"
-          className="text-sm font-semibold text-brand hover:text-brand-dark"
-        >
+        <Link href="/tax" className="pr-link pr-hit text-sm">
           ← Tax Pack
         </Link>
 

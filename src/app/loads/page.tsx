@@ -7,6 +7,7 @@ import {
   PageHeader,
 } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
 import {
   InstrumentPanel,
@@ -275,35 +276,34 @@ export default async function LoadsPage({
               from the calculator. Open the calculator, fill it in, hit Save,
               then come back here.
             </p>
-            <Link
-              href="/"
-              className="mt-3 inline-flex items-center justify-center h-10 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold text-sm"
-            >
+            <ButtonLink href="/" variant="dark" size="sm" className="mt-3">
               Open Calculator
-            </Link>
+            </ButtonLink>
           </Notice>
         )}
 
         {/* Week navigator */}
         <div className="flex items-center justify-between gap-2 mb-3">
-          <Link
+          <ButtonLink
             href={`/loads?week=${isoDate(prevWeek)}`}
-            className="h-10 px-3 rounded-xl border border-border bg-white text-sm font-semibold hover:bg-gray-50"
+            variant="secondary"
+            size="sm"
           >
             ← Prev
-          </Link>
+          </ButtonLink>
           <div className="flex-1 text-center">
             <p className="text-xs text-muted uppercase tracking-wider font-semibold">
               Week of
             </p>
             <p className="text-sm font-bold">{formatWeekLabel(weekStart)}</p>
           </div>
-          <Link
+          <ButtonLink
             href={`/loads?week=${isoDate(nextWeek)}`}
-            className="h-10 px-3 rounded-xl border border-border bg-white text-sm font-semibold hover:bg-gray-50"
+            variant="secondary"
+            size="sm"
           >
             Next →
-          </Link>
+          </ButtonLink>
         </div>
         <WeekStartToggle value={weekStartsOn} />
 
@@ -315,10 +315,7 @@ export default async function LoadsPage({
               {settings.carrierName || "your carrier"}
             </span>{" "}
             · you keep {pctLabel(100 - settings.carrierPct)} ·{" "}
-            <Link
-              href="/profile"
-              className="font-semibold text-brand hover:text-brand-dark"
-            >
+            <Link href="/profile" className="pr-link">
               Change
             </Link>
           </p>
@@ -328,7 +325,7 @@ export default async function LoadsPage({
             You&apos;re leased to a carrier, but ProfitRig doesn&apos;t know
             what they keep — so every load here counts 100% of the pay as
             yours.{" "}
-            <Link href="/profile" className="font-semibold underline">
+            <Link href="/profile" className="pr-link">
               Add your carrier&apos;s %
             </Link>
           </Notice>
@@ -422,16 +419,16 @@ export default async function LoadsPage({
         />
 
         {/* Add load CTA */}
-        <Link
+        <ButtonLink
           href={`/loads/new?date=${isoDate(targetDate)}`}
-          className={`flex items-center justify-center h-14 rounded-2xl text-base font-bold mb-4 transition ${
-            isConfigured
-              ? "bg-brand hover:bg-brand-dark text-white"
-              : "bg-gray-200 text-muted cursor-not-allowed pointer-events-none"
-          }`}
+          variant="primary"
+          size="lg"
+          block
+          disabled={!isConfigured}
+          className="mb-4"
         >
           + Add a Load
-        </Link>
+        </ButtonLink>
 
         {/* Export to Sheets/Excel */}
         {isConfigured && (
@@ -443,19 +440,19 @@ export default async function LoadsPage({
             <div className="flex flex-wrap gap-2">
               <a
                 href={`/api/loads/export?range=week&date=${isoDate(targetDate)}`}
-                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+                className={buttonClass({ variant: "secondary", size: "sm" })}
               >
                 This Week
               </a>
               <a
                 href={`/api/loads/export?range=month&date=${isoDate(targetDate)}`}
-                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+                className={buttonClass({ variant: "secondary", size: "sm" })}
               >
                 This Month
               </a>
               <a
                 href={`/api/loads/export?range=all`}
-                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-border bg-white text-sm font-semibold hover:border-brand hover:text-brand-dark"
+                className={buttonClass({ variant: "secondary", size: "sm" })}
               >
                 All Time
               </a>

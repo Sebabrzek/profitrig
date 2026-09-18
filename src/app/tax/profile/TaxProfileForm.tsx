@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { saveTaxProfileAction } from "@/lib/tax/actions";
 import {
@@ -87,10 +88,10 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
           {ENTITY_OPTIONS.map((o) => (
             <label
               key={o.value}
-              className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
+              className={`flex items-start gap-3 p-3 rounded-[var(--pr-radius-input)] border-2 cursor-pointer transition ${
                 profile.entity_type === o.value
-                  ? "border-brand bg-brand-soft"
-                  : "border-border hover:border-brand/40"
+                  ? "border-[var(--pr-rig-green)] bg-pr-surface-muted"
+                  : "border-border hover:border-[var(--pr-border-strong)]"
               }`}
             >
               <input
@@ -101,7 +102,7 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
                 onChange={() =>
                   setProfile((p) => ({ ...p, entity_type: o.value }))
                 }
-                className="mt-0.5"
+                className="mt-0.5 accent-[var(--pr-rig-green)]"
               />
               <div>
                 <p className="text-sm font-semibold">{o.label}</p>
@@ -110,14 +111,14 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
             </label>
           ))}
         </div>
-        <label className="flex items-start gap-3 mt-4 p-3 rounded-xl border-2 border-border cursor-pointer">
+        <label className="flex items-start gap-3 mt-4 p-3 rounded-[var(--pr-radius-input)] border-2 border-border cursor-pointer">
           <input
             type="checkbox"
             checked={profile.has_hired_driver}
             onChange={(e) =>
               setProfile((p) => ({ ...p, has_hired_driver: e.target.checked }))
             }
-            className="mt-0.5 h-5 w-5 accent-brand"
+            className="mt-0.5 h-5 w-5 accent-[var(--pr-rig-green)]"
           />
           <div>
             <p className="text-sm font-semibold">I have a hired driver</p>
@@ -145,10 +146,10 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
           {FINANCING_OPTIONS.map((o) => (
             <label
               key={o.value}
-              className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
+              className={`flex items-start gap-3 p-3 rounded-[var(--pr-radius-input)] border-2 cursor-pointer transition ${
                 profile.truck_financing === o.value
-                  ? "border-brand bg-brand-soft"
-                  : "border-border hover:border-brand/40"
+                  ? "border-[var(--pr-rig-green)] bg-pr-surface-muted"
+                  : "border-border hover:border-[var(--pr-border-strong)]"
               }`}
             >
               <input
@@ -159,7 +160,7 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
                 onChange={() =>
                   setProfile((p) => ({ ...p, truck_financing: o.value }))
                 }
-                className="mt-0.5"
+                className="mt-0.5 accent-[var(--pr-rig-green)]"
               />
               <div>
                 <p className="text-sm font-semibold">{o.label}</p>
@@ -180,14 +181,15 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
       )}
 
       <div className="flex gap-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          className="flex-1 sm:flex-none"
           onClick={save}
-          disabled={pending || !profile.entity_type || !profile.truck_financing}
-          className="flex-1 h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-50"
+          pending={pending}
+          disabled={!profile.entity_type || !profile.truck_financing}
         >
           {pending ? "Saving…" : "Save tax profile"}
-        </button>
+        </Button>
       </div>
     </div>
   );

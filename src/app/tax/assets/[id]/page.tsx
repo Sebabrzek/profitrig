@@ -53,7 +53,7 @@ export default async function EditAssetPage({
           action={
             <Link
               href={`/tax/assets?year=${initial.placed_in_service.slice(0, 4)}`}
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
+              className="pr-link pr-hit text-sm"
             >
               ← Back
             </Link>

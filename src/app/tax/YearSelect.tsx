@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { SelectInput } from "@/components/ui/Field";
 
 export function YearSelect({ taxYear, years }: { taxYear: number; years: number[] }) {
   const router = useRouter();
@@ -12,7 +13,7 @@ export function YearSelect({ taxYear, years }: { taxYear: number; years: number[
       <label htmlFor="year" className="text-muted">
         Year
       </label>
-      <select
+      <SelectInput
         id="year"
         name="year"
         defaultValue={taxYear}
@@ -21,14 +22,14 @@ export function YearSelect({ taxYear, years }: { taxYear: number; years: number[
           params.set("year", e.target.value);
           router.push(`${pathname}?${params.toString()}`);
         }}
-        className="h-9 px-3 rounded-lg border border-border bg-white text-sm font-semibold"
+        className="h-11 w-auto pl-3 pr-2 font-semibold"
       >
         {years.map((y) => (
           <option key={y} value={y}>
             {y}
           </option>
         ))}
-      </select>
+      </SelectInput>
     </div>
   );
 }

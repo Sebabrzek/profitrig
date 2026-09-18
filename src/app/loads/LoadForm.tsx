@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import {
   MTD_FALLBACK_THRESHOLD_MILES,
   type Load,
@@ -20,22 +19,19 @@ import {
 } from "@/components/instruments/Instruments";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { Chip } from "@/components/ui/Chip";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import {
+  Field,
+  NumberField,
+  TextArea,
+  TextInput,
+} from "@/components/ui/Field";
 import {
   AnswerColumn,
   AnswerLayout,
   WorkColumn,
 } from "@/components/shell/AnswerLayout";
-
-function textForValue(v: number) {
-  return v === 0 ? "" : String(v);
-}
-
-function cleanNumeric(raw: string) {
-  const only = raw.replace(/[^0-9.]/g, "");
-  const dot = only.indexOf(".");
-  if (dot === -1) return only;
-  return only.slice(0, dot + 1) + only.slice(dot + 1).replace(/\./g, "");
-}
 
 function NumInput({
   label,
@@ -52,62 +48,23 @@ function NumInput({
   prefix?: string;
   suffix?: string;
 }) {
-  const [text, setText] = useState(() => textForValue(value));
-  const lastExternal = useRef(value);
-
-  useEffect(() => {
-    if (value !== lastExternal.current) {
-      const ours = text === "" || text === "." ? 0 : parseFloat(text);
-      if (value !== ours) setText(textForValue(value));
-      lastExternal.current = value;
-    }
-  }, [value, text]);
-
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-foreground">{label}</span>
-      {hint && <span className="text-xs text-muted -mt-1">{hint}</span>}
-      <div className="relative">
-        {prefix && (
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-semibold pointer-events-none">
-            {prefix}
-          </span>
-        )}
-        <input
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          value={text}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => {
-            const next = cleanNumeric(e.target.value);
-            setText(next);
-            const parsed = next === "" || next === "." ? 0 : parseFloat(next);
-            const v = Number.isFinite(parsed) ? parsed : 0;
-            lastExternal.current = v;
-            onChange(v);
-          }}
-          onBlur={() => {
-            if (text === "." || text === "") {
-              setText("");
-              return;
-            }
-            if (text.endsWith(".")) setText(text.slice(0, -1));
-          }}
-          className={`w-full h-12 ${prefix ? "pl-8" : "pl-4"} ${
-            suffix ? "pr-12" : "pr-4"
-          } rounded-xl border border-border bg-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-brand`}
-        />
-        {suffix && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
-            {suffix}
-          </span>
-        )}
-      </div>
-    </label>
+    <Field label={label} hint={hint}>
+      <NumberField
+        value={value}
+        onChange={onChange}
+        prefix={prefix}
+        suffix={suffix}
+      />
+    </Field>
   );
 }
 
+/**
+ * A cost ProfitRig estimates until the driver enters what they really paid.
+ * Estimated is neutral, not a warning: the chip says which number the load
+ * is using, and one small action switches between them — exactly as before.
+ */
 function OptionalMoneyInput({
   label,
   hint,
@@ -121,18 +78,28 @@ function OptionalMoneyInput({
   estimate: number;
   onChange: (n: number | null) => void;
 }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
   const usingEstimate = value === null;
-  const displayValue = usingEstimate ? 0 : value;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-foreground">{label}</span>
+    <div className="pr-field">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          {usingEstimate ? (
+            <span className="pr-field-label">{label}</span>
+          ) : (
+            <label htmlFor={id} className="pr-field-label">
+              {label}
+            </label>
+          )}
+          <Chip>{usingEstimate ? "Estimated" : "Actual"}</Chip>
+        </span>
         {usingEstimate ? (
           <button
             type="button"
             onClick={() => onChange(0)}
-            className="text-xs font-semibold text-brand hover:text-brand-dark"
+            className="pr-link pr-hit shrink-0 text-sm"
           >
             Enter actual
           </button>
@@ -140,22 +107,25 @@ function OptionalMoneyInput({
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs font-semibold text-muted hover:text-foreground"
+            className="pr-link pr-hit shrink-0 text-sm"
           >
             Use estimate
           </button>
         )}
       </div>
-      {hint && <span className="text-xs text-muted -mt-1">{hint}</span>}
+      {hint && (
+        <span id={hintId} className="pr-field-hint">
+          {hint}
+        </span>
+      )}
       {usingEstimate ? (
-        <div className="h-12 px-4 rounded-xl border border-dashed border-border bg-gray-50 flex items-center justify-between">
-          <span className="text-muted text-sm">Estimated</span>
-          <span className="font-semibold text-sm">{formatMoney(estimate)}</span>
-        </div>
+        <div className="pr-estimate">{formatMoney(estimate)}</div>
       ) : (
-        <NumInput
-          label=""
-          value={displayValue}
+        <NumberField
+          id={id}
+          aria-describedby={hint ? hintId : undefined}
+          prefix="$"
+          value={value}
           onChange={(n) => onChange(n)}
         />
       )}
@@ -329,45 +299,37 @@ export function LoadForm({
       </AnswerColumn>
       <WorkColumn>
       <Section title="Trip info">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Date</span>
-          <input
+        <Field label="Date">
+          <TextInput
             type="date"
             value={load.load_date}
             onChange={(ev) => setField("load_date")(ev.target.value)}
-            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
           />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Broker / customer</span>
-          <input
+        </Field>
+        <Field label="Broker / customer">
+          <TextInput
             type="text"
             value={load.broker}
             placeholder="e.g. CH Robinson"
             onChange={(ev) => setField("broker")(ev.target.value)}
-            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
           />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Origin</span>
-          <input
+        </Field>
+        <Field label="Origin">
+          <TextInput
             type="text"
             value={load.origin}
             placeholder="City, ST"
             onChange={(ev) => setField("origin")(ev.target.value)}
-            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
           />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">Destination</span>
-          <input
+        </Field>
+        <Field label="Destination">
+          <TextInput
             type="text"
             value={load.destination}
             placeholder="City, ST"
             onChange={(ev) => setField("destination")(ev.target.value)}
-            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand"
           />
-        </label>
+        </Field>
       </Section>
 
       <Section
@@ -421,11 +383,13 @@ export function LoadForm({
           hint="The flat rate on the rate confirmation."
           value={load.linehaul_pay}
           onChange={setField("linehaul_pay")}
+          prefix="$"
         />
         <NumInput
           label="Fuel surcharge (FSC)"
           value={load.fuel_surcharge}
           onChange={setField("fuel_surcharge")}
+          prefix="$"
         />
         <div className="sm:col-span-2">
           <NumInput
@@ -433,6 +397,7 @@ export function LoadForm({
             hint="Detention, layover, tarping, multi-stop, etc."
             value={load.accessorials}
             onChange={setField("accessorials")}
+            prefix="$"
           />
         </div>
         {showCarrierPct && (
@@ -548,12 +513,12 @@ export function LoadForm({
 
       <Section title="Notes (optional)">
         <div className="sm:col-span-2">
-          <textarea
+          <TextArea
             value={load.notes}
             onChange={(ev) => setField("notes")(ev.target.value.slice(0, 2000))}
             rows={3}
+            aria-label="Notes"
             placeholder="Anything you want to remember about this load."
-            className="w-full p-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand resize-y"
           />
         </div>
       </Section>
@@ -564,31 +529,32 @@ export function LoadForm({
         </Notice>
       )}
 
-      <div className="flex flex-col-reverse sm:flex-row gap-3 items-stretch">
+      {/* Phone: Save on top, full width, thumb-reachable. Wider: Delete
+          set apart on the left, Cancel and Save together on the right. */}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
         {loadId && (
-          <button
-            type="button"
+          <Button
+            variant="destructive"
+            className="sm:mr-auto"
             onClick={remove}
-            disabled={deletePending || pending}
-            className="h-12 px-6 rounded-xl border border-border bg-white text-red-600 font-semibold hover:bg-red-50 hover:border-red-300 disabled:opacity-50 transition"
+            pending={deletePending}
+            disabled={pending}
           >
-            {deletePending ? "Deleting..." : "Delete"}
-          </button>
+            {deletePending ? "Deleting…" : "Delete"}
+          </Button>
         )}
-        <Link
-          href="/loads"
-          className="h-12 px-6 rounded-xl border border-border bg-white text-foreground font-semibold flex items-center justify-center hover:bg-gray-50"
-        >
+        <ButtonLink href="/loads" variant="secondary">
           Cancel
-        </Link>
-        <button
-          type="button"
+        </ButtonLink>
+        <Button
+          variant="primary"
+          className="sm:min-w-44"
           onClick={save}
-          disabled={pending || deletePending}
-          className="flex-1 h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-60 transition"
+          pending={pending}
+          disabled={deletePending}
         >
-          {pending ? "Saving..." : loadId ? "Save changes" : "Save load"}
-        </button>
+          {pending ? "Saving…" : loadId ? "Save changes" : "Save load"}
+        </Button>
       </div>
       </WorkColumn>
     </AnswerLayout>

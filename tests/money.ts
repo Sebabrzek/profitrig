@@ -41,6 +41,12 @@
  *      On screen, ProfitRig now drops only a meaningless ".00" — it never
  *      rounds a real cent away.
  *
+ *  13. Four hand-copied number fields became one shared field, and every
+ *      input was restyled. These hold what a driver's keystrokes do — "2."
+ *      and ".5" stay on screen, a cleared field is 0, nothing is formatted
+ *      mid-typing, the text never resyncs under the cursor — so a visual
+ *      phase cannot change how a field types.
+ *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
  */
@@ -80,6 +86,16 @@ import { computeCalculatorTotals } from "../src/lib/calculatorTotals";
 import { csvEscape, csvRow } from "../src/lib/csv";
 import { UPGRADE_PATH, activeNavKey, navItems } from "../src/lib/nav";
 import { MINUS, formatMoney, formatRate, outcomeOf } from "../src/lib/format";
+import {
+  cleanDecimalText,
+  decimalValueOf,
+  digitsAndDots,
+  digitsOnly,
+  fieldTextFor,
+  resyncDecimalText,
+  tidyDecimalText,
+  wholeNumberOf,
+} from "../src/lib/numericInput";
 
 let failures = 0;
 let checks = 0;
@@ -909,6 +925,128 @@ check(
   "profit, loss and break-even-to-the-cent are told apart",
   outcomeOf(0.01) === "profit" && outcomeOf(-0.01) === "loss" &&
     outcomeOf(0) === undefined && outcomeOf(0.004) === undefined
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("A number field keeps what the driver types");
+// ─────────────────────────────────────────────────────────────────────
+
+// Drives the helpers exactly as the shared NumberField wires them: each
+// keystroke cleans the text and reports its number to the form, then the
+// form re-renders with that number and the field decides whether to resync.
+function typeInto(start: number, keystrokes: string[]) {
+  let text = fieldTextFor(start);
+  let lastSeen = start;
+  let formValue = start;
+  const shown: string[] = [];
+  const values: number[] = [];
+  for (const raw of keystrokes) {
+    text = cleanDecimalText(raw);
+    formValue = decimalValueOf(text);
+    lastSeen = formValue;
+    const next = resyncDecimalText(formValue, lastSeen, text);
+    if (next !== null) {
+      text = next;
+      lastSeen = formValue;
+    }
+    shown.push(text);
+    values.push(formValue);
+  }
+  return { text, formValue, lastSeen, shown, values };
+}
+const same = (a: unknown[], b: unknown[]) => JSON.stringify(a) === JSON.stringify(b);
+
+{
+  const t = typeInto(0, ["2", "2.", "2.5"]);
+  check(
+    '"2." stays on screen while typing 2.5',
+    same(t.shown, ["2", "2.", "2.5"]) && same(t.values, [2, 2, 2.5]),
+    t.shown.join(" | ")
+  );
+}
+{
+  const t = typeInto(0, [".", ".5"]);
+  check(
+    'a leading "." is kept, and counts as 0 until a digit follows',
+    same(t.shown, [".", ".5"]) && same(t.values, [0, 0.5])
+  );
+}
+{
+  const t = typeInto(0, ["0", "0.", "0.4", "0.40"]);
+  check(
+    'a trailing zero is not trimmed mid-typing ("0.40" stays "0.40")',
+    t.text === "0.40" && t.formValue === 0.4
+  );
+}
+{
+  const t = typeInto(1500, ["150", "15", "1", ""]);
+  check(
+    "clearing a field leaves it empty and reports 0",
+    t.text === "" && t.formValue === 0
+  );
+}
+{
+  const t = typeInto(0, ["1", "15", "150", "1500"]);
+  check(
+    "no thousands separator is added while typing",
+    t.text === "1500" && t.formValue === 1500 && fieldTextFor(1500) === "1500"
+  );
+}
+check(
+  "typed commas, $ and letters are dropped, one decimal point kept",
+  cleanDecimalText("$1,500.50") === "1500.50" &&
+    cleanDecimalText("1.2.3") === "1.23" &&
+    cleanDecimalText("abc") === ""
+);
+check(
+  "zero shows as an empty field; other numbers as plain digits",
+  fieldTextFor(0) === "" && fieldTextFor(2.5) === "2.5" && fieldTextFor(0.4) === "0.4"
+);
+check(
+  "an impossible number counts as 0 instead of breaking the form",
+  decimalValueOf("9".repeat(400)) === 0
+);
+check(
+  'leaving a field drops a trailing "." and nothing else',
+  tidyDecimalText("2.") === "2" &&
+    tidyDecimalText(".") === "" &&
+    tidyDecimalText("") === "" &&
+    tidyDecimalText(".5") === ".5" &&
+    tidyDecimalText("0.40") === "0.40"
+);
+check(
+  "tidying on blur never changes the number the form already has",
+  ["2.", ".", ".5", "0.40", "12"].every(
+    (t) => decimalValueOf(tidyDecimalText(t)) === decimalValueOf(t)
+  )
+);
+check(
+  "a number set from outside (a loaded snapshot) replaces the text",
+  resyncDecimalText(3.1, 2, "2.") === "3.1" && resyncDecimalText(0, 2, "2.") === ""
+);
+check(
+  "an outside number the text already stands for leaves the text alone",
+  resyncDecimalText(2, 5, "2.") === "2." && resyncDecimalText(0.5, 1, ".5") === ".5"
+);
+check(
+  "the driver's own keystroke never resyncs the text",
+  resyncDecimalText(2, 2, "2.") === null && resyncDecimalText(0, 0, ".") === null
+);
+
+// The loose fields keep their own, looser rules; the forms check on save.
+check(
+  "carrier %, odometer, gallons and road expense: digits and dots as typed",
+  digitsAndDots("20%") === "20" &&
+    digitsAndDots("512,300 mi") === "512300" &&
+    digitsAndDots("1.2.3") === "1.2.3"
+);
+check(
+  "a year or a count of nights: digits only",
+  digitsOnly("2021a") === "2021" && digitsOnly("12.5") === "125"
+);
+check(
+  "an empty nights field is 0 nights",
+  wholeNumberOf("") === 0 && wholeNumberOf("12") === 12 && wholeNumberOf("007") === 7
 );
 
 // ─────────────────────────────────────────────────────────────────────

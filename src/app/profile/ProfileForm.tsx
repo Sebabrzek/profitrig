@@ -3,6 +3,15 @@
 import { useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { ActionBar } from "@/components/ui/ActionBar";
+import { Button } from "@/components/ui/Button";
+import {
+  AffixInput,
+  Field,
+  SelectInput,
+  TextInput,
+} from "@/components/ui/Field";
+import { digitsAndDots } from "@/lib/numericInput";
 import { formatMoney } from "@/lib/format";
 import {
   applyCarrierPctToPastLoadsAction,
@@ -91,27 +100,6 @@ const TRAILER_OPTIONS = [
   { value: "tanker", label: "Tanker" },
   { value: "other", label: "Other" },
 ];
-
-function Field({
-  label,
-  children,
-  hint,
-}: {
-  label: string;
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-foreground">{label}</span>
-      {hint && <span className="text-xs text-muted -mt-1">{hint}</span>}
-      {children}
-    </label>
-  );
-}
-
-const inputClass =
-  "w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand";
 
 export function ProfileForm({
   initial,
@@ -221,26 +209,23 @@ export function ProfileForm({
         <CardHeader title="Contact" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="First Name">
-            <input
-              className={inputClass}
+            <TextInput
               value={p.first_name}
               autoComplete="given-name"
               onChange={setStr("first_name")}
             />
           </Field>
           <Field label="Last Name">
-            <input
-              className={inputClass}
+            <TextInput
               value={p.last_name}
               autoComplete="family-name"
               onChange={setStr("last_name")}
             />
           </Field>
           <Field label="Phone" hint="Best number to reach you.">
-            <input
+            <TextInput
               type="tel"
               inputMode="tel"
-              className={inputClass}
               value={p.phone}
               placeholder="(555) 123-4567"
               autoComplete="tel"
@@ -248,7 +233,7 @@ export function ProfileForm({
             />
           </Field>
           <Field label="Email" hint="From your account. Not editable here.">
-            <input className={inputClass} value={email} readOnly disabled />
+            <TextInput value={email} readOnly disabled />
           </Field>
         </div>
       </Card>
@@ -262,7 +247,7 @@ export function ProfileForm({
           <input
             type="checkbox"
             role="switch"
-            className="mt-1 h-5 w-5 rounded border-border accent-brand"
+            className="mt-1 h-5 w-5 rounded border-border accent-[var(--pr-rig-green)]"
             checked={leased}
             onChange={(e) => toggleLeased(e.target.checked)}
           />
@@ -279,28 +264,21 @@ export function ProfileForm({
         {leased ? (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Carrier you're leased to">
-              <input
-                className={inputClass}
+              <TextInput
                 value={p.carrier_name}
                 onChange={setStr("carrier_name")}
               />
             </Field>
             <Field label="Carrier keeps" hint="Their cut of each load's total pay.">
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className={`${inputClass} pr-10`}
-                  value={pctText}
-                  placeholder="20"
-                  onChange={(e) =>
-                    setPctText(e.target.value.replace(/[^0-9.]/g, ""))
-                  }
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
-                  %
-                </span>
-              </div>
+              <AffixInput
+                suffix="%"
+                numeric
+                type="text"
+                inputMode="decimal"
+                value={pctText}
+                placeholder="20"
+                onChange={(e) => setPctText(digitsAndDots(e.target.value))}
+              />
             </Field>
             <p className="sm:col-span-2 text-sm leading-snug">
               {pctIsValid && typedPct != null ? (
@@ -344,22 +322,22 @@ export function ProfileForm({
               {pastCount === 1 ? "that one" : "those"} too?
             </p>
             <div className="mt-2 flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
+              <Button
+                variant="dark"
+                size="sm"
                 onClick={() => applyToPast(savedPct)}
                 disabled={applyPending}
-                className="h-11 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold disabled:opacity-60 transition"
               >
                 Yes — apply {pctLabel(savedPct)}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => applyToPast(0)}
                 disabled={applyPending}
-                className="h-11 px-4 rounded-xl border border-border bg-white font-semibold hover:bg-gray-50 disabled:opacity-60 transition"
               >
                 No — I kept 100% of those
-              </button>
+              </Button>
             </div>
           </Notice>
         )}
@@ -372,24 +350,21 @@ export function ProfileForm({
         <CardHeader title="Your Operation" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Company Name" hint="Your LLC or business name.">
-            <input
-              className={inputClass}
+            <TextInput
               value={p.company_name}
               autoComplete="organization"
               onChange={setStr("company_name")}
             />
           </Field>
           <Field label="Domicile City">
-            <input
-              className={inputClass}
+            <TextInput
               value={p.domicile_city}
               autoComplete="address-level2"
               onChange={setStr("domicile_city")}
             />
           </Field>
           <Field label="Domicile State">
-            <select
-              className={inputClass}
+            <SelectInput
               value={p.domicile_state}
               onChange={setStr("domicile_state")}
             >
@@ -399,11 +374,10 @@ export function ProfileForm({
                   {s.label}
                 </option>
               ))}
-            </select>
+            </SelectInput>
           </Field>
           <Field label="Trailer Type">
-            <select
-              className={inputClass}
+            <SelectInput
               value={p.trailer_type}
               onChange={setStr("trailer_type")}
             >
@@ -413,7 +387,7 @@ export function ProfileForm({
                   {o.label}
                 </option>
               ))}
-            </select>
+            </SelectInput>
           </Field>
         </div>
       </Card>
@@ -423,7 +397,7 @@ export function ProfileForm({
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
-            className="mt-1 h-5 w-5 rounded border-border accent-brand"
+            className="mt-1 h-5 w-5 rounded border-border accent-[var(--pr-rig-green)]"
             checked={p.marketing_opt_in}
             onChange={(e) =>
               setP((s) => ({ ...s, marketing_opt_in: e.target.checked }))
@@ -439,26 +413,20 @@ export function ProfileForm({
         </label>
       </Card>
 
-      <div
-        className="pr-action-bar bg-white border-t border-border px-4 pt-3 z-20"
+      <ActionBar
+        tone={saved === "ok" ? "success" : saved ? "error" : "default"}
+        status={
+          saved === "ok"
+            ? "✓ Profile saved"
+            : saved && saved !== "ok"
+            ? `Error: ${saved}`
+            : "Your profile is private. We never sell your info."
+        }
       >
-        <div className="pr-action-bar-inner flex items-center gap-3">
-          <div className="flex-1 text-xs text-muted">
-            {saved === "ok"
-              ? "✓ Profile saved"
-              : saved && saved !== "ok"
-              ? `Error: ${saved}`
-              : "Your profile is private. We never sell your info."}
-          </div>
-          <button
-            onClick={save}
-            disabled={pending}
-            className="h-12 px-6 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold transition disabled:opacity-60"
-          >
-            {pending ? "Saving..." : "Save Profile"}
-          </button>
-        </div>
-      </div>
+        <Button variant="primary" onClick={save} pending={pending}>
+          {pending ? "Saving…" : "Save Profile"}
+        </Button>
+      </ActionBar>
     </div>
   );
 }

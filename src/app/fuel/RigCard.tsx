@@ -3,6 +3,14 @@
 import { useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/components/ui/Button";
+import {
+  AffixInput,
+  Field,
+  SelectInput,
+  TextInput,
+} from "@/components/ui/Field";
+import { digitsAndDots, digitsOnly } from "@/lib/numericInput";
 import { saveRigAction } from "../actions";
 import type { Rig, Transmission } from "@/lib/fuel";
 
@@ -19,19 +27,6 @@ const ENGINES = [
   "Caterpillar C15",
 ];
 
-const inputClass =
-  "w-full h-12 px-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand";
-
-const digitsOnly = (v: string) => v.replace(/[^0-9.]/g, "");
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-foreground">{label}</span>
-      {children}
-    </label>
-  );
-}
 
 export function RigCard({ initial }: { initial: Rig }) {
   const hasRig = Boolean(
@@ -86,13 +81,14 @@ export function RigCard({ initial }: { initial: Rig }) {
           title={title || "Your truck"}
           description={details.length > 0 ? details.join(" · ") : undefined}
           aside={
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
               onClick={() => setEditing(true)}
-              className="shrink-0 text-sm font-semibold text-brand hover:text-brand-dark"
             >
               Edit
-            </button>
+            </Button>
           }
         />
       </Card>
@@ -107,34 +103,30 @@ export function RigCard({ initial }: { initial: Rig }) {
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Make">
-          <input
-            className={inputClass}
+          <TextInput
             value={rig.make}
             placeholder="Freightliner"
             onChange={(e) => setRig((s) => ({ ...s, make: e.target.value }))}
           />
         </Field>
         <Field label="Model">
-          <input
-            className={inputClass}
+          <TextInput
             value={rig.model}
             placeholder="Cascadia"
             onChange={(e) => setRig((s) => ({ ...s, model: e.target.value }))}
           />
         </Field>
         <Field label="Year">
-          <input
-            className={inputClass}
+          <TextInput
             inputMode="numeric"
             value={yearText}
             placeholder="2021"
             maxLength={4}
-            onChange={(e) => setYearText(e.target.value.replace(/[^0-9]/g, ""))}
+            onChange={(e) => setYearText(digitsOnly(e.target.value))}
           />
         </Field>
         <Field label="Engine">
-          <input
-            className={inputClass}
+          <TextInput
             value={rig.engine}
             placeholder="Detroit DD15"
             list="engine-options"
@@ -147,8 +139,7 @@ export function RigCard({ initial }: { initial: Rig }) {
           </datalist>
         </Field>
         <Field label="Transmission">
-          <select
-            className={inputClass}
+          <SelectInput
             value={rig.transmission}
             onChange={(e) =>
               setRig((s) => ({ ...s, transmission: e.target.value as Transmission | "" }))
@@ -157,21 +148,17 @@ export function RigCard({ initial }: { initial: Rig }) {
             <option value="">Select…</option>
             <option value="automatic">Automatic</option>
             <option value="manual">Manual</option>
-          </select>
+          </SelectInput>
         </Field>
         <Field label="Starting odometer">
-          <div className="relative">
-            <input
-              className={`${inputClass} pr-12`}
-              inputMode="decimal"
-              value={odometerText}
-              placeholder="512300"
-              onChange={(e) => setOdometerText(digitsOnly(e.target.value))}
-            />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">
-              mi
-            </span>
-          </div>
+          <AffixInput
+            suffix="mi"
+            numeric
+            inputMode="decimal"
+            value={odometerText}
+            placeholder="512300"
+            onChange={(e) => setOdometerText(digitsAndDots(e.target.value))}
+          />
         </Field>
       </div>
       {error && (
@@ -180,17 +167,17 @@ export function RigCard({ initial }: { initial: Rig }) {
         </Notice>
       )}
       <div className="mt-4 flex gap-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          className="flex-1 sm:flex-none"
           onClick={save}
-          disabled={pending}
-          className="flex-1 h-12 rounded-xl bg-brand hover:bg-brand-dark text-white font-bold disabled:opacity-60 transition"
+          pending={pending}
         >
           {pending ? "Saving…" : "Save truck"}
-        </button>
+        </Button>
         {hasRig && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => {
               setRig(initial);
               setYearText(initial.year == null ? "" : String(initial.year));
@@ -201,10 +188,9 @@ export function RigCard({ initial }: { initial: Rig }) {
               setEditing(false);
             }}
             disabled={pending}
-            className="h-12 px-4 rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground transition"
           >
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </Card>

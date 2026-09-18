@@ -51,7 +51,7 @@ export default async function NewAssetPage({
           action={
             <Link
               href={`/tax/assets?year=${year ?? defaultDate.slice(0, 4)}`}
-              className="text-sm font-semibold text-brand hover:text-brand-dark"
+              className="pr-link pr-hit text-sm"
             >
               ← Back
             </Link>

@@ -43,6 +43,24 @@
   --pr-negative: #b85c57;
   --pr-negative-strong: #943f3b;
 
+  /* --- Interaction (Phase 3c) ---------------------------------------------
+     Mixed from the approved colours only — no new hues.
+     A field's and a secondary button's outline: Rig Green at 55% on white,
+     the component board's input border (#84938A). 3.2:1 against white, so
+     the edge of a field is visible on its own (WCAG 1.4.11). */
+  --pr-border-strong: color-mix(in srgb, var(--pr-rig-green) 55%, var(--pr-white));
+  /* A primary action under the pointer: Profit Green deepened toward Rig
+     Green (white label 4.1:1, up from 3.3:1). */
+  --pr-action-primary-hover: color-mix(
+    in srgb,
+    var(--pr-profit-green) 82%,
+    var(--pr-rig-green)
+  );
+  /* A dark action under the pointer: Rig Green lifted toward Off White. */
+  --pr-action-dark-hover: color-mix(in srgb, var(--pr-rig-green) 88%, var(--pr-off-white));
+  /* An unavailable action: the board's "Unavailable" button (#E6E9E3). */
+  --pr-surface-disabled: color-mix(in srgb, var(--pr-rig-green) 7%, var(--pr-off-white));
+
   /* --- Type scale (section 4) -------------------------------------------- */
   --pr-text-xs: 12px;
   --pr-text-sm: 14px;
@@ -436,6 +454,336 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
     var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+}
+
+/* ===========================================================================
+   ACTIONS AND INPUTS — src/components/ui/{Button,Field,SegmentedControl,
+   ActionBar}.tsx
+   In the components layer, so a page's own utilities (w-full, mt-3,
+   sm:w-auto) still win over these defaults.
+
+   Colour carries meaning here as everywhere else:
+     Profit Green  the one commit on a form — Save load, Update my costs
+     Rig Green     neutral emphasis, selection, navigation — never "good"
+     Loss          only an action that destroys something
+   =========================================================================== */
+
+@layer components {
+  /* --- Buttons ------------------------------------------------------------
+     primary      Profit Green, white label. White on Profit Green is 3.3:1,
+                  so its label stays at the large-text size (19px bold and
+                  up; the board draws 20px) — never shrink it.
+     secondary    white, the field outline, Rig Green label: Prev / Next,
+                  Cancel, Later, an export range.
+     dark         Rig Green: emphasised but neutral — opens, applies, asks.
+     destructive  Deep Loss label on a Loss Red outline, Loss Wash under the
+                  pointer. Outlined rather than filled so a Delete never
+                  outweighs the Save beside it.
+     A pending button keeps its colour and says what it is doing; only an
+     unavailable one greys out (the board's "Unavailable"). */
+  .pr-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pr-space-2);
+    min-height: 48px;
+    padding: var(--pr-space-2) var(--pr-space-5);
+    border: 1px solid transparent;
+    border-radius: var(--pr-radius-button);
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-wrap: balance;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease-out,
+      border-color 120ms ease-out,
+      color 120ms ease-out;
+  }
+  .pr-btn:focus-visible {
+    outline: 2px solid var(--pr-rig-green);
+    outline-offset: 2px;
+  }
+  .pr-btn-sm {
+    min-height: 44px;
+    padding: var(--pr-space-2) var(--pr-space-4);
+    font-size: 16px;
+  }
+  .pr-btn-lg {
+    min-height: 52px;
+    padding: var(--pr-space-2) var(--pr-space-6);
+  }
+  .pr-btn-block {
+    width: 100%;
+  }
+
+  .pr-btn-primary {
+    background: var(--pr-profit-green);
+    color: var(--pr-white);
+  }
+  .pr-btn-primary.pr-btn-sm {
+    font-size: 19px;
+  }
+  .pr-btn-secondary {
+    background: var(--pr-white);
+    border-color: var(--pr-border-strong);
+    color: var(--pr-rig-green);
+  }
+  .pr-btn-dark {
+    background: var(--pr-rig-green);
+    color: var(--pr-white);
+  }
+  .pr-btn-destructive {
+    background: var(--pr-white);
+    border-color: var(--pr-loss);
+    color: var(--pr-loss-deep);
+  }
+  @media (hover: hover) {
+    .pr-btn-primary:hover:enabled,
+    a.pr-btn-primary:hover:not([aria-disabled="true"]) {
+      background: var(--pr-action-primary-hover);
+    }
+    .pr-btn-secondary:hover:enabled,
+    a.pr-btn-secondary:hover {
+      background: var(--pr-off-white);
+      border-color: var(--pr-rig-green);
+    }
+    .pr-btn-dark:hover:enabled,
+    a.pr-btn-dark:hover {
+      background: var(--pr-action-dark-hover);
+    }
+    .pr-btn-destructive:hover:enabled {
+      background: var(--pr-loss-wash);
+    }
+  }
+  .pr-btn[aria-busy="true"] {
+    cursor: progress;
+  }
+  .pr-btn:disabled:not([aria-busy="true"]),
+  .pr-btn[aria-disabled="true"] {
+    background: var(--pr-surface-disabled);
+    border-color: transparent;
+    color: var(--pr-text-muted);
+    cursor: not-allowed;
+  }
+  .pr-btn[aria-disabled="true"] {
+    pointer-events: none;
+  }
+
+  /* --- Links and small actions --------------------------------------------
+     Rig Green, and always underlined: Rig Green sits too close to body text
+     for colour alone to mark a link (WCAG 1.4.1). Profit Green is not used
+     for links — 3.3:1 is too faint for small text. */
+  .pr-link {
+    color: var(--pr-rig-green);
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, var(--pr-rig-green) 40%, transparent);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .pr-link:hover {
+    text-decoration-color: currentColor;
+  }
+  .pr-link:focus-visible {
+    outline: 2px solid var(--pr-rig-green);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  /* A standalone link or small action gets a 44px touch target without
+     making its line any taller. */
+  .pr-hit {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-block: -12px;
+  }
+
+  /* --- Fields --------------------------------------------------------------
+     A visible label above, helper text under the label, then the control.
+     Entered values are Inter — a number being typed is work, not an answer,
+     so it is never JetBrains Mono. */
+  .pr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .pr-field-label {
+    font-size: var(--pr-text-sm);
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--pr-text);
+  }
+  .pr-field-hint {
+    margin-top: -2px;
+    font-size: var(--pr-text-xs);
+    line-height: 1.35;
+    color: var(--pr-text-muted);
+  }
+  .pr-control {
+    width: 100%;
+    height: 48px;
+    padding: 0 var(--pr-space-4);
+    border: 1px solid var(--pr-border-strong);
+    border-radius: var(--pr-radius-input);
+    background: var(--pr-white);
+    color: var(--pr-text);
+    font-family: var(--font-inter), system-ui, sans-serif;
+    /* 16px keeps iOS from zooming the page when a field is focused. */
+    font-size: var(--pr-text-base);
+    line-height: 1.25;
+    transition:
+      border-color 120ms ease-out,
+      box-shadow 120ms ease-out;
+  }
+  textarea.pr-control {
+    height: auto;
+    padding: var(--pr-space-3) var(--pr-space-4);
+    resize: vertical;
+  }
+  .pr-control:focus-within {
+    outline: none;
+    border-color: var(--pr-profit-green);
+    box-shadow: 0 0 0 1px var(--pr-profit-green);
+  }
+  .pr-control[aria-invalid="true"],
+  .pr-control:has([aria-invalid="true"]) {
+    border-color: var(--pr-loss);
+  }
+  .pr-control[aria-invalid="true"]:focus-within,
+  .pr-control:has([aria-invalid="true"]):focus-within {
+    box-shadow: 0 0 0 1px var(--pr-loss);
+  }
+  /* Read-only and disabled: still readable (4.6:1), clearly not for typing. */
+  .pr-control:disabled,
+  .pr-control[readonly],
+  .pr-control:has(input:disabled) {
+    background: var(--pr-surface-muted);
+    border-color: var(--pr-border);
+    color: var(--pr-text-muted);
+    cursor: not-allowed;
+  }
+  .pr-control-numeric {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A unit or currency sign beside the value — "$" before, "%", "mi",
+     "gal", "mpg", "nights" after — quieter than the value itself. The
+     field's box is the wrapper; the input inside it is bare. */
+  .pr-control-affixed {
+    display: flex;
+    align-items: center;
+    gap: var(--pr-space-2);
+    cursor: text;
+  }
+  .pr-control-affixed > input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+  .pr-affix {
+    flex-shrink: 0;
+    font-size: var(--pr-text-sm);
+    font-weight: 500;
+    color: var(--pr-text-muted);
+    user-select: none;
+  }
+
+  /* A value ProfitRig is estimating for the driver: same size and place as
+     the field it stands in for, Off White, read-only. Neutral — an estimate
+     is not a warning. */
+  .pr-estimate {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pr-space-3);
+    height: 48px;
+    padding: 0 var(--pr-space-4);
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius-input);
+    background: var(--pr-surface-muted);
+    color: var(--pr-text);
+    font-size: var(--pr-text-base);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Selection ----------------------------------------------------------
+     Choosing between options is neutral, so the chosen one is Rig Green —
+     never Profit Green. */
+  .pr-segmented {
+    display: inline-flex;
+    border: 1px solid var(--pr-border-strong);
+    border-radius: var(--pr-radius-button);
+    background: var(--pr-white);
+  }
+  .pr-segment,
+  .pr-choice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 var(--pr-space-4);
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: var(--pr-text-sm);
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease-out,
+      color 120ms ease-out;
+  }
+  .pr-segment {
+    border-radius: calc(var(--pr-radius-button) - 1px);
+    color: var(--pr-text-muted);
+  }
+  /* The chosen segment is inset by a white ring, so the whole 44px stays
+     tappable while it reads as a pill inside the control. */
+  .pr-segment[aria-pressed="true"] {
+    background: var(--pr-rig-green);
+    color: var(--pr-white);
+    box-shadow: inset 0 0 0 3px var(--pr-white);
+  }
+  .pr-choice {
+    border: 1px solid var(--pr-border-strong);
+    border-radius: var(--pr-radius-button);
+    background: var(--pr-white);
+    color: var(--pr-text);
+  }
+  .pr-choice[aria-pressed="true"] {
+    border-color: var(--pr-rig-green);
+    background: var(--pr-rig-green);
+    color: var(--pr-white);
+  }
+  @media (hover: hover) {
+    .pr-segment:hover:enabled:not([aria-pressed="true"]) {
+      color: var(--pr-rig-green);
+    }
+    .pr-choice:hover:enabled:not([aria-pressed="true"]) {
+      border-color: var(--pr-rig-green);
+    }
+  }
+  .pr-segment:focus-visible,
+  .pr-choice:focus-visible {
+    outline: 2px solid var(--pr-rig-green);
+    outline-offset: 2px;
+  }
+  .pr-segment:disabled,
+  .pr-choice:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
 }
 
 input[type="number"]::-webkit-outer-spin-button,
