@@ -418,14 +418,14 @@ export default async function LoadsPage({
           }
         />
 
-        {/* Add load CTA */}
+        {/* Add load CTA — full width on a phone, a 240px button from
+            tablet up, on the column's left edge. */}
         <ButtonLink
           href={`/loads/new?date=${isoDate(targetDate)}`}
           variant="primary"
           size="lg"
-          block
           disabled={!isConfigured}
-          className="mb-4"
+          className="mb-4 flex w-full sm:w-60"
         >
           + Add a Load
         </ButtonLink>
