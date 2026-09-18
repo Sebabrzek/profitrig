@@ -283,7 +283,7 @@ export function Calculator({
         <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
           Your true cost per mile
         </p>
-        <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
+        <p className="text-5xl font-bold mt-1 leading-none pr-figure">
           {cpm(totals.totalCPM)}
         </p>
         {overrideActive && (
@@ -307,14 +307,14 @@ export function Calculator({
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Minimum target rate</p>
-            <p className="text-xl font-bold">{cpm(totals.requiredRate)}</p>
+            <p className="text-xl font-bold pr-figure">{cpm(totals.requiredRate)}</p>
             <p className="text-xs opacity-80 mt-0.5">
               (cost + {cpm(p.desired_profit_per_mile)} profit)
             </p>
           </div>
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Break-even monthly revenue</p>
-            <p className="text-xl font-bold">
+            <p className="text-xl font-bold pr-figure">
               {money(Math.round(totals.breakEven))}
             </p>
             <p className="text-xs opacity-80 mt-0.5">
@@ -327,7 +327,7 @@ export function Calculator({
             <p className="opacity-80 text-xs">
               Projected monthly profit at target rate
             </p>
-            <p className="text-xl font-bold">
+            <p className="text-xl font-bold pr-figure">
               {money(Math.round(totals.projectedProfit))}
             </p>
           </div>

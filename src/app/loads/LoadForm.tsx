@@ -286,13 +286,13 @@ export function LoadForm({
         <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
           Profit this load
         </p>
-        <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
+        <p className="text-5xl font-bold mt-1 leading-none pr-figure">
           {money(e.profit)}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Rate achieved</p>
-            <p className="text-xl font-black leading-none">
+            <p className="text-xl font-bold leading-none pr-figure">
               {e.totalMiles > 0 ? `$${e.rpm.toFixed(2)}` : "—"}
               <span className="text-xs font-bold opacity-80"> /mi</span>
             </p>
@@ -323,7 +323,7 @@ export function LoadForm({
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Revenue</p>
-            <p className="text-base font-bold">{moneyCompact(e.revenue)}</p>
+            <p className="text-base font-bold pr-figure">{moneyCompact(e.revenue)}</p>
             {e.carrierCut > 0 && (
               <p className="text-[11px] opacity-80">
                 after {moneyCompact(e.carrierCut)} to carrier
@@ -332,7 +332,7 @@ export function LoadForm({
           </div>
           <div className="bg-white/15 rounded-xl p-3">
             <p className="opacity-80 text-xs">Cost</p>
-            <p className="text-base font-bold">{moneyCompact(e.totalCost)}</p>
+            <p className="text-base font-bold pr-figure">{moneyCompact(e.totalCost)}</p>
           </div>
         </div>
         {e.totalMiles > 0 && (

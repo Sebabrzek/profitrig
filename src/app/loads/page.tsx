@@ -347,13 +347,13 @@ export default async function LoadsPage({
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Week profit
           </p>
-          <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
+          <p className="text-5xl font-bold mt-1 leading-none pr-figure">
             {money(totals.profit)}
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Revenue</p>
-              <p className="text-base font-bold">{money(totals.revenue)}</p>
+              <p className="text-base font-bold pr-figure">{money(totals.revenue)}</p>
               {totals.carrierCut > 0 && (
                 <p className="text-xs opacity-80">
                   after {money(totals.carrierCut)} to carrier
@@ -362,7 +362,7 @@ export default async function LoadsPage({
             </div>
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Costs</p>
-              <p className="text-base font-bold">{money(totals.totalCost)}</p>
+              <p className="text-base font-bold pr-figure">{money(totals.totalCost)}</p>
               {totals.roadExpenses > 0 && (
                 <p className="text-xs opacity-80">
                   incl. {money(totals.roadExpenses)} other
@@ -390,7 +390,7 @@ export default async function LoadsPage({
             </div>
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Avg rate / mile</p>
-              <p className="text-base font-bold">{moneyCents(totals.rpm)}</p>
+              <p className="text-base font-bold pr-figure">{moneyCents(totals.rpm)}</p>
               <p className="text-xs opacity-80">
                 cost {moneyCents(totals.cpm)}
               </p>

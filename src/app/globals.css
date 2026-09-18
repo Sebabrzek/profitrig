@@ -155,6 +155,22 @@ h6 {
   font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
 }
 
+/* A financial figure: a number ProfitRig is presenting as an answer — a cost
+   per mile, a rate, a profit, a break-even, an efficiency reading. This is
+   the single place the JetBrains Mono rule is expressed, so it stays a
+   semantic decision rather than a list of blessed elements.
+
+   It is NOT for ordinary digits: dates, phone numbers, IDs, years, counts,
+   mileage and gallon entries, form fields, and numbers inside a sentence all
+   stay in the interface fonts. Phase 3's PRMoney and PRKPI will wrap this
+   class rather than replace the rule. */
+.pr-figure {
+  font-family:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

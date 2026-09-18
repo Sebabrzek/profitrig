@@ -14,11 +14,23 @@ import {
 import { RigCard } from "./RigCard";
 import { FuelLogCard } from "./FuelLogCard";
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  figure = false,
+}: {
+  label: string;
+  value: string;
+  /** True when the value is a financial/efficiency reading rather than a
+      raw count — see .pr-figure in globals.css. */
+  figure?: boolean;
+}) {
   return (
     <div className="bg-white/15 rounded-xl p-3">
       <p className="opacity-80 text-xs">{label}</p>
-      <p className="text-base font-bold">{value}</p>
+      <p className={`text-base font-bold${figure ? " pr-figure" : ""}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -96,7 +108,7 @@ export default async function FuelPage() {
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Your average
           </p>
-          <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
+          <p className="text-5xl font-bold mt-1 leading-none pr-figure">
             {stats.averageMpg == null ? "—" : stats.averageMpg.toFixed(1)}
             <span className="text-lg font-bold opacity-80"> MPG</span>
           </p>
@@ -105,6 +117,7 @@ export default async function FuelPage() {
           ) : (
             <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
               <Stat
+                figure
                 label="Latest week"
                 value={
                   stats.latestMpg == null

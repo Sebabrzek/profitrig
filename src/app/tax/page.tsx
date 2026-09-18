@@ -194,23 +194,23 @@ export default async function TaxPage({
           <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
             Gross revenue · {taxYear}
           </p>
-          <p className="text-5xl font-mono font-bold mt-1 leading-none tracking-tight">
+          <p className="text-5xl font-bold mt-1 leading-none pr-figure">
             {money(revenue.total)}
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Linehaul</p>
-              <p className="text-base font-bold">{money(revenue.linehaul)}</p>
+              <p className="text-base font-bold pr-figure">{money(revenue.linehaul)}</p>
             </div>
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">FSC</p>
-              <p className="text-base font-bold">
+              <p className="text-base font-bold pr-figure">
                 {money(revenue.fuel_surcharge)}
               </p>
             </div>
             <div className="bg-white/15 rounded-xl p-3">
               <p className="opacity-80 text-xs">Accessorials</p>
-              <p className="text-base font-bold">
+              <p className="text-base font-bold pr-figure">
                 {money(revenue.accessorials)}
               </p>
             </div>
