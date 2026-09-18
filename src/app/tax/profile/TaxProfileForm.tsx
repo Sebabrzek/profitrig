@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { useRouter } from "next/navigation";
 import { saveTaxProfileAction } from "@/lib/tax/actions";
 import {
@@ -76,12 +78,11 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-1">Entity type</h2>
-        <p className="text-xs text-muted mb-3">
-          Pick the entity that files your taxes. If your LLC elected S-corp,
-          pick S-corporation.
-        </p>
+      <Card>
+        <CardHeader
+          title="Entity type"
+          description="Pick the entity that files your taxes. If your LLC elected S-corp, pick S-corporation."
+        />
         <div className="flex flex-col gap-2">
           {ENTITY_OPTIONS.map((o) => (
             <label
@@ -127,19 +128,19 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
             </p>
           </div>
         </label>
-        <div className="mt-4 bg-gray-50 rounded-xl px-4 py-3 text-sm">
+        <div className="mt-4 bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm">
           <p className="text-xs text-muted uppercase tracking-wider font-semibold">
             Driver-pay treatment for this profile
           </p>
           <p className="font-semibold mt-1">{treatmentLabel}</p>
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-1">Truck financing</h2>
-        <p className="text-xs text-muted mb-3">
-          Drives which truck-payment numbers belong in the Tax Pack.
-        </p>
+      <Card>
+        <CardHeader
+          title="Truck financing"
+          description="Drives which truck-payment numbers belong in the Tax Pack."
+        />
         <div className="flex flex-col gap-2">
           {FINANCING_OPTIONS.map((o) => (
             <label
@@ -167,18 +168,15 @@ export function TaxProfileForm({ initial }: { initial: TaxProfile }) {
             </label>
           ))}
         </div>
-      </section>
+      </Card>
 
-      {saved && (
-        <div
-          className={`text-sm rounded-xl p-3 ${
-            saved === "ok"
-              ? "bg-brand-soft text-brand-dark"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
-          {saved === "ok" ? "✓ Saved" : `Error: ${saved}`}
-        </div>
+      {saved === "ok" && (
+        <p role="status" className="text-sm font-semibold text-[var(--pr-rig-green)]">
+          ✓ Saved
+        </p>
+      )}
+      {saved && saved !== "ok" && (
+        <Notice tone="error">{`Error: ${saved}`}</Notice>
       )}
 
       <div className="flex gap-2">

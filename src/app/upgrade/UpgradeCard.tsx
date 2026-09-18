@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { createCheckoutAction, createPortalAction } from "../actions";
 
 type Plan = "monthly" | "yearly";
@@ -38,7 +40,7 @@ export function UpgradeCard({
       : "Cancel anytime";
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-5 mb-4 shadow-sm">
+    <Card as="div" className="mb-4">
       <div className="flex gap-2 bg-gray-100 rounded-full p-1 mb-5">
         <button
           type="button"
@@ -86,9 +88,9 @@ export function UpgradeCard({
       </div>
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
+        <Notice tone="error" className="mb-3">
           {error}
-        </div>
+        </Notice>
       )}
 
       <button
@@ -104,7 +106,7 @@ export function UpgradeCard({
         Card billed only after the 7-day trial. Cancel anytime. Secured by
         Stripe. We never see your card number.
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -135,9 +137,9 @@ export function ProActiveControls() {
         {pending ? "Opening…" : "Manage subscription"}
       </button>
       {error && (
-        <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+        <Notice tone="error" className="mt-3">
           {error}
-        </div>
+        </Notice>
       )}
     </div>
   );

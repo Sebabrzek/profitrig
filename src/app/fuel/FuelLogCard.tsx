@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
+import { Chip } from "@/components/ui/Chip";
 import { addFuelLogAction, deleteFuelLogAction } from "../actions";
 import { isPlausibleMpg, type FuelEntry } from "@/lib/fuel";
 
@@ -21,30 +24,24 @@ function StatusBadge({ entry }: { entry: FuelEntry }) {
   switch (entry.status) {
     case "ok":
       return (
-        <span className="px-2.5 py-1 rounded-full text-sm font-bold bg-brand-soft text-brand-dark whitespace-nowrap">
-          {entry.mpg!.toFixed(1)} MPG
-        </span>
+        <Chip>{entry.mpg!.toFixed(1)} MPG</Chip>
       );
     case "check":
       return (
-        <span
-          className="px-2.5 py-1 rounded-full text-sm font-bold bg-amber-100 text-amber-900 whitespace-nowrap"
+        <Chip
+          tone="loss"
           title="No semi gets this MPG. Check the odometer and gallons — or it was a partial fill, which evens out in your average."
         >
           {entry.mpg!.toFixed(1)} MPG · check
-        </span>
+        </Chip>
       );
     case "baseline":
       return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-muted whitespace-nowrap">
-          Starting point
-        </span>
+        <Chip>Starting point</Chip>
       );
     case "odometer":
       return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 whitespace-nowrap">
-          Odometer too low
-        </span>
+        <Chip tone="loss">Odometer too low</Chip>
       );
   }
 }
@@ -118,11 +115,11 @@ export function FuelLogCard({
   }
 
   return (
-    <section className="bg-white border border-border rounded-2xl p-5 mb-4">
-      <h2 className="text-lg font-bold mb-1">Log a week</h2>
-      <p className="text-sm text-muted mb-4">
-        Your odometer now, and every gallon you bought since your last reading.
-      </p>
+    <Card className="mb-4">
+      <CardHeader
+        title="Log a week"
+        description="Your odometer now, and every gallon you bought since your last reading."
+      />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">Date</span>
@@ -168,7 +165,11 @@ export function FuelLogCard({
         </label>
       </div>
       {preview && <p className="text-sm text-foreground/80 mt-3">{preview}</p>}
-      {error && <p className="text-sm text-red-600 font-semibold mt-3">{error}</p>}
+      {error && (
+        <Notice tone="error" className="mt-3">
+          {error}
+        </Notice>
+      )}
       <button
         type="button"
         onClick={add}
@@ -211,6 +212,6 @@ export function FuelLogCard({
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }

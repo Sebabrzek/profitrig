@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Notice } from "@/components/ui/Notice";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "profitrig.profileBannerDismissed";
@@ -27,13 +28,13 @@ export function ProfileBanner({ profileComplete }: { profileComplete: boolean })
   }
 
   return (
-    <div className="bg-brand-soft border border-brand/30 rounded-2xl p-4 mb-4">
+    <Notice className="mb-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-bold text-sm">
+          <p className="font-display font-bold text-[var(--pr-rig-green)]">
             Finish your profile in 30 seconds
           </p>
-          <p className="text-xs text-foreground/80 mt-0.5">
+          <p className="text-xs mt-0.5">
             Add your name, phone, and what you haul so ProfitRig can send
             tips matched to your operation.
           </p>
@@ -55,6 +56,6 @@ export function ProfileBanner({ profileComplete }: { profileComplete: boolean })
           Open profile
         </Link>
       </div>
-    </div>
+    </Notice>
   );
 }

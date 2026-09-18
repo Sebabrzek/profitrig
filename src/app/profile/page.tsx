@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { EmptyState, PageHeader, SectionHeading } from "@/components/ui/Surfaces";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
@@ -92,37 +93,32 @@ export default async function ProfilePage() {
         isAdmin: isAdminEmail(email),
       }}
     >
-        <h1 className="text-2xl font-black mb-1">Your Profile</h1>
-        <p className="text-sm text-muted mb-5">
-          Quick info about you and your operation. All optional. Helps us send
-          tips that actually match what you haul.
-        </p>
+        <PageHeader
+          title="Your Profile"
+          description="Quick info about you and your operation. All optional. Helps us send tips that actually match what you haul."
+        />
         <ProfileForm initial={initial} email={email} pastLoads={pastLoads} />
         <div className="mt-4">
           <FeedbackCard />
         </div>
 
         <section id="history" className="mt-8 scroll-mt-20">
-          <h2 className="text-lg font-bold mb-1">Carrier &amp; rate history</h2>
-          <p className="text-sm text-muted mb-4">
-            Every snapshot you save on the calculator, newest first: who you
-            were driving for, your cost per mile, and your target rate. Load
-            one back into the calculator anytime.
-          </p>
+          <SectionHeading
+            title="Carrier & rate history"
+            description="Every snapshot you save on the calculator, newest first: who you were driving for, your cost per mile, and your target rate. Load one back into the calculator anytime."
+          />
           {snapshots.length === 0 ? (
-            <div className="bg-white border border-border rounded-2xl p-6 text-center">
-              <p className="text-sm text-muted">
-                No snapshots yet. On the{" "}
-                <Link href="/" className="text-brand font-semibold">
-                  calculator
-                </Link>
-                , tap{" "}
-                <span className="font-semibold text-foreground">
-                  Save a dated snapshot
-                </span>{" "}
-                to record your first one.
-              </p>
-            </div>
+            <EmptyState title="No snapshots yet.">
+              On the{" "}
+              <Link href="/" className="text-brand font-semibold">
+                calculator
+              </Link>
+              , tap{" "}
+              <span className="font-semibold text-foreground">
+                Save a dated snapshot
+              </span>{" "}
+              to record your first one.
+            </EmptyState>
           ) : (
             <HistoryList snapshots={snapshots} />
           )}

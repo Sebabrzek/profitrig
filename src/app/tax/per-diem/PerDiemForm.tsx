@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { formatMoney } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { savePerDiemSummaryAction } from "@/lib/tax/actions";
@@ -90,17 +92,16 @@ export function PerDiemForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-1">Nights away ({taxYear})</h2>
-        <p className="text-xs text-muted mb-3 leading-snug">
-          A &quot;night away&quot; is any night your job requires you to sleep
-          somewhere other than your tax home. Split by the IRS rate-change
-          date (Oct 1) — the per-diem rate increases each fiscal year.
-        </p>
+      <Card>
+        <CardHeader
+          title={<>Nights away ({taxYear})</>}
+          description={
+            'A "night away" is any night your job requires you to sleep somewhere other than your tax home. Split by the IRS rate-change date (Oct 1) — the per-diem rate increases each fiscal year.'
+          }
+        />
 
         {suggestedNights.periodANights + suggestedNights.periodBNights > 0 && (
-          <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-border text-sm">
-            <p className="font-semibold mb-1">From your logged loads</p>
+          <Notice title="From your logged loads" className="mb-3">
             <p className="text-xs text-muted leading-snug mb-2">
               Suggested: {suggestedNights.periodANights} nights Jan 1 – Sep 30,{" "}
               {suggestedNights.periodBNights} nights Oct 1 – Dec 31 (loads with
@@ -113,7 +114,7 @@ export function PerDiemForm({
             >
               Use suggested nights
             </button>
-          </div>
+          </Notice>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -130,18 +131,18 @@ export function PerDiemForm({
             onChange={(n) => setS((p) => ({ ...p, period_b_nights: n }))}
           />
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-1">Calculation</h2>
-        <p className="text-xs text-muted mb-3 leading-snug">
-          80% deductible per the DOT transportation-worker rule (IRC §274(n)).
-        </p>
-        <div className="flex flex-col gap-3 text-sm">
+      <Card>
+        <CardHeader
+          title="Calculation"
+          description="80% deductible per the DOT transportation-worker rule (IRC §274(n))."
+        />
+        <div className="flex flex-col text-sm">
           {computed.periods.map((p) => (
             <div
               key={p.label}
-              className="border border-border rounded-xl px-4 py-3"
+              className="border-b border-border py-3 first:pt-0"
             >
               <div className="flex items-baseline justify-between gap-2">
                 <p className="font-semibold">{p.label}</p>
@@ -154,26 +155,25 @@ export function PerDiemForm({
               </p>
             </div>
           ))}
-          <div className="border-t border-border pt-3 mt-1 flex items-baseline justify-between">
+          <div className="pt-3 flex items-baseline justify-between">
             <p className="font-semibold">Total deductible per-diem</p>
-            <p className="text-xl font-black">{formatMoney(computed.totalDeductible)}</p>
+            <p className="pr-figure text-xl font-semibold">
+              {formatMoney(computed.totalDeductible)}
+            </p>
           </div>
-          <p className="text-[11px] text-muted">
+          <p className="mt-3 text-[11px] text-muted">
             Schedule C line 24b — Meals (80%). CPA-confirmable.
           </p>
         </div>
-      </section>
+      </Card>
 
-      {saved && (
-        <div
-          className={`text-sm rounded-xl p-3 ${
-            saved === "ok"
-              ? "bg-brand-soft text-brand-dark"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
-          {saved === "ok" ? "✓ Saved" : `Error: ${saved}`}
-        </div>
+      {saved === "ok" && (
+        <p role="status" className="text-sm font-semibold text-[var(--pr-rig-green)]">
+          ✓ Saved
+        </p>
+      )}
+      {saved && saved !== "ok" && (
+        <Notice tone="error">{`Error: ${saved}`}</Notice>
       )}
 
       <button

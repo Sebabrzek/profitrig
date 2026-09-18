@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Notice } from "@/components/ui/Notice";
 import { formatRate } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { deleteSnapshotAction, loadSnapshotAction } from "../actions";
@@ -80,9 +81,7 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
   return (
     <div className="flex flex-col gap-3">
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-          {error}
-        </div>
+        <Notice tone="error">{error}</Notice>
       )}
       {snapshots.map((s) => (
         <div

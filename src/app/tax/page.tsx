@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { Card, CardHeader, PageHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { formatMoney } from "@/lib/format";
 import {
   InstrumentPanel,
@@ -147,25 +149,16 @@ export default async function TaxPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <div className="flex items-end justify-between mb-3">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-brand font-bold">
-              Tax Pack
-            </p>
-            <h1 className="text-2xl font-black">Year-end records</h1>
-          </div>
-          <YearSelect taxYear={taxYear} years={years} />
-        </div>
-
-        <p className="text-xs text-muted mb-4 leading-snug">
-          Organized records for your accountant. Tax Pack reads only actual
-          dollars — not the estimates and reserves from your Calculator.
-        </p>
+        <PageHeader
+          eyebrow="Tax Pack"
+          title="Year-end records"
+          description="Organized records for your accountant. Tax Pack reads only actual dollars — not the estimates and reserves from your Calculator."
+          action={<YearSelect taxYear={taxYear} years={years} />}
+        />
 
         {!profileSet && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
-            <p className="font-bold text-sm">Set up your Tax Profile first</p>
-            <p className="text-xs text-foreground/80 mt-1 leading-snug">
+          <Notice title="Set up your Tax Profile first" className="mb-4">
+            <p>
               We need your entity type and truck financing to know which line
               items belong in the Tax Pack (e.g. owner&apos;s draw is excluded
               for sole props/SMLLCs; financed truck payments are not
@@ -177,7 +170,7 @@ export default async function TaxPage({
             >
               Open Tax Profile
             </Link>
-          </div>
+          </Notice>
         )}
 
         <AnswerLayout>
@@ -240,14 +233,12 @@ export default async function TaxPage({
         </section>
 
         {/* Load-derived actuals snapshot (tax view) */}
-        <section className="@container bg-white border border-border rounded-2xl p-5 mb-4">
-          <p className="text-xs uppercase tracking-wider text-muted font-semibold">
-            From your loads · {taxYear}
-          </p>
-          <p className="text-sm text-muted mb-3 leading-snug">
-            Only actual receipts entered on each load. Estimates and reserves
-            from the Calculator never appear here.
-          </p>
+        <Card className="@container mb-4">
+          <CardHeader
+            className="mb-0"
+            title={<>From your loads · {taxYear}</>}
+            description="Only actual receipts entered on each load. Estimates and reserves from the Calculator never appear here."
+          />
           <ReadingGrid>
             <Reading
               label="Fuel actual"
@@ -263,11 +254,11 @@ export default async function TaxPage({
               value={formatMoney(loadActuals.lumpersActualTotal)}
             />
           </ReadingGrid>
-        </section>
+        </Card>
 
         {/* Driver pay treatment note */}
-        <section className="bg-white border border-border rounded-2xl p-5 mb-4 text-sm">
-          <p className="font-semibold mb-1">Driver pay treatment</p>
+        <Card className="mb-4 text-sm">
+          <CardHeader title="Driver pay treatment" className="mb-1" />
           <p className="text-muted leading-snug">
             {driverPay === "owner_draw_excluded" && (
               <>
@@ -297,15 +288,14 @@ export default async function TaxPage({
               </>
             )}
           </p>
-        </section>
+        </Card>
 
         {/* CTA */}
-        <section className="bg-white border border-border rounded-2xl p-5 mb-4">
-          <p className="text-sm font-semibold mb-1">Year-end export</p>
-          <p className="text-xs text-muted mb-3 leading-snug">
-            Downloads a CSV grouped by Schedule C line plus a printable summary
-            you can hand your accountant.
-          </p>
+        <Card className="mb-4">
+          <CardHeader
+            title="Year-end export"
+            description="Downloads a CSV grouped by Schedule C line plus a printable summary you can hand your accountant."
+          />
           <div className="flex flex-wrap gap-2">
             <a
               href={`/api/tax/export?year=${taxYear}&format=csv`}
@@ -322,7 +312,7 @@ export default async function TaxPage({
               Printable summary
             </a>
           </div>
-        </section>
+        </Card>
 
         <p className="text-[11px] text-muted leading-snug mt-2">
           {TAX_PACK_DISCLAIMER}

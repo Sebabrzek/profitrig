@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { Card, EmptyState, PageHeader } from "@/components/ui/Surfaces";
+import { Reading } from "@/components/instruments/Instruments";
 import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -56,27 +58,19 @@ export default async function AssetsPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div>
-            <h1 className="text-2xl font-black">Capital assets</h1>
-            <p className="text-xs text-muted leading-snug">
-              Truck, trailer, APU, etc. CPA depreciates / applies §179.
-            </p>
-          </div>
-          <YearSelect taxYear={taxYear} years={years} />
-        </div>
+        <PageHeader
+          title="Capital assets"
+          description="Truck, trailer, APU, etc. CPA depreciates / applies §179."
+          action={<YearSelect taxYear={taxYear} years={years} />}
+        />
 
-        <div className="bg-white border border-border rounded-2xl p-4 mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted font-semibold">
-              Total cost placed in service {taxYear}
-            </p>
-            <p className="text-2xl font-black leading-none">
-              {formatMoney(grandTotal)}
-            </p>
-            <p className="text-[10px] text-muted">
-              Listed separately — never added to expense totals.
-            </p>
+        <Card as="div" className="mb-4 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <Reading
+              label={<>Total cost placed in service {taxYear}</>}
+              value={formatMoney(grandTotal)}
+              context="Listed separately — never added to expense totals."
+            />
           </div>
           <Link
             href={`/tax/assets/new?year=${taxYear}`}
@@ -84,7 +78,7 @@ export default async function AssetsPage({
           >
             + Add asset
           </Link>
-        </div>
+        </Card>
 
         <Link
           href="/tax"
@@ -94,11 +88,10 @@ export default async function AssetsPage({
         </Link>
 
         {assets.length === 0 ? (
-          <div className="mt-4 bg-white border border-border rounded-2xl p-8 text-center">
-            <p className="text-muted text-sm">
-              No capital assets placed in service for {taxYear}.
-            </p>
-          </div>
+          <EmptyState
+            className="mt-4"
+            title={<>No capital assets placed in service for {taxYear}.</>}
+          />
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
             {assets.map((a) => (

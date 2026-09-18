@@ -18,6 +18,8 @@ import {
   Reading,
   ReadingGrid,
 } from "@/components/instruments/Instruments";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import {
   AnswerColumn,
   AnswerLayout,
@@ -171,13 +173,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-5 mb-4">
-      <h2 className="text-lg font-bold mb-1">{title}</h2>
-      {subtitle && (
-        <p className="text-sm text-muted mb-3 leading-snug">{subtitle}</p>
-      )}
+    <Card className="mb-4">
+      <CardHeader title={title} description={subtitle} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
-    </section>
+    </Card>
   );
 }
 
@@ -390,13 +389,13 @@ export function LoadForm({
             suffix="mi"
           />
           {load.deadhead_miles > load.loaded_miles && load.loaded_miles > 0 && (
-            <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
+            <Notice size="sm" className="mt-2">
               ⚠ Deadhead is higher than loaded miles. Double-check you&apos;re
               not counting the same empty leg here AND on the next load.
-            </p>
+            </Notice>
           )}
         </div>
-        <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+        <div className="sm:col-span-2 flex items-center justify-between bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm">
           <span className="font-semibold">Total miles</span>
           <span className="font-bold">
             {e.totalMiles.toLocaleString()}
@@ -448,7 +447,7 @@ export function LoadForm({
           </div>
         )}
         {e.carrierPct > 0 ? (
-          <div className="sm:col-span-2 bg-gray-50 rounded-xl px-4 py-3 text-sm flex flex-col gap-1.5">
+          <div className="sm:col-span-2 bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-muted">Load pay</span>
               <span className="font-semibold">{formatMoney(e.loadPay)}</span>
@@ -465,7 +464,7 @@ export function LoadForm({
             </div>
           </div>
         ) : (
-          <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+          <div className="sm:col-span-2 flex items-center justify-between bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm">
             <span className="font-semibold">Total revenue</span>
             <span className="font-bold">{formatMoney(e.revenue)}</span>
           </div>
@@ -508,30 +507,20 @@ export function LoadForm({
       <Section
         title="Auto-allocated from your cost profile"
       >
-        <div className="sm:col-span-2 grid grid-cols-2 gap-3 text-sm">
-          <div className="bg-gray-50 rounded-xl px-3 py-2">
-            <p className="text-muted text-xs">Driver pay</p>
-            <p className="font-bold">{formatMoney(e.driverPayCost)}</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl px-3 py-2">
-            <p className="text-muted text-xs">Maintenance reserve</p>
-            <p className="font-bold">{formatMoney(e.maintenanceCost)}</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl px-3 py-2">
-            <p className="text-muted text-xs">Tires</p>
-            <p className="font-bold">{formatMoney(e.tiresCost)}</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl px-3 py-2">
-            <p className="text-muted text-xs">DEF</p>
-            <p className="font-bold">{formatMoney(e.defCost)}</p>
-          </div>
-          <div className="col-span-2 bg-gray-50 rounded-xl px-3 py-2">
-            <p className="text-muted text-xs">
-              Fixed costs allocated (truck/trailer/insurance/permits/overhead)
-            </p>
-            <p className="font-bold">{formatMoney(e.allocatedFixedCost)}</p>
-            <p className="text-xs text-muted mt-0.5">
-              {e.allocationBasis === "actual_mtd" ? (
+        <div className="sm:col-span-2 grid grid-cols-2 gap-x-6 gap-y-5">
+          <Reading label="Driver pay" value={formatMoney(e.driverPayCost)} />
+          <Reading
+            label="Maintenance reserve"
+            value={formatMoney(e.maintenanceCost)}
+          />
+          <Reading label="Tires" value={formatMoney(e.tiresCost)} />
+          <Reading label="DEF" value={formatMoney(e.defCost)} />
+          <div className="col-span-2">
+            <Reading
+              label="Fixed costs allocated (truck/trailer/insurance/permits/overhead)"
+              value={formatMoney(e.allocatedFixedCost)}
+              context={
+              e.allocationBasis === "actual_mtd" ? (
                 <>
                   Share of monthly bills based on{" "}
                   <span className="font-semibold text-foreground">
@@ -550,8 +539,9 @@ export function LoadForm({
                   {MTD_FALLBACK_THRESHOLD_MILES.toLocaleString()} mi this
                   month.
                 </>
-              )}
-            </p>
+              )
+              }
+            />
           </div>
         </div>
       </Section>
@@ -569,9 +559,9 @@ export function LoadForm({
       </Section>
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+        <Notice tone="error" className="mb-4">
           {error}
-        </div>
+        </Notice>
       )}
 
       <div className="flex flex-col-reverse sm:flex-row gap-3 items-stretch">

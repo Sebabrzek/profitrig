@@ -53,7 +53,9 @@ export function WeekStartToggle({ value }: { value: WeekStart }) {
       </div>
       <p className="text-[11px] text-muted mt-1">
         {error ? (
-          <span className="text-red-600 font-semibold">{error}</span>
+          <span role="alert" className="text-[var(--pr-loss-deep)] font-semibold">
+            {error}
+          </span>
         ) : (
           "Leased? Pick the days your settlement covers."
         )}

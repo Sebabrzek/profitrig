@@ -30,6 +30,10 @@
   --pr-text-dark-surface: #ffffff;
   --pr-text-muted: #667085;
 
+  /* Inner rows, empty states and neutral chips on a white card: the board's
+     Off White, named for what it does. */
+  --pr-surface-muted: var(--pr-off-white);
+
   /* --- Borders ----------------------------------------------------------- */
   --pr-border: rgba(31, 41, 55, 0.12);
   --pr-border-dark: rgba(255, 255, 255, 0.12);
@@ -127,6 +131,7 @@
   --color-pr-loss-wash: var(--pr-loss-wash);
   --color-pr-surface: var(--pr-surface);
   --color-pr-surface-dark: var(--pr-surface-dark);
+  --color-pr-surface-muted: var(--pr-surface-muted);
 
   /* Inter carries body copy, so it is the default sans. Satoshi is reached
      through font-display, JetBrains Mono through font-mono — and font-mono

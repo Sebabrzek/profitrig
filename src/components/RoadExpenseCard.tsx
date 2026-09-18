@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
+import { Chip } from "@/components/ui/Chip";
 import { formatMoney } from "@/lib/format";
 import {
   ROAD_CATEGORIES,
@@ -82,25 +85,22 @@ export function RoadExpenseCard({
   }
 
   return (
-    <section className="bg-white border border-border rounded-2xl p-4 mb-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold leading-tight">
-            Other expenses this week
-          </h2>
-          <p className="text-xs text-muted mt-0.5 leading-snug">
-            Anything you bought that isn&apos;t tied to one load.
-          </p>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-xl font-black leading-none text-foreground">
-            {formatMoney(total)}
-          </p>
-          <p className="text-[11px] text-muted mt-0.5">
-            {rows.length} {rows.length === 1 ? "item" : "items"}
-          </p>
-        </div>
-      </div>
+    <Card className="mb-4">
+      <CardHeader
+        className=""
+        title="Other expenses this week"
+        description="Anything you bought that isn't tied to one load."
+        aside={
+          <div className="text-right">
+            <p className="pr-figure text-xl font-semibold leading-none text-foreground">
+              {formatMoney(total)}
+            </p>
+            <p className="text-[11px] text-muted mt-1">
+              {rows.length} {rows.length === 1 ? "item" : "items"}
+            </p>
+          </div>
+        }
+      />
 
       {rows.length > 0 && (
         <ul className="mt-3 divide-y divide-border border-y border-border">
@@ -120,11 +120,10 @@ export function RoadExpenseCard({
                     <span className="text-muted"> — {r.note}</span>
                   )}
                   {meta.taxCategory == null && (
-                    <span
-                      className="ml-1.5 text-[9px] uppercase tracking-wider bg-gray-100 text-muted px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap"
-                      title="Counted in your weekly profit. Not sent to the tax report — the per-diem worksheet covers meals."
-                    >
-                      profit only
+                    <span className="ml-1.5">
+                      <Chip title="Counted in your weekly profit. Not sent to the tax report — the per-diem worksheet covers meals.">
+                        profit only
+                      </Chip>
                     </span>
                   )}
                 </span>
@@ -148,7 +147,7 @@ export function RoadExpenseCard({
 
       {untaxed > 0 && (
         <p className="text-[11px] text-muted mt-2 leading-snug">
-          {formatMoney(untaxed)} of this is food. It counts against your profit
+          {formatMoney(untaxed)}{" "}of this is food. It counts against your profit
           here, but it isn&apos;t sent to the tax report — your per-diem
           worksheet already covers meals.
         </p>
@@ -240,7 +239,9 @@ export function RoadExpenseCard({
           />
 
           {error && (
-            <p className="text-xs text-red-600 mt-2 font-semibold">{error}</p>
+            <Notice tone="error" size="sm" className="mt-2">
+              {error}
+            </Notice>
           )}
 
           <div className="mt-3 flex gap-2">
@@ -263,7 +264,7 @@ export function RoadExpenseCard({
           </div>
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 

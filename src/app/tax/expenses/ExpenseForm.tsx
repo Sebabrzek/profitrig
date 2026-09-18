@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Card } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { CATEGORIES, categoryMeta } from "@/lib/tax/categories";
@@ -70,7 +72,7 @@ export function ExpenseForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="bg-white border border-border rounded-2xl p-5 flex flex-col gap-4">
+      <Card className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">Date</span>
           <input
@@ -106,7 +108,7 @@ export function ExpenseForm({
             <span className="italic">CPA-confirmable</span>
           </p>
           {meta.hint && (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1 leading-snug">
+            <p className="text-xs text-[var(--pr-text)] mt-1 leading-snug">
               {meta.hint}
             </p>
           )}
@@ -165,12 +167,10 @@ export function ExpenseForm({
             className="w-full p-4 rounded-xl border border-border bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand resize-y"
           />
         </label>
-      </section>
+      </Card>
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
-          {error}
-        </div>
+        <Notice tone="error">{error}</Notice>
       )}
 
       <div className="flex flex-col-reverse sm:flex-row gap-3 items-stretch">

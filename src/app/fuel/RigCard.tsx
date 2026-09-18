@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { saveRigAction } from "../actions";
 import type { Rig, Transmission } from "@/lib/fuel";
 
@@ -77,31 +79,32 @@ export function RigCard({ initial }: { initial: Rig }) {
 
   if (!editing) {
     return (
-      <section className="bg-white border border-border rounded-2xl p-4 mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-wider text-muted font-semibold">Your rig</p>
-          <p className="font-bold text-base truncate">{title || "Your truck"}</p>
-          {details.length > 0 && (
-            <p className="text-xs text-muted mt-0.5">{details.join(" · ")}</p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="shrink-0 text-sm font-semibold text-brand hover:text-brand-dark"
-        >
-          Edit
-        </button>
-      </section>
+      <Card className="mb-4">
+        <CardHeader
+          className=""
+          eyebrow="Your rig"
+          title={title || "Your truck"}
+          description={details.length > 0 ? details.join(" · ") : undefined}
+          aside={
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="shrink-0 text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              Edit
+            </button>
+          }
+        />
+      </Card>
     );
   }
 
   return (
-    <section className="bg-white border border-border rounded-2xl p-5 mb-4">
-      <h2 className="text-lg font-bold mb-1">Your rig</h2>
-      <p className="text-sm text-muted mb-4">
-        The truck you&apos;re tracking, and its odometer when you start.
-      </p>
+    <Card className="mb-4">
+      <CardHeader
+        title="Your rig"
+        description="The truck you're tracking, and its odometer when you start."
+      />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Make">
           <input
@@ -171,7 +174,11 @@ export function RigCard({ initial }: { initial: Rig }) {
           </div>
         </Field>
       </div>
-      {error && <p className="text-sm text-red-600 font-semibold mt-3">{error}</p>}
+      {error && (
+        <Notice tone="error" className="mt-3">
+          {error}
+        </Notice>
+      )}
       <div className="mt-4 flex gap-2">
         <button
           type="button"
@@ -200,6 +207,6 @@ export function RigCard({ initial }: { initial: Rig }) {
           </button>
         )}
       </div>
-    </section>
+    </Card>
   );
 }

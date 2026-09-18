@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Card } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -65,7 +67,7 @@ export function AssetForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="bg-white border border-border rounded-2xl p-5 flex flex-col gap-4">
+      <Card className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">Description</span>
           <input
@@ -128,12 +130,10 @@ export function AssetForm({
             §179. This number never gets added to your expense totals.
           </p>
         </label>
-      </section>
+      </Card>
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
-          {error}
-        </div>
+        <Notice tone="error">{error}</Notice>
       )}
 
       <div className="flex flex-col-reverse sm:flex-row gap-3 items-stretch">

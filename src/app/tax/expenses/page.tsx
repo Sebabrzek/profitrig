@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { Card, EmptyState, PageHeader } from "@/components/ui/Surfaces";
+import { Reading } from "@/components/instruments/Instruments";
 import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -74,24 +76,18 @@ export default async function ExpensesPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div>
-            <h1 className="text-2xl font-black">Expenses</h1>
-            <p className="text-xs text-muted leading-snug">
-              Non-load business expenses, actuals only.
-            </p>
-          </div>
-          <YearSelect taxYear={taxYear} years={years} />
-        </div>
+        <PageHeader
+          title="Expenses"
+          description="Non-load business expenses, actuals only."
+          action={<YearSelect taxYear={taxYear} years={years} />}
+        />
 
-        <div className="bg-white border border-border rounded-2xl p-4 mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted font-semibold">
-              Total {taxYear}
-            </p>
-            <p className="text-2xl font-black leading-none">
-              {formatMoney(grandTotal)}
-            </p>
+        <Card as="div" className="mb-4 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <Reading
+              label={<>Total {taxYear}</>}
+              value={formatMoney(grandTotal)}
+            />
           </div>
           <Link
             href={`/tax/expenses/new?year=${taxYear}`}
@@ -99,7 +95,7 @@ export default async function ExpensesPage({
           >
             + Add expense
           </Link>
-        </div>
+        </Card>
 
         <Link
           href="/tax"
@@ -109,13 +105,11 @@ export default async function ExpensesPage({
         </Link>
 
         {expenses.length === 0 ? (
-          <div className="mt-4 bg-white border border-border rounded-2xl p-8 text-center">
-            <p className="text-muted text-sm">
-              No expenses recorded for {taxYear}. Tap{" "}
-              <span className="font-semibold text-foreground">+ Add expense</span>{" "}
-              after every business receipt.
-            </p>
-          </div>
+          <EmptyState className="mt-4" title={<>No expenses recorded for {taxYear}.</>}>
+            Tap{" "}
+            <span className="font-semibold text-foreground">+ Add expense</span>{" "}
+            after every business receipt.
+          </EmptyState>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
             {CATEGORIES.map((cat) => {

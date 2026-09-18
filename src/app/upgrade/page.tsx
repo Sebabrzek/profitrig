@@ -1,5 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/shell/AppShell";
+import { Card, CardHeader, PageHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription } from "@/lib/subscription";
 import { isPro } from "@/lib/subscription";
@@ -32,19 +34,14 @@ export default async function UpgradePage({
       }}
     >
         {canceled && !alreadyPro && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-4 text-sm">
-            Checkout canceled — no charges made.
-          </div>
+          <Notice className="mb-4">Checkout canceled — no charges made.</Notice>
         )}
 
-        <div className="mb-6">
-          <p className="text-xs uppercase tracking-wider text-brand font-bold">
-            ProfitRig Pro
-          </p>
-          <h1 className="text-3xl font-black mt-1">
-            Track every load. Know every dollar.
-          </h1>
-          <p className="text-sm text-muted mt-2 leading-snug">
+        <PageHeader
+          eyebrow="ProfitRig Pro"
+          title="Track every load. Know every dollar."
+          description={
+            <>
             The free Calculator tells you what your cost per mile{" "}
             <em>should</em> be. ProfitRig Pro adds the{" "}
             <span className="font-semibold text-foreground">
@@ -52,8 +49,9 @@ export default async function UpgradePage({
             </span>{" "}
             so you can record every trip, see actual profit per load, and
             export a clean week-by-week ledger to your accountant.
-          </p>
-        </div>
+            </>
+          }
+        />
 
         {alreadyPro ? (
           <ProActive sub={sub} />
@@ -77,14 +75,14 @@ function FeatureList() {
     "Cancel anytime. 7-day free trial.",
   ];
   return (
-    <ul className="bg-white border border-border rounded-2xl p-5 mb-4 flex flex-col gap-2">
+    <Card as="ul" className="mb-4 flex flex-col gap-2">
       {items.map((t) => (
         <li key={t} className="flex items-start gap-2 text-sm">
           <span className="text-brand font-bold mt-0.5">✓</span>
           <span>{t}</span>
         </li>
       ))}
-    </ul>
+    </Card>
   );
 }
 
@@ -101,13 +99,12 @@ function ProActive({ sub }: { sub: SubscriptionRow | null }) {
     : null;
   const isTrial = sub?.status === "trialing";
   return (
-    <div className="bg-white border border-border rounded-2xl p-5 mb-4">
-      <p className="text-xs uppercase tracking-wider text-brand-dark font-bold">
-        You&apos;re on ProfitRig Pro
-      </p>
-      <p className="text-2xl font-black mt-1">
-        {isTrial ? "Free trial active" : "Subscription active"}
-      </p>
+    <Card as="div" className="mb-4">
+      <CardHeader
+        className="mb-0"
+        eyebrow="You're on ProfitRig Pro"
+        title={isTrial ? "Free trial active" : "Subscription active"}
+      />
       {ends && (
         <p className="text-sm text-muted mt-1">
           {sub?.cancel_at_period_end
@@ -121,6 +118,6 @@ function ProActive({ sub }: { sub: SubscriptionRow | null }) {
       <div className="mt-4">
         <ProActiveControls />
       </div>
-    </div>
+    </Card>
   );
 }

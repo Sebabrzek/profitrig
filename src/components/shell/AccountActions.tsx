@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOutAction } from "@/app/actions";
+import { Chip } from "@/components/ui/Chip";
 
 /**
  * Plan badge, Admin link and Sign Out — or, for a visitor, Sign In and
@@ -41,11 +42,7 @@ export function AccountActions({
   if (variant === "light") {
     return (
       <div className="flex items-center gap-2 sm:gap-3">
-        {isPro && (
-          <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-soft text-brand-dark px-2 py-0.5 rounded-full whitespace-nowrap">
-            Pro
-          </span>
-        )}
+        {isPro && <Chip>Pro</Chip>}
         {isAdmin && (
           <Link
             href="/admin"

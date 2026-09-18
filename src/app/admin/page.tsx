@@ -1,5 +1,8 @@
 import "server-only";
 import { AppShell } from "@/components/shell/AppShell";
+import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
+import { Chip } from "@/components/ui/Chip";
 import { formatRate } from "@/lib/format";
 import { StatTile } from "@/components/instruments/Instruments";
 import { notFound } from "next/navigation";
@@ -84,7 +87,7 @@ function Bar({
           {count} ({pct}%)
         </span>
       </div>
-      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-pr-surface-muted overflow-hidden">
         <div
           className="h-full bg-brand"
           style={{ width: `${pct}%` }}
@@ -111,13 +114,13 @@ export default async function AdminPage() {
         width="form"
         account={{ email: user.email ?? "", isPro: true, isAdmin: true }}
       >
-          <h1 className="text-2xl font-black mb-4">Admin — setup needed</h1>
-          <div className="bg-white border border-border rounded-2xl p-6 space-y-3">
+          <PageHeader title="Admin — setup needed" />
+          <Card as="div" className="space-y-3">
             <p>
               Add these env vars in Vercel → Project → Settings → Environment
               Variables, then redeploy:
             </p>
-            <pre className="bg-gray-50 border border-border rounded-xl p-3 text-xs overflow-x-auto">
+            <pre className="bg-pr-surface-muted border border-border rounded-[var(--pr-radius-input)] p-3 text-xs overflow-x-auto">
 {`SUPABASE_SERVICE_ROLE_KEY = <from Supabase: Project Settings → API → "service_role" secret>
 ADMIN_EMAILS = ${user.email}`}
             </pre>
@@ -126,7 +129,7 @@ ADMIN_EMAILS = ${user.email}`}
               page can read all users. Keep it on the server only — never
               prefix it with NEXT_PUBLIC_.
             </p>
-          </div>
+          </Card>
       </AppShell>
     );
   }
@@ -279,16 +282,16 @@ ADMIN_EMAILS = ${user.email}`}
     >
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-black">ProfitRig Admin</h1>
-          <p className="text-sm text-muted mt-1">
-            Live data from Supabase. Numbers update on every page refresh.
-            {allowlistEmpty && (
-              <span className="block text-red-600 mt-1">
-                Warning: ADMIN_EMAILS env var is empty. Add it in Vercel so
-                only you can see this page.
-              </span>
-            )}
-          </p>
+          <PageHeader
+            title="ProfitRig Admin"
+            description="Live data from Supabase. Numbers update on every page refresh."
+          />
+          {allowlistEmpty && (
+            <Notice tone="error">
+              Warning: ADMIN_EMAILS env var is empty. Add it in Vercel so only
+              you can see this page.
+            </Notice>
+          )}
         </div>
 
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -343,15 +346,11 @@ ADMIN_EMAILS = ${user.email}`}
           />
         </section>
 
-        <section className="bg-white border border-border rounded-2xl p-5">
-          <h2 className="text-lg font-bold mb-1">
-            User activity — every signup
-          </h2>
-          <p className="text-xs text-muted mb-3">
-            CPM = computed cost/mile from the user&apos;s saved cost profile
-            (override applied if they set one). Target = CPM + their desired
-            profit/mile.
-          </p>
+        <Card>
+          <CardHeader
+            title="User activity — every signup"
+            description="CPM = computed cost/mile from the user's saved cost profile (override applied if they set one). Target = CPM + their desired profit/mile."
+          />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -401,8 +400,8 @@ ADMIN_EMAILS = ${user.email}`}
                           ? formatRate(cpm.totalCPM)
                           : "—"}
                         {cpm?.hasOverride && (
-                          <span className="ml-1 text-[9px] uppercase tracking-wider bg-amber-200 text-amber-900 px-1 rounded-full font-bold">
-                            man
+                          <span className="ml-1">
+                            <Chip>man</Chip>
                           </span>
                         )}
                       </td>
@@ -442,21 +441,25 @@ ADMIN_EMAILS = ${user.email}`}
           <p className="text-xs text-muted mt-3">
             Showing all {sortedUsers.length} users, newest first.
           </p>
-        </section>
+        </Card>
 
         {/* The two feedback lists sit side by side once there is room,
             in their existing order: latest feedback, then questions. */}
         <div className="@container">
         <div className="grid gap-6 items-start @min-[960px]:grid-cols-2">
-        <section className="bg-white border border-border rounded-2xl p-5">
-          <h2 className="text-lg font-bold mb-3">
-            Latest feedback{" "}
-            <span className="text-sm text-muted font-normal">
-              ({feedback.length})
-            </span>
-          </h2>
+        <Card>
+          <CardHeader
+            title={
+              <>
+                Latest feedback{" "}
+                <span className="text-sm text-muted font-normal">
+                  ({feedback.length})
+                </span>
+              </>
+            }
+          />
           {feedback.length === 0 ? (
-            <p className="text-muted text-sm">No feedback yet.</p>
+            <EmptyState title="No feedback yet." />
           ) : (
             <ul className="flex flex-col gap-3">
               {feedback.slice(0, 20).map((f) => (
@@ -482,29 +485,29 @@ ADMIN_EMAILS = ${user.email}`}
               Showing latest 20 of {feedback.length}.
             </p>
           )}
-        </section>
+        </Card>
 
-        <section className="bg-white border border-border rounded-2xl p-5">
-          <h2 className="text-lg font-bold mb-1">
-            What users are asking{" "}
-            <span className="text-sm text-muted font-normal">
-              (Ask ProfitRig chat)
-            </span>
-          </h2>
-          <p className="text-xs text-muted mb-3">
-            Latest driver questions to the AI assistant. Repeated questions =
-            something the app should make more obvious.
-          </p>
+        <Card>
+          <CardHeader
+            title={
+              <>
+                What users are asking{" "}
+                <span className="text-sm text-muted font-normal">
+                  (Ask ProfitRig chat)
+                </span>
+              </>
+            }
+            description="Latest driver questions to the AI assistant. Repeated questions = something the app should make more obvious."
+          />
           {chatQuestions.length === 0 ? (
-            <p className="text-muted text-sm">
-              No chat questions yet.
+            <EmptyState title="No chat questions yet.">
               {chatRes.error ? (
-                <span className="block text-red-600 mt-1">
+                <span className="text-[var(--pr-loss-deep)]">
                   ({chatRes.error.message} — did you run
                   supabase-migration-010.sql?)
                 </span>
               ) : null}
-            </p>
+            </EmptyState>
           ) : (
             <ul className="flex flex-col gap-3">
               {chatQuestions.slice(0, 25).map((q) => {
@@ -550,13 +553,13 @@ ADMIN_EMAILS = ${user.email}`}
               messages.
             </p>
           )}
-        </section>
+        </Card>
         </div>
         </div>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="bg-white border border-border rounded-2xl p-5">
-            <h3 className="text-base font-bold mb-3">By state</h3>
+          <Card as="div">
+            <CardHeader title="By state" className="mb-3" />
             <div className="flex flex-col gap-2.5">
               {byState.length === 0 && (
                 <p className="text-xs text-muted">No data yet.</p>
@@ -565,9 +568,9 @@ ADMIN_EMAILS = ${user.email}`}
                 <Bar key={k} label={k} count={v} total={profiles.length} />
               ))}
             </div>
-          </div>
-          <div className="bg-white border border-border rounded-2xl p-5">
-            <h3 className="text-base font-bold mb-3">By trailer type</h3>
+          </Card>
+          <Card as="div">
+            <CardHeader title="By trailer type" className="mb-3" />
             <div className="flex flex-col gap-2.5">
               {byTrailer.length === 0 && (
                 <p className="text-xs text-muted">No data yet.</p>
@@ -581,9 +584,9 @@ ADMIN_EMAILS = ${user.email}`}
                 />
               ))}
             </div>
-          </div>
-          <div className="bg-white border border-border rounded-2xl p-5">
-            <h3 className="text-base font-bold mb-3">By authority</h3>
+          </Card>
+          <Card as="div">
+            <CardHeader title="By authority" className="mb-3" />
             <div className="flex flex-col gap-2.5">
               {byAuthority.length === 0 && (
                 <p className="text-xs text-muted">No data yet.</p>
@@ -597,7 +600,7 @@ ADMIN_EMAILS = ${user.email}`}
                 />
               ))}
             </div>
-          </div>
+          </Card>
         </section>
       </div>
     </AppShell>

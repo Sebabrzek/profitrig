@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/ui/Surfaces";
 import {
   InstrumentPanel,
   Reading,
@@ -79,11 +80,10 @@ export default async function FuelPage() {
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <h1 className="text-2xl font-black mb-1">Fuel Economy</h1>
-        <p className="text-sm text-muted mb-5">
-          Each week, log your odometer and the gallons you bought. ProfitRig
-          works out the miles per gallon your truck really gets.
-        </p>
+        <PageHeader
+          title="Fuel Economy"
+          description="Each week, log your odometer and the gallons you bought. ProfitRig works out the miles per gallon your truck really gets."
+        />
 
         <AnswerLayout>
         <AnswerColumn>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/ui/Surfaces";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -46,19 +47,18 @@ export default async function TaxProfilePage() {
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-2xl font-black">Tax Profile</h1>
-          <Link
-            href="/tax"
-            className="text-sm font-semibold text-brand hover:text-brand-dark"
-          >
-            ← Tax Pack
-          </Link>
-        </div>
-        <p className="text-sm text-muted mb-4 leading-snug">
-          Tells the Tax Pack which line items apply to you. Drives the
-          driver-pay rule and the truck-payment treatment. Change anytime.
-        </p>
+        <PageHeader
+          title="Tax Profile"
+          description="Tells the Tax Pack which line items apply to you. Drives the driver-pay rule and the truck-payment treatment. Change anytime."
+          action={
+            <Link
+              href="/tax"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              ← Tax Pack
+            </Link>
+          }
+        />
         <TaxProfileForm initial={initial} />
     </AppShell>
   );

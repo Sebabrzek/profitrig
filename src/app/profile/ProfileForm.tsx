@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { formatMoney } from "@/lib/format";
 import {
   applyCarrierPctToPastLoadsAction,
@@ -215,8 +217,8 @@ export function ProfileForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-4">Contact</h2>
+      <Card>
+        <CardHeader title="Contact" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="First Name">
             <input
@@ -249,13 +251,13 @@ export function ProfileForm({
             <input className={inputClass} value={email} readOnly disabled />
           </Field>
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-1">How you get paid</h2>
-        <p className="text-sm text-muted mb-4">
-          This decides the revenue on every load you log.
-        </p>
+      <Card>
+        <CardHeader
+          title="How you get paid"
+          description="This decides the revenue on every load you log."
+        />
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -327,13 +329,17 @@ export function ProfileForm({
         )}
 
         {savedPct != null && pastCount > 0 && (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
-            <p className="font-semibold text-amber-950">
-              {pastCount === 1 ? "1 load" : `${pastCount} loads`} you logged{" "}
-              {pastRange} still {pastCount === 1 ? "counts" : "count"} 100% as
-              yours.
-            </p>
-            <p className="text-amber-900 mt-1">
+          <Notice
+            className="mt-4"
+            title={
+              <>
+                {pastCount === 1 ? "1 load" : `${pastCount} loads`} you logged{" "}
+                {pastRange} still {pastCount === 1 ? "counts" : "count"} 100%
+                as yours.
+              </>
+            }
+          >
+            <p>
               Did your carrier keep {pctLabel(savedPct)} of{" "}
               {pastCount === 1 ? "that one" : "those"} too?
             </p>
@@ -355,15 +361,15 @@ export function ProfileForm({
                 No — I kept 100% of those
               </button>
             </div>
-          </div>
+          </Notice>
         )}
         {pastMessage && (
           <p className="mt-3 text-sm text-muted">{pastMessage}</p>
         )}
-      </section>
+      </Card>
 
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-4">Your Operation</h2>
+      <Card>
+        <CardHeader title="Your Operation" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Company Name" hint="Your LLC or business name.">
             <input
@@ -410,10 +416,10 @@ export function ProfileForm({
             </select>
           </Field>
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-lg font-bold mb-3">Stay in touch</h2>
+      <Card>
+        <CardHeader title="Stay in touch" />
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -431,7 +437,7 @@ export function ProfileForm({
             </span>
           </span>
         </label>
-      </section>
+      </Card>
 
       <div
         className="pr-action-bar bg-white border-t border-border px-4 pt-3 z-20"

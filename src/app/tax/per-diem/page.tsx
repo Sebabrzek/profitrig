@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/ui/Surfaces";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -84,15 +85,11 @@ export default async function PerDiemPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div>
-            <h1 className="text-2xl font-black">Per-diem worksheet</h1>
-            <p className="text-xs text-muted leading-snug">
-              Nights away from your tax home × IRS rate × 80% (DOT rule).
-            </p>
-          </div>
-          <YearSelect taxYear={taxYear} years={years} />
-        </div>
+        <PageHeader
+          title="Per-diem worksheet"
+          description="Nights away from your tax home × IRS rate × 80% (DOT rule)."
+          action={<YearSelect taxYear={taxYear} years={years} />}
+        />
 
         <Link
           href="/tax"

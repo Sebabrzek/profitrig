@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import {
+  Card,
+  CardHeader,
+  EmptyState,
+  PageHeader,
+} from "@/components/ui/Surfaces";
+import { Notice } from "@/components/ui/Notice";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
 import {
   InstrumentPanel,
@@ -260,10 +267,10 @@ export default async function LoadsPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
+        <PageHeader title="Loads" />
         {!isConfigured && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4">
-            <p className="font-bold text-sm">Set up your cost per mile first</p>
-            <p className="text-xs text-foreground/80 mt-1">
+          <Notice title="Set up your cost per mile first" className="mb-4">
+            <p>
               The load tracker uses your saved monthly costs and per-mile rates
               from the calculator. Open the calculator, fill it in, hit Save,
               then come back here.
@@ -274,7 +281,7 @@ export default async function LoadsPage({
             >
               Open Calculator
             </Link>
-          </div>
+          </Notice>
         )}
 
         {/* Week navigator */}
@@ -317,14 +324,14 @@ export default async function LoadsPage({
           </p>
         ) : settings.authorityType === "leased" ||
           settings.authorityType === "both" ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-4 text-xs text-amber-900 leading-snug">
+          <Notice size="sm" className="mb-4">
             You&apos;re leased to a carrier, but ProfitRig doesn&apos;t know
             what they keep — so every load here counts 100% of the pay as
             yours.{" "}
             <Link href="/profile" className="font-semibold underline">
               Add your carrier&apos;s %
             </Link>
-          </div>
+          </Notice>
         ) : null}
 
         {/* The weekly scoreboard: the result and why it is what it is. */}
@@ -383,18 +390,20 @@ export default async function LoadsPage({
         {/* Why this week's fixed-cost share is what it is */}
         {isConfigured && allocationNotes.length > 0 && (
           <div className="flex flex-col gap-2 mb-4">
-            {allocationNotes.map((note) => (
-              <p
-                key={note.monthKey}
-                className={`text-xs leading-snug rounded-xl border px-3 py-2.5 ${
-                  note.lowPace
-                    ? "bg-amber-50 border-amber-200 text-amber-900"
-                    : "bg-white border-border text-muted"
-                }`}
-              >
-                {allocationNoteText(note)}
-              </p>
-            ))}
+            {allocationNotes.map((note) =>
+              note.lowPace ? (
+                <Notice key={note.monthKey} size="sm">
+                  {allocationNoteText(note)}
+                </Notice>
+              ) : (
+                <p
+                  key={note.monthKey}
+                  className="px-1 text-xs leading-snug text-muted"
+                >
+                  {allocationNoteText(note)}
+                </p>
+              )
+            )}
           </div>
         )}
 
@@ -426,14 +435,11 @@ export default async function LoadsPage({
 
         {/* Export to Sheets/Excel */}
         {isConfigured && (
-          <section className="bg-white border border-border rounded-2xl p-4 mb-4">
-            <h3 className="text-sm font-bold mb-1">
-              Export to Sheets / Excel
-            </h3>
-            <p className="text-xs text-muted mb-3">
-              Download a CSV with every load + auto-totals. Opens in Google
-              Sheets, Excel, or Numbers.
-            </p>
+          <Card className="mb-4">
+            <CardHeader
+              title="Export to Sheets / Excel"
+              description="Download a CSV with every load + auto-totals. Opens in Google Sheets, Excel, or Numbers."
+            />
             <div className="flex flex-wrap gap-2">
               <a
                 href={`/api/loads/export?range=week&date=${isoDate(targetDate)}`}
@@ -454,18 +460,16 @@ export default async function LoadsPage({
                 All Time
               </a>
             </div>
-          </section>
+          </Card>
         )}
 
         {/* Load list */}
         {loads.length === 0 ? (
-          <div className="bg-white border border-border rounded-2xl p-8 text-center">
-            <p className="text-muted text-sm">
-              No loads this week. Tap{" "}
-              <span className="font-semibold text-foreground">Add a Load</span>{" "}
-              after every trip to track your real profit.
-            </p>
-          </div>
+          <EmptyState title="No loads this week.">
+            Tap{" "}
+            <span className="font-semibold text-foreground">Add a Load</span>{" "}
+            after every trip to track your real profit.
+          </EmptyState>
         ) : (
           <div className="flex flex-col gap-3">
             {loads.map((load) => {

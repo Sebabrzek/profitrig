@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/ui/Surfaces";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -137,15 +138,17 @@ export default async function NewLoadPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-2xl font-black">Add a Load</h1>
-          <Link
-            href="/loads"
-            className="text-sm font-semibold text-brand hover:text-brand-dark"
-          >
-            ← Back
-          </Link>
-        </div>
+        <PageHeader
+          title="Add a Load"
+          action={
+            <Link
+              href="/loads"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              ← Back
+            </Link>
+          }
+        />
         <LoadForm
           initial={initial}
           costProfile={profile}

@@ -17,6 +17,7 @@ import {
   ReadingGrid,
 } from "@/components/instruments/Instruments";
 import { ProfileBanner } from "@/components/ProfileBanner";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
 import {
   AnswerColumn,
   AnswerLayout,
@@ -134,13 +135,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-5 mb-4">
-      <h2 className="text-lg font-bold mb-1">{title}</h2>
-      {subtitle && (
-        <p className="text-sm text-muted mb-4 leading-snug">{subtitle}</p>
-      )}
+    <Card className="mb-4">
+      <CardHeader title={title} description={subtitle} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
-    </section>
+    </Card>
   );
 }
 
@@ -248,11 +246,9 @@ export function Calculator({
       <AnswerLayout>
       <AnswerColumn>
       {realInsightVisible && (
-        <div className="bg-white border border-border rounded-2xl p-4 mb-4">
-          <p className="text-xs uppercase tracking-wider text-muted font-semibold">
-            From your loads
-          </p>
-          <p className="text-sm mt-1 leading-snug">
+        <Card as="div" className="mb-4">
+          <CardHeader title="From your loads" className="mb-1" />
+          <p className="text-sm leading-snug">
             Your real cost/mile from{" "}
             <span className="font-bold">{loggedLoadCount} logged loads</span>:{" "}
             <span className="font-bold text-brand-dark">
@@ -281,7 +277,7 @@ export function Calculator({
               </span>
             )}
           </div>
-        </div>
+        </Card>
       )}
       {/* Big result card */}
       <InstrumentPanel>
@@ -402,7 +398,7 @@ export function Calculator({
             />
           </div>
         </div>
-        <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+        <div className="sm:col-span-2 flex items-center justify-between bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm">
           <span className="font-semibold">Total Fixed Costs</span>
           <span className="font-bold">{formatMoney(totals.fixed)}</span>
         </div>
@@ -440,7 +436,7 @@ export function Calculator({
           value={p.fuel_price_per_gallon}
           onChange={set("fuel_price_per_gallon")}
         />
-        <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+        <div className="sm:col-span-2 flex items-center justify-between bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm">
           <span className="font-semibold">Fuel Cost Per Mile</span>
           <span className="font-bold">{formatRate(totals.fuelPerMile)}</span>
         </div>
@@ -480,7 +476,7 @@ export function Calculator({
             onChange={set("driver_pay_per_mile")}
           />
         </div>
-        <div className="sm:col-span-2 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+        <div className="sm:col-span-2 flex items-center justify-between bg-pr-surface-muted rounded-[var(--pr-radius-input)] px-4 py-3 text-sm">
           <span className="font-semibold">Total Variable / mile</span>
           <span className="font-bold">{formatRate(totals.variablePerMile)}</span>
         </div>
@@ -500,12 +496,11 @@ export function Calculator({
         </div>
       </Section>
 
-      <div className="bg-white border border-border rounded-2xl p-5 mb-4">
-        <p className="text-sm font-semibold mb-1">Save a dated snapshot</p>
-        <p className="text-xs text-muted mb-3 leading-snug">
-          Keep a record of these costs to compare later. Use this whenever
-          your costs change meaningfully — new carrier, paid off trailer, etc.
-        </p>
+      <Card className="mb-4">
+        <CardHeader
+          title="Save a dated snapshot"
+          description="Keep a record of these costs to compare later. Use this whenever your costs change meaningfully — new carrier, paid off trailer, etc."
+        />
         {showSnapshot ? (
           <div className="flex flex-col gap-2">
             <input
@@ -560,7 +555,7 @@ export function Calculator({
             View save history →
           </Link>
         </div>
-      </div>
+      </Card>
 
       {/* Visitors: after they've seen their own number, pitch the tracker. */}
       {!isAuthed && <VisitorPitch />}

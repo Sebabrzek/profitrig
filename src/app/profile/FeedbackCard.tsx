@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { submitFeedbackAction } from "../actions";
 
 const MAX_LEN = 5000;
@@ -28,12 +29,11 @@ export function FeedbackCard() {
   const canSend = trimmed.length > 0 && trimmed.length <= MAX_LEN && !pending;
 
   return (
-    <section className="bg-white border border-border rounded-2xl p-5">
-      <h2 className="text-lg font-bold mb-1">Send Feedback</h2>
-      <p className="text-sm text-muted mb-3 leading-snug">
-        Hit a bug? Have an idea? Want a feature that would save you time on the
-        road? Type away — every message gets read.
-      </p>
+    <Card>
+      <CardHeader
+        title="Send Feedback"
+        description="Hit a bug? Have an idea? Want a feature that would save you time on the road? Type away — every message gets read."
+      />
       <textarea
         value={message}
         onChange={(e) => setMessage(e.target.value.slice(0, MAX_LEN))}
@@ -48,7 +48,9 @@ export function FeedbackCard() {
               ✓ Thanks! We read every message.
             </span>
           ) : result && result !== "ok" ? (
-            <span className="text-red-600">Error: {result}</span>
+            <span role="alert" className="text-[var(--pr-loss-deep)]">
+              Error: {result}
+            </span>
           ) : (
             <span>
               {message.length} / {MAX_LEN}
@@ -63,6 +65,6 @@ export function FeedbackCard() {
           {pending ? "Sending..." : "Send"}
         </button>
       </div>
-    </section>
+    </Card>
   );
 }

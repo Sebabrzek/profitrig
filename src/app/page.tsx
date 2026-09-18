@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Calculator } from "./Calculator";
 import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/ui/Surfaces";
 import { VisitorHero } from "@/components/VisitorHero";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
@@ -164,7 +165,7 @@ export default async function HomePage() {
           : null
       }
     >
-      {!user && <VisitorHero />}
+      {user ? <PageHeader title="Calculator" /> : <VisitorHero />}
       <Calculator
         initial={initial}
         profileComplete={profileComplete}
