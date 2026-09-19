@@ -5,6 +5,10 @@ import { usePathname } from "next/navigation";
 import { submitFeedbackAction } from "@/app/actions";
 import { Button } from "@/components/ui/Button";
 import { TextArea } from "@/components/ui/Field";
+import {
+  ASK_PROFITRIG_EVENT,
+  ChatIcon,
+} from "@/components/shell/AskProfitRigButton";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -54,6 +58,13 @@ export function SupportChat() {
       // storage full / private mode — chat still works, just not persisted
     }
   }, [messages]);
+
+  // The top-bar button (phones and tablets) opens the same panel.
+  useEffect(() => {
+    const openChat = () => setOpen(true);
+    window.addEventListener(ASK_PROFITRIG_EVENT, openChat);
+    return () => window.removeEventListener(ASK_PROFITRIG_EVENT, openChat);
+  }, []);
 
   useEffect(() => {
     if (open && scrollRef.current) {
@@ -163,15 +174,17 @@ export function SupportChat() {
 
   return (
     <>
-      {/* Floating launcher — sits above the mobile bottom nav. Rig Green:
-          help is a neutral action, so it never competes with a page's
-          Profit Green save. */}
+      {/* Floating launcher — desktop only (1024px up). Where the bottom nav
+          shows, Ask ProfitRig is docked in the top bar instead, so it can
+          never sit on top of a page's numbers or buttons. Rig Green: help
+          is a neutral action, so it never competes with a page's Profit
+          Green save. */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Ask ProfitRig"
-          className="pr-chat-launcher fixed right-4 z-40 flex min-h-11 items-center gap-2 rounded-full bg-[var(--pr-rig-green)] hover:bg-[var(--pr-action-dark-hover)] text-white pl-3 pr-4 py-3 shadow-lg shadow-black/20 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pr-rig-green)]"
+          className="pr-chat-launcher fixed right-4 z-40 hidden min-h-11 items-center gap-2 lg:flex rounded-full bg-[var(--pr-rig-green)] hover:bg-[var(--pr-action-dark-hover)] text-white pl-3 pr-4 py-3 shadow-lg shadow-black/20 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pr-rig-green)]"
         >
           <ChatIcon />
           <span className="font-display text-sm font-bold">Ask ProfitRig</span>
@@ -356,26 +369,6 @@ function Bubble({
         {children}
       </div>
     </div>
-  );
-}
-
-function ChatIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" />
-      <circle cx="9" cy="12" r="0.8" fill="currentColor" />
-      <circle cx="13" cy="12" r="0.8" fill="currentColor" />
-      <circle cx="17" cy="12" r="0.8" fill="currentColor" />
-    </svg>
   );
 }
 

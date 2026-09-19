@@ -105,6 +105,8 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LoadLedger, LoadRecord } from "../src/app/loads/LoadRecord";
 import { RecordDeleteButton } from "../src/components/ui/Records";
+import { AskProfitRigButton } from "../src/components/shell/AskProfitRigButton";
+import { readFileSync } from "node:fs";
 import {
   fuelEntryPresentation,
   loadRecordFigures,
@@ -1206,6 +1208,25 @@ check(
     "a record's delete is a plain button with its label and a 44px target class",
     /^<button type="button" aria-label="Delete week of Sep 13" class="pr-icon-action "/.test(del) &&
       del.includes('aria-hidden="true"')
+  );
+}
+
+{
+  // Phones and tablets always get the load card: the ledger's container
+  // queries live only inside the 1024px (sidebar) layout.
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+  const gate = css.indexOf("@media (min-width: 1024px) {\n    @container (min-width: 520px)");
+  check(
+    "the load ledger only exists in the desktop layout; below 1024px a load is a card",
+    gate > 0 &&
+      (css.match(/@container \(min-width: 520px\)/g) ?? []).length === 1 &&
+      (css.match(/@container \(min-width: 640px\)/g) ?? []).length === 1 &&
+      css.indexOf("@container (min-width: 640px)") > gate
+  );
+  const ask = renderToStaticMarkup(React.createElement(AskProfitRigButton));
+  check(
+    "Ask ProfitRig in the top bar is a real button with a name, not a floating layer",
+    /^<button type="button" aria-label="Ask ProfitRig"/.test(ask) && !/fixed/.test(ask)
   );
 }
 

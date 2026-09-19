@@ -1,5 +1,6 @@
 import { Wordmark } from "@/components/Wordmark";
 import { AccountActions } from "./AccountActions";
+import { AskProfitRigButton } from "./AskProfitRigButton";
 import { BottomNav } from "./BottomNav";
 import { SidebarNav } from "./SidebarNav";
 
@@ -81,15 +82,19 @@ export function AppShell({
           signedIn ? "lg:hidden" : ""
         }`}
       >
-        <div className="pr-shell-column flex items-center justify-between gap-3 py-3">
+        <div className="pr-shell-column flex items-center justify-between gap-2 py-3 sm:gap-3">
           <Wordmark size="md" />
-          <AccountActions
-            variant="light"
-            signedIn={signedIn}
-            email={email}
-            isPro={isPro}
-            isAdmin={isAdmin}
-          />
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* Signed in, this bar only shows where the bottom nav does. */}
+            {signedIn && <AskProfitRigButton />}
+            <AccountActions
+              variant="light"
+              signedIn={signedIn}
+              email={email}
+              isPro={isPro}
+              isAdmin={isAdmin}
+            />
+          </div>
         </div>
       </header>
 
