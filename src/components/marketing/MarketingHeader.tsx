@@ -3,8 +3,8 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Wordmark } from "@/components/Wordmark";
 
 /**
- * The public header. It sits on the hero's Rig Green band, so it carries the
- * approved reversed lockup and has no surface of its own.
+ * The public header, sitting on the hero's ivory field: the approved lockup
+ * in its standard colours, and nothing behind it.
  *
  * "Use Free Calculator" is deliberately a button and not a nav link: the
  * calculator is the promise the page is making, and it stays one tap away
@@ -16,15 +16,15 @@ export function MarketingHeader() {
       <Link
         href="/"
         aria-label="ProfitRig home"
-        className="shrink-0 rounded-[var(--pr-radius-button)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--pr-sage)]"
+        className="shrink-0 rounded-[var(--pr-radius-button)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--pr-rig-green)]"
       >
-        <Wordmark size="md" tone="dark" />
+        <Wordmark size="md" />
       </Link>
 
       <div className="ml-auto flex flex-wrap items-center gap-2 sm:gap-3">
         <Link
           href="/login"
-          className="inline-flex min-h-11 items-center px-1 font-display text-sm font-semibold text-white/80 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pr-sage)]"
+          className="inline-flex min-h-11 items-center px-1 font-display text-sm font-semibold text-[var(--pr-rig-green)] transition-colors hover:text-[var(--pr-action-dark-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pr-rig-green)]"
         >
           Sign In
         </Link>
