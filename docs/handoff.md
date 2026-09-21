@@ -1,6 +1,6 @@
 # ProfitRig — handoff
 
-Updated 18 Sep 2026. **Read this first in any new session.**
+Updated 21 Sep 2026. **Read this first in any new session.**
 
 ## Start of a new session: do not code
 
@@ -14,21 +14,23 @@ Updated 18 Sep 2026. **Read this first in any new session.**
 4. Tell Sebastian, briefly and in plain words, what you understand.
 5. Wait for his instruction.
 
-**Likely next step:** he says "push it" → push the final 3b commits → give
-him the preview link → he checks it → "merge it" → merge 3b. **Phase 3c does
-not start until he says "Go Build".**
+**Likely next step:** the design rollout (3a–3d), the Ask ProfitRig
+guardrails and the Phase 4A identity are all merged and live. What follows is
+Sebastian's call — the remaining identity work is Phase 5 (signed-out and
+marketing surfaces), and the business work is the carrier-pay order at the
+bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (18 Sep 2026)
+## Repository state (21 Sep 2026)
 
-- Branch: `design/03b-surfaces-hierarchy`. Latest code commit `f1f8b12`
-  (Tax: the (1099) contract-pay space); the tip is the handoff commit on top
-  of it — check `git log -3`.
-- Pushed: only `caeeef2`. **Not pushed:** `8053709`, `f1f8b12` and the
-  handoff commit.
-- Phase 3b is **not merged**.
-- Production `main` = `origin/main` = `cc90307` (Phase 3a, live).
-- 3b preview (still shows `caeeef2` until the next push):
-  https://profitrig-git-design-03b-surfaces-hierarchy-hellotrucker.vercel.app
+- Production `main` = `origin/main` = the Phase 4A identity, live.
+  `git log --oneline -3` is the truth; this file is a summary.
+- Nothing is waiting to be pushed or merged.
+- Merged branches kept on the remote: `design/03b-surfaces-hierarchy`,
+  `design/03c-actions-inputs`, `design/03d-records-lists`,
+  `feature/ai-guardrails`, `security/016-chat-writes`, `design/04a-identity`.
+- Untracked and **not ours**: two reference images Sebastian dropped into
+  `docs/design/assets/references/archive/` (`ProfitRig Design.png`,
+  `webpageexample.png`). Nothing references them. Leave them.
 - Uncommitted and **not ours to touch**: `docs/audit-2026-08-25.md`,
   `docs/plan-carrier-pay-and-fees.md` (modified), `docs/phase0-carrier-pay.md`
   (untracked). Never stage, commit, revert or clean them.
@@ -62,21 +64,33 @@ not start until he says "Go Build".**
 | Phase 1 — tokens and fonts | `1cdad30`, `4d96944` | live |
 | Phase 2a — app shell | `808ba59` | live |
 | Phase 2b — desktop layout | `584f72c` | live |
-| Phase 3a — financial instruments | `63ad0be`, `cc90307` | merged, live |
-| Phase 3b — surfaces and hierarchy | `caeeef2`, `8053709`, `f1f8b12` | awaiting final preview and merge |
+| Phase 3a — financial instruments | `63ad0be`, `cc90307` | live |
+| Phase 3b — surfaces and hierarchy | `caeeef2`, `8053709`, `f1f8b12`, `e1ce89d` | live |
+| Phase 3c — actions and inputs | `9e0af8e`, `f4f13be` | live |
+| Phase 3d — records and lists | `b0e1df2`, `cf86249` | live |
+| Ask ProfitRig guardrails | `91d5d85`, `2c2c9a9`, `fab6a25` | live (migration 015 applied) |
+| Chat rows server-written only | `2e4def2` | live (migration 016 applied) |
+| Phase 4A — the approved identity | `3379df7` | live |
 
 ## Locked design decisions
 
 - Direction: **AMERICAN IRON × FINANCIAL PRECISION.** Tagline KNOW YOUR
   NUMBERS. TAKE CONTROL. The charging bison and the Option 01 wordmark are
-  decided; `PENDING.md` under `assets/logos/` only means the vectors are late.
+  decided, and since Phase 4A the production vectors exist: masters under
+  `docs/design/assets/logos/`, the two files the app serves in
+  `public/brand/`. Never retype or redraw either — the bison and wordmark
+  path data is identical in every asset, and must stay that way.
 - Palette: Rig Green `#173C2B`, Profit Green `#16A34A`, Sage `#8FAE91`,
   Off White `#F6F7F4`, Charcoal `#1F2937`, Loss Red `#B85C57`,
   Deep Loss `#943F3B`, Loss Wash `#F2DEDA`.
 - Type: **Satoshi** = interface hierarchy. **Inter** = work and input.
   **JetBrains Mono** = financial answers and results (never inside inputs).
-  **Montserrat Black** = temporary wordmark construction only.
+  No font builds the logo; the wordmark is vector artwork.
 - **Phase 3a financial instruments are LOCKED** (`components/instruments/`).
+- **Phases 3b, 3c and 3d are LOCKED**: the surface and hierarchy system
+  (`components/ui/Surfaces.tsx`, `Notice.tsx`, `Chip.tsx`), the button and
+  field systems (`Button.tsx`, `Field.tsx`, `SegmentedControl.tsx`,
+  `ActionBar.tsx`) and the record primitives (`Records.tsx`).
 - Dark surfaces = financial intelligence and results. White surfaces = work
   and input.
 - Profit Green means action or a positive financial meaning, never decoration.
@@ -86,46 +100,66 @@ not start until he says "Go Build".**
 - Money: drop only `.00`; meaningful cents always stay. Rates always show two
   decimals. Visual work never changes what a number says.
 
-## Phase 3b status
+## Decisions from the design reviews — keep them
 
-Built (`components/ui/`): `PageHeader`, `Card` / `CardHeader`,
-`SectionHeading`, `EmptyState` (Surfaces.tsx), `Notice` and its error tone
-(Notice.tsx), `Chip` (Chip.tsx), plus the `--pr-surface-muted` token.
-Converted: Calculator, Loads (list, new, edit, LoadForm), Fuel, Tax and its
-subpages, Profile, Upgrade, Admin, ProfileBanner, RoadExpenseCard.
-
-Sebastian reviewed Calculator, Loads, Tax, Fuel and the Load editor. Decided:
-
-- The 3b system is approved.
-- The Notice with the Sage left rule is approved, and was made more compact.
-- The standard Card is unchanged.
 - The large empty space on Fuel is intentional. **Do not fill it** with
   decorative content.
-- Fixed in the last pass: the W-2 wages and (1099) contract-pay spaces on Tax.
+- The Notice with the Sage left rule is approved and deliberately compact.
+- The load ledger is desktop only (≥1024px); phones get load **cards**. Do
+  not render a compressed ledger on a phone.
+- Ask ProfitRig docks in the top bar under 1024px so it cannot cover a
+  driver's numbers; it floats only on desktop. Its colour is Rig Green.
+- "+ Add a Load" is full width on a phone, 240px from tablet up.
+- No grey tiles, and no Profit Green hover borders on records.
+- The mobile top bar wraps to two rows when signed out, because the lockup
+  has a 200px minimum width. Approved 21 Sep 2026 — not a bug to fix.
 
-Belongs to later phases, not 3b:
+## Ask ProfitRig — how it is protected
 
-- **3c:** inputs, buttons, links, the dashed estimate box, the Upgrade plan
-  toggle, the chat launcher colour.
-- **3d:** records and lists (load card profit pills, grey tiles).
+The browser sends one question and nothing else; the server decides
+everything (`src/lib/aiGuard.ts` holds the rules, and they are tested).
+
+- Limits per driver, enforced in Postgres by `ai_reserve_request()`, rolling:
+  Pro 5/minute, 30/day, 300/month. Free 5/5/25. It fails closed.
+- Every request is recorded in `ai_usage` with tokens, status and cost.
+  Measured: about 4,400 input tokens a question, so a Pro driver at the cap
+  costs roughly $2 a month.
+- Chat rows are written **only** by the server with the service-role key.
+  A driver can read their own transcript and nothing else (migration 016).
+- Only server-written (`trusted`) rows are ever replayed to the model, so a
+  driver cannot forge an earlier answer to argue with.
+- Cancellation is best effort: Vercel usually lets a request finish, so an
+  abandoned answer may still complete. Do not claim otherwise.
+
+## Still to do on the identity
+
 - **Phase 5:** signed-out and marketing surfaces (VisitorPitch, login,
-  landing), PWA theme colour, the wordmark vector.
+  landing). The PWA theme colour and the wordmark vector are done.
+- The Admin view of `ai_usage` is not built. Sebastian's own test chat and
+  its 12 usage rows are deliberately still in the database.
+- Supabase "Confirm email" is still unverified. Do not enable it before
+  sign-up has a "check your email" step and a callback route — today it has
+  neither, so turning it on would break sign-up.
 
 ## Stack, commands, gotchas
 
 - Next.js 16 (App Router, Turbopack) — **read `node_modules/next/dist/docs/`
   before using Next APIs.** React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 147 checks in `tests/money.ts` (money math, CSV, calculator,
-  nav, formatters).
+- `npm test` = 194 checks in `tests/money.ts` (money math, CSV, calculator,
+  nav, formatters, and the Ask ProfitRig guardrails).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
-  Latest is **014**.
+  Latest is **016**, applied 21 Sep 2026.
 - Local preview: `.claude/launch.json` → "profitrig", port 3000. Signed-in
-  pages redirect to /login; for visual checks, a temporary page under
-  `src/app/login-harness/` gets through the middleware. **Delete it before
-  committing.**
+  pages redirect to /login, so local checks only reach signed-out screens; a
+  temporary page under `src/app/login-harness/` gets through the middleware
+  if one is needed. **Delete it before committing.**
 - If the dev server serves stale CSS (after `npm run build`): stop it,
   `rm -rf .next/dev`, restart.
+- The Vercel CLI now asks for a fresh login, and preview URLs sit behind
+  Vercel SSO, so a preview cannot be checked from here — it redirects to a
+  Vercel sign-in page. Say so plainly rather than implying it was verified;
+  production on www.profitrig.com can still be checked over plain HTTP.
 - The JSX compiler drops a space before text containing `&apos;` / `&quot;`
   after an element or expression. Write an explicit `{" "}` and check the
   compiled output.

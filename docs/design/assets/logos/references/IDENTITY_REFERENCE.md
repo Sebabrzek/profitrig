@@ -26,9 +26,9 @@ Approved minimum-width guidance: primary with tagline 1000 CSS px / 170 mm print
 
 Compact SVG canvases are now 1426 × 198, removing unused bottom space to balance the top and bottom margins. Internal paths, placement, proportions, and spacing are unchanged. Primary canvases remain 1426 × 218. Do not force both variants into the same aspect ratio.
 
-The user approved the larger-framed browser favicon on 21 September 2026. Production files are `mark/profitrig-favicon.svg` and `mark/profitrig-favicon-{16,32,48}.png`. The exact bison path occupies approximately 88% of tile width, versus 66% in the superseded framing. Use this treatment for browser favicons only, not masked app icons. At 16 px fine gaps still soften. Candidate-named files and the comparison sheet remain as review history; production PNGs now use the approved framing. No frontend code or installation was changed.
+The user approved the larger-framed browser favicon on 21 September 2026. Production files are `mark/profitrig-favicon.svg` and `mark/profitrig-favicon-{16,32,48}.png`. The exact bison path occupies approximately 88% of tile width, versus 66% in the superseded framing. Use this treatment for browser favicons only, not masked app icons. At 16 px fine gaps still soften. Candidate-named files and the comparison sheet remain as review history; production PNGs now use the approved framing. Phase 4A installed this treatment as the three-frame `src/app/favicon.ico` and `src/app/icon.svg`.
 
-App icon: Off White bison on solid Rig Green, no baked-in corner radius. The mark stays within the center safe area for platform masking. 512 px and 192 px PNGs plus SVG are provided. Platform installation and PWA manifest updates are outside this task.
+App icon: Off White bison on solid Rig Green, no baked-in corner radius. The mark stays within the center safe area for platform masking. 512 px and 192 px PNGs plus SVG are provided. Phase 4A installed them as `public/icons/icon-{192,512}.png` and `src/app/apple-icon.png`, with the manifest theme set to Rig Green on an Off White launch background.
 
 Never stretch, add strokes, bevels, gradients, chrome, shadows, or texture. Engraving belongs only in marketing illustrations.
 

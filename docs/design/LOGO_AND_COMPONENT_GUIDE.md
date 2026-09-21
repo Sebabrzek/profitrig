@@ -30,4 +30,4 @@ Satoshi was obtained from Fontshare's official download endpoint. Inter and JetB
 
 ## Claude handoff
 
-Read the complete design system and identity reference. Use supplied production SVGs rather than typing the wordmark or redrawing the bison. Keep the audit-first process. Primary and compact lockups are approved; review the derived proof-sheet treatments and guidance before Phase 4 frontend implementation. This asset task does not authorize application changes.
+Read the complete design system and identity reference. Use supplied production SVGs rather than typing the wordmark or redrawing the bison. Keep the audit-first process. Primary and compact lockups are approved, and Phase 4A shipped them in the application: the shared `Wordmark` component renders the compact lockup from `public/brand/`, and the browser and installed-app icons come from the approved mark treatments.

@@ -8,7 +8,7 @@ Claude's job is implementation. Do not invent design choices where this system a
 
 ## Phase 4A identity approval — 21 September 2026
 
-The user approved the primary horizontal and compact previews. Production wordmark and lockup files now reside in `assets/logos/wordmark/` and `assets/logos/lockup/`. Their custom path geometry is the approved Phase 4A execution of Option 01, not a recovered historical source. The existing charging-bison SVG remains unchanged. Refer to `assets/logos/references/IDENTITY_REFERENCE.md` and the identity proof sheet. This approval supersedes the historical pending-vectorization statements below; it does not approve the earlier rejected Montserrat reconstruction or authorize frontend implementation.
+The user approved the primary horizontal and compact previews. Production wordmark and lockup files now reside in `assets/logos/wordmark/` and `assets/logos/lockup/`. Their custom path geometry is the approved Phase 4A execution of Option 01, not a recovered historical source. The existing charging-bison SVG remains unchanged. Refer to `assets/logos/references/IDENTITY_REFERENCE.md` and the identity proof sheet. This approval supersedes the historical pending-vectorization statements below; it does not approve the earlier rejected Montserrat reconstruction. Phase 4A then implemented the approved identity in the application, reviewed and approved on the same date.
 
 ## Approved typography — mandatory correction
 
