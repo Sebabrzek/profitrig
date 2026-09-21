@@ -47,6 +47,11 @@
  *      mid-typing, the text never resyncs under the cursor — so a visual
  *      phase cannot change how a field types.
  *
+ *  14. Load, fuel and road-expense records were redrawn as a ledger. These
+ *      hold what each record says — its link, its numbers, a profit, a loss
+ *      and a break-even told apart in words and not only colour — so the
+ *      redesign cannot move a figure or break a record's action.
+ *
  * Numbers below come from a real user's saved profile, so a regression here
  * is a regression someone would actually notice.
  */
@@ -96,6 +101,18 @@ import {
   tidyDecimalText,
   wholeNumberOf,
 } from "../src/lib/numericInput";
+import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { LoadLedger, LoadRecord } from "../src/app/loads/LoadRecord";
+import { RecordDeleteButton } from "../src/components/ui/Records";
+import { AskProfitRigButton } from "../src/components/shell/AskProfitRigButton";
+import { readFileSync } from "node:fs";
+import {
+  fuelEntryPresentation,
+  loadRecordFigures,
+  roadExpenseDeleteLabel,
+  type LoadRecordEconomics,
+} from "../src/lib/records";
 
 let failures = 0;
 let checks = 0;
@@ -1048,6 +1065,170 @@ check(
   "an empty nights field is 0 nights",
   wholeNumberOf("") === 0 && wholeNumberOf("12") === 12 && wholeNumberOf("007") === 7
 );
+
+// ─────────────────────────────────────────────────────────────────────
+section("Records say what their numbers mean");
+// ─────────────────────────────────────────────────────────────────────
+
+// The components' JSX compiles to React.createElement in this runner.
+(globalThis as unknown as { React: typeof React }).React = React;
+
+const econ = (over: Partial<LoadRecordEconomics> = {}): LoadRecordEconomics => ({
+  totalMiles: 490,
+  deadheadPct: 7.8,
+  revenue: 3240,
+  carrierPct: 0,
+  loadPay: 3240,
+  rpm: 3.3612,
+  totalCost: 2252.67,
+  cpm: 2.4987,
+  profit: 987.33,
+  ...over,
+});
+const recordHtml = (over: Partial<LoadRecordEconomics> = {}, props = {}) =>
+  renderToStaticMarkup(
+    React.createElement(LoadRecord, {
+      id: "L1",
+      href: "/loads/L1",
+      dateLabel: "Wed, Sep 16",
+      broker: "CH Robinson",
+      origin: "Dallas, TX",
+      destination: "Memphis, TN",
+      economics: econ(over),
+      ...props,
+    })
+  );
+
+{
+  const f = loadRecordFigures(econ());
+  check(
+    "a load record shows the figures it always has, formatted by lib/format",
+    f.revenue === "$3,240" &&
+      f.cost === "$2,252.67" &&
+      f.rate === "$3.36 / mi" &&
+      f.costRate === "$2.50 / mi" &&
+      f.miles === "490" &&
+      f.deadhead === "8% deadhead" &&
+      f.share === null,
+    JSON.stringify(f)
+  );
+  const leased = loadRecordFigures(econ({ carrierPct: 20, loadPay: 2060, revenue: 1648 }));
+  check(
+    "a leased load still says the share the driver keeps",
+    leased.share === "80% of $2,060" &&
+      loadRecordFigures(econ({ carrierPct: 17.5, loadPay: 2000 })).share === "82.5% of $2,000"
+  );
+  check(
+    "profit, loss and break-even read differently on a record",
+    f.profit === "+$987.33" && f.outcome === "profit" &&
+      loadRecordFigures(econ({ profit: -142 })).profit === `${MINUS}$142` &&
+      loadRecordFigures(econ({ profit: -142 })).outcome === "loss" &&
+      loadRecordFigures(econ({ profit: 0 })).profit === "$0" &&
+      loadRecordFigures(econ({ profit: 0 })).outcome === undefined &&
+      loadRecordFigures(econ({ profit: 0.004 })).outcome === undefined
+  );
+}
+{
+  const win = recordHtml();
+  const loss = recordHtml({ profit: -142 });
+  const even = recordHtml({ profit: 0 });
+  check(
+    "the whole load record is still the link to its editor, with nothing clickable inside",
+    /^<li><a [^>]*href="\/loads\/L1"/.test(win) &&
+      (win.match(/<a /g) ?? []).length === 1 &&
+      !/<button/.test(win)
+  );
+  const ids = (win.match(/aria-(?:labelledby|describedby)="([^"]+)"/g) ?? [])
+    .flatMap((a) => a.replace(/^[^"]*"|"$/g, "").split(" "));
+  check(
+    "a record's name and description point at text that exists",
+    ids.length >= 6 && ids.every((id) => win.includes(`id="${id}"`)),
+    ids.join(" ")
+  );
+  check(
+    "a profit is green and signed, with no PROFIT tag",
+    /pr-amount-profit">\+\$987\.33</.test(win) && !/pr-loss-tag/.test(win) && !win.includes("↑")
+  );
+  check(
+    "a loss is red, signed with a true minus, and says LOSS in words",
+    loss.includes(`pr-amount-loss">${MINUS}$142<`) &&
+      /pr-loss-tag"><span aria-hidden="true">↓ <\/span>Loss</.test(loss)
+  );
+  check(
+    "a break-even load is neither green nor red",
+    /pr-load-hero ">\$0</.test(even) &&
+      !/pr-amount-(profit|loss)/.test(even) &&
+      !/pr-loss-tag/.test(even)
+  );
+  check(
+    "money on a record is JetBrains Mono; the route arrow is not read aloud",
+    (win.match(/pr-load-value|pr-load-hero/g) ?? []).length === 3 &&
+      win.includes('<span aria-hidden="true">→</span><span class="sr-only">to</span>')
+  );
+  const bare = recordHtml({}, { broker: "", origin: "", destination: "" });
+  check(
+    'a load with no broker or route reads "Untitled load" and names nothing missing',
+    bare.includes(">Untitled load<") &&
+      !bare.includes("pr-load-route") &&
+      !/aria-labelledby="[^"]*-route/.test(bare)
+  );
+  const ledger = renderToStaticMarkup(
+    React.createElement(LoadLedger, null, React.createElement(LoadRecord, {
+      id: "L1", href: "/loads/L1", dateLabel: "Wed, Sep 16", broker: "CH Robinson",
+      origin: "", destination: "", economics: econ(),
+    }))
+  );
+  check(
+    "the ledger is a list, its column headings hidden from screen readers",
+    /^<div class="pr-load-list"><ul class="pr-load-rows"><li aria-hidden="true" class="pr-load-head">/.test(ledger)
+  );
+}
+
+check(
+  "fuel weeks: a measured week is a reading, every other state is said in words",
+  JSON.stringify(fuelEntryPresentation({ status: "ok", mpg: 6.58 })) ===
+    JSON.stringify({ mpg: "6.6", state: null }) &&
+    fuelEntryPresentation({ status: "check", mpg: 31.24 }).mpg === "31.2" &&
+    fuelEntryPresentation({ status: "check", mpg: 31.24 }).state?.label === "Check" &&
+    fuelEntryPresentation({ status: "check", mpg: 31.24 }).state?.tone === "loss" &&
+    fuelEntryPresentation({ status: "baseline", mpg: null }).state?.label === "Starting point" &&
+    fuelEntryPresentation({ status: "baseline", mpg: null }).state?.tone === "neutral" &&
+    fuelEntryPresentation({ status: "odometer", mpg: null }).state?.label === "Odometer too low" &&
+    fuelEntryPresentation({ status: "odometer", mpg: null }).state?.tone === "loss"
+);
+check(
+  "a road expense's delete says which expense it deletes",
+  roadExpenseDeleteLabel("Food / meals", 18.4, "9/15") === "Delete Food / meals, $18.40, 9/15"
+);
+{
+  const del = renderToStaticMarkup(
+    React.createElement(RecordDeleteButton, { "aria-label": "Delete week of Sep 13" })
+  );
+  check(
+    "a record's delete is a plain button with its label and a 44px target class",
+    /^<button type="button" aria-label="Delete week of Sep 13" class="pr-icon-action "/.test(del) &&
+      del.includes('aria-hidden="true"')
+  );
+}
+
+{
+  // Phones and tablets always get the load card: the ledger's container
+  // queries live only inside the 1024px (sidebar) layout.
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+  const gate = css.indexOf("@media (min-width: 1024px) {\n    @container (min-width: 520px)");
+  check(
+    "the load ledger only exists in the desktop layout; below 1024px a load is a card",
+    gate > 0 &&
+      (css.match(/@container \(min-width: 520px\)/g) ?? []).length === 1 &&
+      (css.match(/@container \(min-width: 640px\)/g) ?? []).length === 1 &&
+      css.indexOf("@container (min-width: 640px)") > gate
+  );
+  const ask = renderToStaticMarkup(React.createElement(AskProfitRigButton));
+  check(
+    "Ask ProfitRig in the top bar is a real button with a name, not a floating layer",
+    /^<button type="button" aria-label="Ask ProfitRig"/.test(ask) && !/fixed/.test(ask)
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────
 

@@ -114,51 +114,52 @@ export default async function ExpensesPage({
             {CATEGORIES.map((cat) => {
               const list = grouped.get(cat.key) ?? [];
               if (list.length === 0) return null;
+              const headingId = `expenses-${cat.key}`;
               return (
-                <section
-                  key={cat.key}
-                  className="bg-white border border-border rounded-2xl p-4"
-                >
-                  <div className="flex items-baseline justify-between mb-1">
-                    <p className="font-bold text-sm">{cat.label}</p>
-                    <p className="font-black text-base">
+                <Card key={cat.key} aria-labelledby={headingId}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h2
+                      id={headingId}
+                      className="font-display text-base font-bold text-[var(--pr-rig-green)]"
+                    >
+                      {cat.label}
+                    </h2>
+                    <p className="pr-figure shrink-0 text-lg font-semibold">
                       {formatMoney(totalByCat.get(cat.key) ?? 0)}
                     </p>
                   </div>
-                  <p className="text-[11px] text-muted mb-3">
+                  <p className="mt-0.5 text-xs leading-snug text-muted">
                     Suggested: {cat.scheduleC}
                   </p>
-                  <ul className="flex flex-col gap-2">
+                  {/* Date | vendor and note | amount — one row per receipt,
+                      the whole row opens it. */}
+                  <ul className="mt-3 divide-y divide-border border-t border-border">
                     {list.map((e) => (
                       <li key={e.id}>
                         <Link
                           href={`/tax/expenses/${e.id}`}
-                          className="block border border-border rounded-xl px-3 py-2 hover:border-brand"
+                          className="pr-row-link -mx-2 grid-cols-[5.5rem_minmax(0,1fr)_auto] gap-3 px-2 py-2.5"
                         >
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-xs text-muted">
-                              {new Date(
-                                e.expense_date + "T12:00:00"
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </span>
-                            <span className="font-bold text-sm">
-                              {formatMoney(e.amount)}
-                            </span>
-                          </div>
-                          {(e.vendor || e.note) && (
-                            <p className="text-xs text-muted truncate">
-                              {[e.vendor, e.note].filter(Boolean).join(" · ")}
-                            </p>
-                          )}
+                          <span className="text-xs tabular-nums text-muted">
+                            {new Date(
+                              e.expense_date + "T12:00:00"
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <span className="truncate text-sm">
+                            {[e.vendor, e.note].filter(Boolean).join(" · ")}
+                          </span>
+                          <span className="pr-figure text-[15px] font-semibold">
+                            {formatMoney(e.amount)}
+                          </span>
                         </Link>
                       </li>
                     ))}
                   </ul>
-                </section>
+                </Card>
               );
             })}
           </div>

@@ -786,6 +786,352 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
   }
 }
 
+/* ===========================================================================
+   RECORDS AND LISTS — src/components/ui/Records.tsx, app/loads/LoadRecord.tsx
+   A record is a white surface with a hairline border and 14px corners. Under
+   the pointer its border firms up to the neutral field outline — never
+   Profit Green just for being clickable — and keyboard focus is a Rig Green
+   ring. Money on a record is JetBrains Mono; the words around it are
+   Satoshi (names, labels) and Inter (dates, routes, context).
+   =========================================================================== */
+
+@layer components {
+  .pr-record {
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius-card);
+    background: var(--pr-white);
+  }
+  .pr-record-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 120ms ease-out;
+  }
+  @media (hover: hover) {
+    .pr-record-link:hover {
+      border-color: var(--pr-border-strong);
+    }
+  }
+  .pr-record-link:focus-visible {
+    outline: 2px solid var(--pr-rig-green);
+    outline-offset: 2px;
+  }
+
+  /* A row inside a ledger section (tax expenses): the whole row is the link,
+     Off White under the pointer, a ring inside its own edge on focus. */
+  .pr-row-link {
+    display: grid;
+    align-items: center;
+    min-height: 44px;
+    border-radius: var(--pr-radius-sm);
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 120ms ease-out;
+  }
+  @media (hover: hover) {
+    .pr-row-link:hover {
+      background: var(--pr-surface-muted);
+    }
+  }
+  .pr-row-link:focus-visible {
+    outline: 2px solid var(--pr-rig-green);
+    outline-offset: -2px;
+  }
+
+  /* The small label over a number — the Reading label, for light records. */
+  .pr-record-label {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: var(--pr-text-xs);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pr-text-muted);
+  }
+
+  /* A signed result on a white record. Profit Green and Loss Red only at
+     20px bold and up (large text: 3.3:1 and 4.5:1 on white); the words and
+     the sign carry the meaning, the colour confirms it. Break-even is plain. */
+  .pr-amount-profit {
+    color: var(--pr-profit-green);
+  }
+  .pr-amount-loss {
+    color: var(--pr-loss);
+  }
+  .pr-loss-tag {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: var(--pr-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--pr-loss-deep);
+  }
+
+  /* An icon action on a record (delete): a 44px target around a small icon. */
+  .pr-icon-action {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--pr-radius-button);
+    color: var(--pr-text-muted);
+    cursor: pointer;
+    transition:
+      color 120ms ease-out,
+      background-color 120ms ease-out;
+  }
+  @media (hover: hover) {
+    .pr-icon-action:hover:enabled {
+      background: var(--pr-loss-wash);
+      color: var(--pr-loss-deep);
+    }
+  }
+  .pr-icon-action:focus-visible {
+    outline: 2px solid var(--pr-rig-green);
+    outline-offset: -2px;
+  }
+  .pr-icon-action:disabled {
+    opacity: 0.4;
+    cursor: progress;
+  }
+
+  /* --- Load records ---------------------------------------------------------
+     One record, two shapes, chosen by the width of the list — not the
+     window — so the same component is a card on a phone and a ledger row
+     in a desktop work column.
+       card         who and where, then Revenue / Cost / Profit as
+                    labelled lines, then two lines of mileage and rates —
+                    always, below 1024px (the bottom-nav layouts)
+       520px up     ledger row: Load | Revenue | Cost | Profit, the miles
+                    under the route; column headings once, above the list
+       640px up     ledger row: Load | Miles | Revenue | Cost | Profit
+     The ledger widths are the list's own; the ledger also needs the
+     1024px sidebar layout.
+     In a ledger the rows share one grid (subgrid), so every column lines up
+     down the list whatever the width of its numbers. */
+  .pr-load-list {
+    container-type: inline-size;
+  }
+  .pr-load-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pr-space-2);
+  }
+  .pr-load-head,
+  .pr-load-inline-miles,
+  .pr-load-miles,
+  .pr-load-wide-only {
+    display: none;
+  }
+  .pr-load {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: var(--pr-space-4);
+  }
+  .pr-load-id {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .pr-load-date {
+    font-size: var(--pr-text-xs);
+    line-height: 1.4;
+    color: var(--pr-text-muted);
+  }
+  .pr-load-title {
+    overflow: hidden;
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: var(--pr-text-base);
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--pr-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pr-load-route,
+  .pr-load-inline-miles {
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--pr-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pr-load-cell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: var(--pr-space-3);
+  }
+  .pr-load-cell > .pr-record-label {
+    grid-column: 1;
+  }
+  .pr-load-cell > :not(.pr-record-label) {
+    grid-column: 2;
+    justify-self: end;
+    text-align: right;
+  }
+  /* On a card the miles live in the line of detail at the bottom. */
+  .pr-load-cell.pr-load-miles {
+    display: none;
+  }
+  .pr-load-revenue {
+    margin-top: var(--pr-space-3);
+    padding-top: var(--pr-space-3);
+    border-top: 1px solid var(--pr-border);
+  }
+  .pr-load-cost,
+  .pr-load-profit {
+    margin-top: var(--pr-space-1);
+  }
+  .pr-load-value {
+    font-family:
+      var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    color: var(--pr-text);
+    white-space: nowrap;
+  }
+  .pr-load-count {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+    color: var(--pr-text);
+    white-space: nowrap;
+  }
+  /* No colour of its own: the result's tone (.pr-amount-profit / -loss) or
+     the record's Charcoal for break-even. */
+  .pr-load-hero {
+    font-family:
+      var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .pr-load-context {
+    font-size: var(--pr-text-xs);
+    line-height: 1.4;
+    color: var(--pr-text-muted);
+    white-space: nowrap;
+  }
+  .pr-load-support {
+    margin-top: var(--pr-space-3);
+    font-size: var(--pr-text-xs);
+    line-height: 1.45;
+    color: var(--pr-text-muted);
+  }
+  .pr-load-support > span {
+    display: block;
+  }
+
+  /* The ledger is a desktop shape: only in the sidebar layout (1024px up).
+     Wherever the bottom nav shows — phones in any orientation or in
+     "desktop site" mode, and tablets — a load is always the card. */
+  @media (min-width: 1024px) {
+    @container (min-width: 520px) {
+      .pr-load-rows {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) repeat(3, max-content);
+        column-gap: var(--pr-space-4);
+        row-gap: var(--pr-space-2);
+      }
+      .pr-load-rows > li,
+      .pr-load-head,
+      .pr-load {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: subgrid;
+        align-items: center;
+      }
+      .pr-load-head {
+        padding: 0 var(--pr-space-4);
+      }
+      .pr-load-head > :not(:first-child) {
+        text-align: right;
+      }
+      .pr-load {
+        padding: var(--pr-space-3) var(--pr-space-4);
+      }
+      /* Broker on top; date · route under it; miles under that at this width. */
+      .pr-load-id {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+      .pr-load-title {
+        grid-row: 1;
+        grid-column: 1 / -1;
+      }
+      .pr-load-date {
+        grid-row: 2;
+        grid-column: 1;
+        font-size: 13px;
+      }
+      .pr-load-date:has(~ .pr-load-route)::after {
+        content: "·";
+        margin: 0 var(--pr-space-2);
+      }
+      .pr-load-route {
+        grid-row: 2;
+        grid-column: 2;
+      }
+      .pr-load-inline-miles {
+        display: block;
+        grid-row: 3;
+        grid-column: 1 / -1;
+      }
+      .pr-load-cell {
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        text-align: right;
+      }
+      /* The column heading names each number once; readers still hear it. */
+      .pr-load-cell > .pr-record-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      .pr-load-wide-only {
+        display: block;
+      }
+      /* Miles ride under the route until there is room for their column. */
+      .pr-load-support,
+      .pr-load-head-miles,
+      .pr-load-cell.pr-load-miles {
+        display: none;
+      }
+    }
+    @container (min-width: 640px) {
+      .pr-load-rows {
+        grid-template-columns: minmax(0, 1fr) repeat(4, max-content);
+        column-gap: var(--pr-space-5);
+      }
+      .pr-load-cell.pr-load-miles,
+      .pr-load-head-miles {
+        display: block;
+      }
+      .pr-load-inline-miles {
+        display: none;
+      }
+    }
+  }
+}
+
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

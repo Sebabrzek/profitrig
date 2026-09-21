@@ -97,24 +97,26 @@ export default async function AssetsPage({
               <li key={a.id}>
                 <Link
                   href={`/tax/assets/${a.id}`}
-                  className="block bg-white border border-border rounded-2xl p-4 hover:border-brand"
+                  className="pr-record pr-record-link flex items-center justify-between gap-4 p-4"
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="font-bold text-base truncate">
+                  <span className="min-w-0">
+                    <span className="block truncate font-display text-base font-bold">
                       {a.description}
-                    </p>
-                    <p className="font-black text-lg">{formatMoney(a.cost)}</p>
-                  </div>
-                  <p className="text-xs text-muted">
-                    Placed in service{" "}
-                    {new Date(
-                      a.placed_in_service + "T12:00:00"
-                    ).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </p>
+                    </span>
+                    <span className="mt-0.5 block text-[13px] text-muted">
+                      Placed in service{" "}
+                      {new Date(
+                        a.placed_in_service + "T12:00:00"
+                      ).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </span>
+                  <span className="pr-figure shrink-0 text-xl font-semibold">
+                    {formatMoney(a.cost)}
+                  </span>
                 </Link>
               </li>
             ))}
