@@ -6,6 +6,10 @@
 
 Claude's job is implementation. Do not invent design choices where this system already provides an answer.
 
+## Phase 4A identity approval — 21 September 2026
+
+The user approved the primary horizontal and compact previews. Production wordmark and lockup files now reside in `assets/logos/wordmark/` and `assets/logos/lockup/`. Their custom path geometry is the approved Phase 4A execution of Option 01, not a recovered historical source. The existing charging-bison SVG remains unchanged. Refer to `assets/logos/references/IDENTITY_REFERENCE.md` and the identity proof sheet. This approval supersedes the historical pending-vectorization statements below; it does not approve the earlier rejected Montserrat reconstruction or authorize frontend implementation.
+
 ## Approved typography — mandatory correction
 
 Do not choose, substitute, or reinterpret fonts.
@@ -17,7 +21,7 @@ Do not choose, substitute, or reinterpret fonts.
 
 **Authoritative wordmark reference:** `assets/logos/references/APPROVED-OPTION-01-REFERENCE.png`, **Option 01 in the upper-left panel**. Other options on that sheet are not approved alternatives. Preserve the approved tagline: **KNOW YOUR NUMBERS. TAKE CONTROL.**
 
-The previously generated Montserrat-based `profitrig-wordmark*` and `profitrig-lockup-*` SVG/PNG files are **superseded drafts, not official assets**. Their wordmark appears in the archived logo and component boards; those wordmarks are not approved references. The active component board omits the rejected wordmark. A correct official Option 01 vector asset remains outstanding. Do not substitute another font while it is unavailable.
+The previously generated Montserrat-based `profitrig-wordmark*` and `profitrig-lockup-*` SVG/PNG files are **superseded drafts, not official assets**. Their wordmark appears in the archived logo and component boards; those wordmarks are not approved references. The active component board omits the rejected wordmark. The approved Phase 4A production wordmark is now available; do not substitute another font.
 
 This correction takes precedence over conflicting examples or historical asset-status statements elsewhere in this document or the handoff files.
 
@@ -1375,7 +1379,7 @@ Review and approve the audit and phased plan before implementation. Start with t
 
 ## I. BRAND FOLDER AND ASSET HANDOFF
 
-Current identity package: `docs/design/assets/logos/mark/`, `wordmark/`, `lockup/`, and `references/`. Existing bison assets are preserved in `mark/`. The production wordmark and dependent lockups are pending an adequate approved Option 01 source; see `references/IDENTITY_REFERENCE.md` and the family `PENDING.md` files. The tree below is the original proposed handoff layout, not the current identity-folder structure.
+Current identity package: `docs/design/assets/logos/mark/`, `wordmark/`, `lockup/`, and `references/`. Existing bison assets are preserved in `mark/`. The production wordmark and dependent lockups now use the user-approved Phase 4A geometry; see `references/IDENTITY_REFERENCE.md`. The tree below is the original proposed handoff layout, not the current identity-folder structure.
 
 Recommended repository structure:
 

@@ -63,7 +63,7 @@ export function AppShell({
 
       {signedIn && (
         <aside className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-[var(--pr-sidebar-w)] flex-col overflow-y-auto bg-[var(--pr-surface-dark)] text-[var(--pr-text-dark-surface)]">
-          <div className="px-7 pt-7 pb-6">
+          <div className="px-2.5 pt-4 pb-3">
             <Wordmark size="md" tone="dark" />
           </div>
           <SidebarNav isPro={isPro} />
@@ -82,9 +82,9 @@ export function AppShell({
           signedIn ? "lg:hidden" : ""
         }`}
       >
-        <div className="pr-shell-column flex items-center justify-between gap-2 py-3 sm:gap-3">
+        <div className="pr-shell-column flex flex-wrap items-center justify-between gap-2 py-3 sm:gap-3">
           <Wordmark size="md" />
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
             {/* Signed in, this bar only shows where the bottom nav does. */}
             {signedIn && <AskProfitRigButton />}
             <AccountActions

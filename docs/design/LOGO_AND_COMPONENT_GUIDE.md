@@ -1,23 +1,12 @@
 # ProfitRig logo and component assets
 
-Created 17 September 2026 from Product Design System v1.0. These are newly constructed deliverables, not recovered source artwork from the earlier conversation.
+## Phase 4A production identity — 21 September 2026
 
-## Superseded wordmark — do not implement
+Primary horizontal and compact lockups were approved by the user. Use the new SVG/PNG families in `assets/logos/wordmark/` and `assets/logos/lockup/`, together with the unchanged master in `assets/logos/mark/`.
 
-The generated Montserrat-based wordmark and every lockup containing it are superseded drafts. The user supplied `assets/logos/references/APPROVED-OPTION-01-REFERENCE.png`: use **Option 01, upper-left panel**, as the authoritative visual reference. Do not typeset, substitute, or reconstruct the official wordmark from another font. A correct official Option 01 vector asset remains outstanding.
+The Phase 4A custom outlined wordmark is now authoritative. Earlier rejected Montserrat-based files remain archived and must not be used. See `assets/logos/README.md`, `assets/logos/references/IDENTITY_REFERENCE.md`, and the new identity proof sheet for approved geometry, derived variants, and production guidance.
 
-The archived logo and component boards contain the incorrect wordmark and must not be used as references. The active component board now omits the wordmark and uses a neutral Satoshi title. The product typography remains **Satoshi for headings/UI; Inter for body, helper text and forms; JetBrains Mono selectively for important financial values**. Follow the corrected design-system file over any conflicting board example or earlier note below.
-
-## Active identity asset families
-
-- `assets/logos/mark/`: existing charging bison SVG/PNG files, unchanged.
-- `assets/logos/wordmark/`: `PENDING.md` lists the required production wordmark files and source dependency.
-- `assets/logos/lockup/`: `PENDING.md` lists the required horizontal lockups and source dependency.
-- `assets/logos/references/`: original Option 01 visual sheet, original bison references, and `IDENTITY_REFERENCE.md`.
-
-The production package remains incomplete until an adequate approved wordmark source is supplied. The small raster reference is not a final vector asset. Read the identity reference document for exact colors, tagline, typography roles, and required source formats.
-
-Incorrect wordmark/lockup SVGs and PNGs remain in `assets/references/archive/superseded-typography/logos/`. Do not use them.
+No product typography changes: Satoshi for headings/UI; Inter for body/forms; JetBrains Mono for financial/data values.
 
 ## Visual component board
 
@@ -41,4 +30,4 @@ Satoshi was obtained from Fontshare's official download endpoint. Inter and JetB
 
 ## Claude handoff
 
-Read `PROFITRIG_DESIGN_SYSTEM.md`, this guide, the active component board, and `assets/logos/references/IDENTITY_REFERENCE.md` together. Do not use the superseded wordmark or lockup SVGs. Follow the supplied Option 01 reference and wait for the official wordmark asset instead of substituting typography. Keep the audit-first implementation process from `CLAUDE_IMPLEMENTATION_START.md`. Do not replace the application UI merely by adding these reference assets.
+Read the complete design system and identity reference. Use supplied production SVGs rather than typing the wordmark or redrawing the bison. Keep the audit-first process. Primary and compact lockups are approved; review the derived proof-sheet treatments and guidance before Phase 4 frontend implementation. This asset task does not authorize application changes.

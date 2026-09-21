@@ -1,37 +1,35 @@
 # PROFITRIG custom wordmark — Option 01
 
-Approved visual source: `APPROVED-OPTION-01-REFERENCE.png`, upper-left panel labeled **01**. The remaining eleven options are not approved alternatives.
+## Approval and provenance
 
-Construction starting reference: **Montserrat ExtraBold/Black**.
+The user approved the Phase 4A primary horizontal and compact previews on 21 September 2026. Production assets use those same custom letter paths, spacing, bison geometry, relative placement, and tagline treatment. They are the approved Phase 4A execution of the Option 01 direction, not a recovered historical source file.
 
-- **PROFIT** — Rig Green `#173C2B`
-- **RIG** — Sage Green `#8FAE91`
+Construction starting reference: **Montserrat ExtraBold/Black**. The approved wordmark consists of custom vector paths, not typeset Montserrat or another font.
 
-The wordmark is wide, heavy, squared/geometric, with custom adjustments. Montserrat describes the construction starting point; typing PROFITRIG in Montserrat does not reproduce the approved custom geometry.
+- PROFIT — Rig Green `#173C2B`
+- RIG — Sage `#8FAE91`
+- Tagline — **KNOW YOUR NUMBERS. TAKE CONTROL.**
 
-Final production wordmark should use vector outlines rather than live font text. Do not substitute Satoshi, Inter, or another font. Do not invent letterforms or trace uncertain details as though they were exact.
+The tagline is outlined Inter Medium, as shown in the approved preview. No runtime font dependencies exist in the SVG logos.
 
-## Identity versus application typography
+The charging-bison master is unchanged. Master SHA-256: 6743273ad8857d936372b8e4b2189bdea1d0dfaa665a8e7dca6770f81a8348c1. Only uniform scaling, placement, and one-color fills are used in variants.
 
-| Role | Approved typography |
-|---|---|
-| Official wordmark | Custom Option 01 geometry |
-| UI/headings | Satoshi |
-| Body | Inter |
-| Financial/data | JetBrains Mono |
+## Typography distinctions
 
-Satoshi: headings, navigation, buttons, card titles, short UI emphasis. Inter: paragraphs, descriptions, helper text, forms, longer reading. JetBrains Mono: important financial values and percentages.
+Official wordmark: approved custom Option 01 geometry. UI/headings: Satoshi. Body: Inter. Financial/data: JetBrains Mono. Do not recreate the wordmark using any application font.
 
-## Bison and tagline
+## Production guidance
 
-Preserve the charging bison in `../mark/` without redesign. Original raster references are retained here unchanged.
+Minimum clear space is half the wordmark cap height on every side, measured from the outermost visible artwork (including bison and tagline). For standalone bison use one-quarter of the visible mark height. SVG canvas padding is not the required clear space: add external layout space. For square app tiles and favicons, use their supplied framing instead; do not add the standalone-mark margin inside the tile.
 
-Exact tagline: **KNOW YOUR NUMBERS. TAKE CONTROL.**
+Approved minimum-width guidance: primary with tagline 1000 CSS px / 170 mm print; compact 200 CSS px / 45 mm; wordmark 160 CSS px / 35 mm; standalone bison 32 CSS px, preferably 48 px. At 1000 CSS px the tagline capitals are approximately 12 px high; at 170 mm they are approximately 2 mm high. The previous 480 CSS px / 100 mm primary recommendation is superseded. Use compact below the primary threshold. CSS dimensions refer to the entire SVG canvas, not raster pixel count. Test at actual display size and with a physical print proof; approval of this guidance does not replace medium-specific readability checks.
 
-## Source limitation and required source
+Compact SVG canvases are now 1426 × 198, removing unused bottom space to balance the top and bottom margins. Internal paths, placement, proportions, and spacing are unchanged. Primary canvases remain 1426 × 218. Do not force both variants into the same aspect ratio.
 
-The approved reference is a 1536 × 1024 raster sheet. The Option 01 wordmark itself is approximately 290 × 32 pixels. It shows the selected appearance but does not reliably establish the exact custom vector contours. The other available design board is also a raster sheet and does not supply an outlined master.
+The user approved the larger-framed browser favicon on 21 September 2026. Production files are `mark/profitrig-favicon.svg` and `mark/profitrig-favicon-{16,32,48}.png`. The exact bison path occupies approximately 88% of tile width, versus 66% in the superseded framing. Use this treatment for browser favicons only, not masked app icons. At 16 px fine gaps still soften. Candidate-named files and the comparison sheet remain as review history; production PNGs now use the approved framing. No frontend code or installation was changed.
 
-Required: the approved Option 01 custom wordmark source as SVG, AI, EPS, or vector PDF; alternatively, a substantially larger, clean export of the exact approved wordmark sufficient for faithful vectorization. A font file or the rejected generated wordmark is not a substitute.
+App icon: Off White bison on solid Rig Green, no baked-in corner radius. The mark stays within the center safe area for platform masking. 512 px and 192 px PNGs plus SVG are provided. Platform installation and PWA manifest updates are outside this task.
 
-Production vectorization and dependent lockups are stopped pending that source. Do not embed a raster in an SVG and call it a vector master. Do not enlarge a screenshot and label it a high-resolution production export.
+Never stretch, add strokes, bevels, gradients, chrome, shadows, or texture. Engraving belongs only in marketing illustrations.
+
+The primary and compact design, production review adjustments, and larger-framed favicon are approved. The proof sheet records the approved identity treatments and guidance for Phase 4 frontend implementation.

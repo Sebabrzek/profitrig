@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#16a34a",
+  themeColor: "#173C2B",
   width: "device-width",
   initialScale: 1,
   // No maximumScale: a driver reading a rate confirmation in a dark cab has
