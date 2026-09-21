@@ -887,7 +887,7 @@ check(
 );
 
 const lit = (path: string) => activeNavKey(path);
-check("/ lights up Calc", lit("/") === "calc");
+check("/calculator lights up Calc", lit("/calculator") === "calc");
 check(
   "Calc does not light up everywhere just because every path starts with /",
   ["/loads", "/tax", "/fuel", "/profile", "/upgrade", "/admin"].every(
@@ -920,7 +920,15 @@ check(
   "pages outside the five light up nothing",
   lit("/upgrade") === null && lit("/admin") === null && lit("/login") === null
 );
-check("no pathname yet reads as the home page", activeNavKey(null) === "calc");
+check(
+  "the marketing home lights up nothing — it has no application shell",
+  lit("/") === null && activeNavKey(null) === null
+);
+check(
+  "a free driver's Calc goes to the public calculator",
+  free.find((i) => i.key === "calc")!.href === "/calculator" &&
+    pro.find((i) => i.key === "calc")!.href === "/calculator"
+);
 
 // ─────────────────────────────────────────────────────────────────────
 section("Money on screen: cents only when they mean something");

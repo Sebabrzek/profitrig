@@ -1154,3 +1154,298 @@ input[type="number"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================================================
+   MARKETING SURFACES (Phase 4)
+   The public homepage only. Nothing here is used by the product, and the
+   product's own components are imported into these sections unchanged.
+
+   The page is roughly 70% clean financial product, 30% American Iron. The
+   engraving appears at four levels and no more:
+     0  none — every product section
+     1  full illustration — the hero and the closing band
+     2  accent — a small marked detail
+     3  micro texture — the currency line under a band
+   ========================================================================= */
+@layer components {
+  /* Full-bleed band inside a normal page container. */
+  .pr-mk-band {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+  }
+  .pr-mk-dark {
+    background: var(--pr-surface-dark);
+    color: var(--pr-text-dark-surface);
+  }
+  .pr-mk-inner {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 1120px;
+    padding-inline: var(--pr-space-4);
+  }
+  @media (min-width: 640px) {
+    .pr-mk-inner {
+      padding-inline: var(--pr-space-8);
+    }
+  }
+
+  /* Section rhythm: design system §F — 40–64px on a phone, 64–96px up. */
+  .pr-mk-section {
+    padding-block: var(--pr-space-12);
+  }
+  @media (min-width: 768px) {
+    .pr-mk-section {
+      padding-block: var(--pr-space-24);
+    }
+  }
+
+  /* LEVEL 1 — the artwork carries the band. The flat Rig Green scrim is
+     for legibility, not decoration: Off White type must clear AA over the
+     illustration's cream sky. */
+  .pr-mk-art {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+  }
+  .pr-mk-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+  /* 74% measured, not guessed: over the illustration's brightest sky that
+     leaves Off White body type at 5.13:1, clear of AA, while showing as
+     much of the artwork as the type will allow. */
+  .pr-mk-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: color-mix(in srgb, var(--pr-rig-green) 74%, transparent);
+  }
+  /* The closing band's supporting lines sit over the brightest part of the
+     artwork — the sky — so it needs more, not less: 78% puts Off White at
+     5.8:1 there. */
+  .pr-mk-scrim-soft {
+    background: color-mix(in srgb, var(--pr-rig-green) 78%, transparent);
+  }
+
+  /* Sage is a supporting colour, not a text colour: at 12px it manages
+     2.4:1 on white and 2.0:1 over the illustration. So an eyebrow takes
+     its colour from what it sits on — Rig Green on a light band, Sage only
+     on flat Rig Green (5.1:1), Off White over artwork. */
+  .pr-mk-eyebrow {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--pr-rig-green);
+  }
+  .pr-mk-dark .pr-mk-eyebrow {
+    color: var(--pr-sage);
+  }
+  .pr-mk-art-band .pr-mk-eyebrow {
+    color: var(--pr-off-white);
+  }
+  /* Marketing hero: Satoshi Black, the one place the type scale goes above
+     a page title (design system §4 and §B). */
+  .pr-mk-h1 {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-weight: 900;
+    font-size: 40px;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  @media (min-width: 640px) {
+    .pr-mk-h1 {
+      font-size: 56px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .pr-mk-h1 {
+      font-size: 68px;
+    }
+  }
+  .pr-mk-h2 {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  @media (min-width: 768px) {
+    .pr-mk-h2 {
+      font-size: 40px;
+    }
+  }
+  .pr-mk-lead {
+    font-size: 16px;
+    line-height: 1.55;
+    max-width: 62ch;
+  }
+  @media (min-width: 768px) {
+    .pr-mk-lead {
+      font-size: 18px;
+    }
+  }
+
+  /* The five things ProfitRig does, as one quiet line of type. */
+  .pr-mk-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--pr-space-4) var(--pr-space-6);
+  }
+  @media (min-width: 768px) {
+    .pr-mk-strip {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+  .pr-mk-strip-item {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--pr-rig-green);
+    padding-top: var(--pr-space-3);
+    border-top: 2px solid var(--pr-sage);
+  }
+
+  /* A product section: the real interface on the left, the point on the
+     right — or stacked on a phone, interface first. */
+  .pr-mk-split {
+    display: grid;
+    gap: var(--pr-space-8);
+    align-items: center;
+  }
+  @media (min-width: 1024px) {
+    .pr-mk-split {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: var(--pr-space-16);
+    }
+    /* Give the column holding real product UI the extra width, so the
+       interface renders at the shape it really has on a desktop — the load
+       ledger needs its container past 520px to become a ledger at all.
+       Columns follow DOM order; the sections are written in reading order. */
+    .pr-mk-split-ui-left,
+    .pr-mk-split-ui-right {
+      /* 1.5fr against a 48px gap keeps the interface column past the 520px
+         its own container query needs, at 1024px as well as 1280px. Below
+         that it stacks and the product shows its phone shape, which is the
+         honest thing to show on a phone. */
+      gap: var(--pr-space-12);
+    }
+    .pr-mk-split-ui-left {
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    }
+    .pr-mk-split-ui-right {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    }
+  }
+
+  /* Demonstration data is always named as such, wherever it appears. */
+  .pr-mk-demo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pr-space-2);
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--pr-text-muted);
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius-pill);
+    padding: 4px 10px;
+    background: var(--pr-white);
+  }
+  .pr-mk-demo-dark {
+    color: var(--pr-sage);
+    background: transparent;
+    border-color: var(--pr-border-dark);
+  }
+  /* The frame that says "this is the real ProfitRig interface". */
+  .pr-mk-screen {
+    border-radius: var(--pr-radius-large);
+    border: 1px solid var(--pr-border);
+    background: var(--pr-off-white);
+    padding: var(--pr-space-4);
+  }
+  @media (min-width: 640px) {
+    .pr-mk-screen {
+      padding: var(--pr-space-5);
+    }
+  }
+
+  /* LEVEL 3 — micro texture. Engraved currency lines, barely there, used
+     to close a band rather than to decorate a surface. */
+  .pr-mk-rule {
+    height: 10px;
+    border: 0;
+    margin: 0;
+    opacity: 0.5;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--pr-sage) 0 1px,
+      transparent 1px 7px
+    );
+  }
+
+  /* LEVEL 2 — accent. A small engraved detail beside a marketing figure. */
+  .pr-mk-accent {
+    color: var(--pr-sage);
+    opacity: 0.85;
+  }
+}
+
+/* =========================================================================
+   THE MONEY ACTION
+   One treatment, one button: "+ Add a Load". Profit Green underneath, a
+   white label on top, and a currency-line guilloché at about 8% presence —
+   visible when you look for it, invisible when you are reading the label.
+
+   It is a background layer only. Height, radius, focus ring, disabled and
+   pending states, and the label all come from .pr-btn unchanged, so the
+   button behaves exactly as it did before.
+   ========================================================================= */
+@layer components {
+  .pr-btn-money {
+    position: relative;
+    isolation: isolate;
+  }
+  .pr-btn-money::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    opacity: 0.08;
+    background-image:
+      repeating-linear-gradient(
+        68deg,
+        var(--pr-white) 0 0.5px,
+        transparent 0.5px 6px
+      ),
+      repeating-linear-gradient(
+        -68deg,
+        var(--pr-white) 0 0.5px,
+        transparent 0.5px 6px
+      );
+  }
+  /* Nothing to decorate when the button cannot be pressed. */
+  .pr-btn-money:disabled::before,
+  .pr-btn-money[aria-disabled="true"]::before,
+  .pr-btn-money[aria-busy="true"]::before {
+    opacity: 0;
+  }
+  @media (forced-colors: active) {
+    .pr-btn-money::before {
+      display: none;
+    }
+  }
+}

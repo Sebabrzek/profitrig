@@ -277,7 +277,7 @@ export default async function LoadsPage({
               from the calculator. Open the calculator, fill it in, hit Save,
               then come back here.
             </p>
-            <ButtonLink href="/" variant="dark" size="sm" className="mt-3">
+            <ButtonLink href="/calculator" variant="dark" size="sm" className="mt-3">
               Open Calculator
             </ButtonLink>
           </Notice>
@@ -420,13 +420,16 @@ export default async function LoadsPage({
         />
 
         {/* Add load CTA — full width on a phone, a 240px button from
-            tablet up, on the column's left edge. */}
+            tablet up, on the column's left edge. `pr-btn-money` adds the
+            engraved currency line behind the label, at about 8%: the one
+            button in ProfitRig that carries it. Everything else about the
+            button — size, radius, focus, disabled — is unchanged. */}
         <ButtonLink
           href={`/loads/new?date=${isoDate(targetDate)}`}
           variant="primary"
           size="lg"
           disabled={!isConfigured}
-          className="mb-4 flex w-full sm:w-60"
+          className="pr-btn-money mb-4 flex w-full sm:w-60"
         >
           + Add a Load
         </ButtonLink>

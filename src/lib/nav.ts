@@ -25,7 +25,7 @@ export const UPGRADE_PATH = "/upgrade";
 
 // Order is the product's information architecture. Do not reorder.
 const DESTINATIONS: readonly Destination[] = [
-  { key: "calc", label: "Calculator", shortLabel: "Calc", path: "/", proOnly: false },
+  { key: "calc", label: "Calculator", shortLabel: "Calc", path: "/calculator", proOnly: false },
   { key: "loads", label: "Loads", shortLabel: "Loads", path: "/loads", proOnly: true },
   { key: "tax", label: "Tax", shortLabel: "Tax", path: "/tax", proOnly: true },
   { key: "fuel", label: "Fuel", shortLabel: "Fuel", path: "/fuel", proOnly: false },
@@ -54,21 +54,16 @@ export function navItems(isPro: boolean): NavItem[] {
 }
 
 /**
- * Which destination a pathname belongs to. `/` matches only itself — every
- * path starts with a slash, so a prefix test would light Calc up everywhere.
- * The others match their own path and anything nested under it
- * (`/loads/new`, `/tax/expenses/abc`), but not a sibling that merely shares
- * the letters (`/loadsheet`). Pages outside the five — `/upgrade`, `/admin` —
- * highlight nothing.
+ * Which destination a pathname belongs to. Each matches its own path and
+ * anything nested under it (`/loads/new`, `/tax/expenses/abc`), but not a
+ * sibling that merely shares the letters (`/loadsheet`). Pages outside the
+ * five — `/upgrade`, `/admin`, and the marketing home at `/` — highlight
+ * nothing; the marketing page does not use the application shell.
  */
 export function activeNavKey(pathname: string | null | undefined): NavKey | null {
   const p = pathname || "/";
   for (const d of DESTINATIONS) {
-    if (d.path === "/") {
-      if (p === "/") return d.key;
-    } else if (p === d.path || p.startsWith(`${d.path}/`)) {
-      return d.key;
-    }
+    if (p === d.path || p.startsWith(`${d.path}/`)) return d.key;
   }
   return null;
 }

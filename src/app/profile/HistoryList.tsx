@@ -59,7 +59,7 @@ export function HistoryList({ snapshots }: { snapshots: Snapshot[] }) {
         setError(r.error);
         return;
       }
-      router.push("/");
+      router.push("/calculator");
       router.refresh();
     });
   }

@@ -25,7 +25,7 @@ export async function signInAction(
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect("/calculator");
 }
 
 export async function signUpAction(
@@ -50,7 +50,7 @@ export async function signUpAction(
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect("/calculator");
 }
 
 export async function signOutAction() {
