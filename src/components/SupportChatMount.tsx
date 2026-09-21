@@ -9,5 +9,7 @@ export async function SupportChatMount() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return <SupportChat />;
+  // Keyed by the driver: if someone else signs in on this browser, the chat
+  // starts empty instead of showing the last person's conversation.
+  return <SupportChat key={user.id} />;
 }

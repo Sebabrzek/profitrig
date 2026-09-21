@@ -9,26 +9,31 @@ import {
   ASK_PROFITRIG_EVENT,
   ChatIcon,
 } from "@/components/shell/AskProfitRigButton";
+import {
+  CHAT_MAX_MESSAGE_CHARS,
+  CHAT_REMAINING_NOTICE_AT,
+} from "@/lib/aiGuard";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
-const STORAGE_KEY = "profitrig.chat.v1";
+/** Chats used to be kept in this browser. They live with the account now. */
+const RETIRED_STORAGE_KEY = "profitrig.chat.v1";
 
-function loadStoredMessages(): ChatMessage[] {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (m): m is ChatMessage =>
-        !!m &&
-        (m.role === "user" || m.role === "assistant") &&
-        typeof m.content === "string"
-    );
-  } catch {
-    return [];
-  }
+function isChatMessage(m: unknown): m is ChatMessage {
+  const row = m as ChatMessage | null;
+  return (
+    !!row &&
+    (row.role === "user" || row.role === "assistant") &&
+    typeof row.content === "string"
+  );
+}
+
+/** "2 questions remaining today." — only when a driver is nearly out. */
+function remainingNotice(header: string | null): string | null {
+  const left = Number(header);
+  if (!Number.isFinite(left) || left > CHAT_REMAINING_NOTICE_AT) return null;
+  if (left <= 0) return "No questions remaining today.";
+  return `${left} question${left === 1 ? "" : "s"} remaining today.`;
 }
 
 export function SupportChat() {
@@ -42,22 +47,51 @@ export function SupportChat() {
   const [humanStatus, setHumanStatus] = useState<
     "idle" | "sending" | "sent" | "error"
   >("idle");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const hydratedRef = useRef(false);
+  const answerRef = useRef<AbortController | null>(null);
 
+  // Nothing is kept in this browser any more; clear what older versions left.
   useEffect(() => {
-    setMessages(loadStoredMessages());
-    hydratedRef.current = true;
+    try {
+      sessionStorage.removeItem(RETIRED_STORAGE_KEY);
+    } catch {
+      // private mode — nothing to clear
+    }
   }, []);
 
+  // The conversation comes back from the driver's own account, once, when
+  // they open the chat.
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40)));
-    } catch {
-      // storage full / private mode — chat still works, just not persisted
-    }
-  }, [messages]);
+    if (!open || historyLoaded) return;
+    let dropped = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/chat/history", { cache: "no-store" });
+        const data = res.ok ? await res.json() : null;
+        const rows = Array.isArray(data?.messages)
+          ? data.messages.filter(isChatMessage)
+          : [];
+        if (!dropped && rows.length > 0) {
+          setMessages((current) => (current.length === 0 ? rows : current));
+        }
+      } catch {
+        // an empty chat is fine; the answer still works
+      } finally {
+        if (!dropped) setHistoryLoaded(true);
+      }
+    })();
+    return () => {
+      dropped = true;
+    };
+  }, [open, historyLoaded]);
+
+  // Closing the chat stops the answer — and stops paying for it.
+  useEffect(() => {
+    if (!open) answerRef.current?.abort();
+  }, [open]);
+  useEffect(() => () => answerRef.current?.abort(), []);
 
   // The top-bar button (phones and tablets) opens the same panel.
   useEffect(() => {
@@ -80,19 +114,26 @@ export function SupportChat() {
 
   async function send() {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || busy || [...text].length > CHAT_MAX_MESSAGE_CHARS) return;
     setInput("");
     setBusy(true);
+    setNotice(null);
 
     const outgoing: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages([...outgoing, { role: "assistant", content: "" }]);
 
+    const controller = new AbortController();
+    answerRef.current = controller;
     try {
+      // Only the question travels. What was said before is read back on the
+      // server from this driver's own records.
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: outgoing }),
+        body: JSON.stringify({ message: text }),
+        signal: controller.signal,
       });
+      setNotice(remainingNotice(res.headers.get("X-Ask-Remaining-Day")));
 
       if (!res.ok) {
         let msg = "Something went wrong. Try again in a minute.";
@@ -138,16 +179,20 @@ export function SupportChat() {
         assistant += decoder.decode(value, { stream: true });
         setMessages([...outgoing, { role: "assistant", content: assistant }]);
       }
-    } catch {
-      setMessages([
-        ...outgoing,
-        {
-          role: "assistant",
-          content:
-            "Couldn't reach the server. Check your connection and try again.",
-        },
-      ]);
+    } catch (err) {
+      // An abort is the driver closing the chat, not a failure.
+      if ((err as Error)?.name !== "AbortError") {
+        setMessages([
+          ...outgoing,
+          {
+            role: "assistant",
+            content:
+              "Couldn't reach the server. Check your connection and try again.",
+          },
+        ]);
+      }
     } finally {
+      answerRef.current = null;
       setBusy(false);
     }
   }
@@ -227,13 +272,28 @@ export function SupportChat() {
                 put an expense, how the calculator works, what a number means.
                 What&apos;s up?
               </Bubble>
+              {/* Said once, at the top, where a driver starts reading. */}
+              <p className="px-1 text-[11px] leading-snug text-muted">
+                Your Ask ProfitRig messages are saved to your account and
+                processed by our AI provider, Anthropic, to answer you.
+                ProfitRig may review them to help you and improve the app.
+                Please don&apos;t share passwords or bank details here.
+              </p>
               {messages.map((m, i) => (
                 <Bubble key={i} role={m.role}>
                   {m.content ||
                     (busy && i === messages.length - 1 ? "…" : m.content)}
                 </Bubble>
               ))}
-              <p className="text-[10px] text-muted text-center pt-1">
+              {notice && (
+                <p
+                  role="status"
+                  className="pt-1 text-center text-[11px] font-semibold text-[var(--pr-rig-green)]"
+                >
+                  {notice}
+                </p>
+              )}
+              <p className="text-[11px] text-muted text-center pt-1">
                 AI assistant — for tax questions, always confirm with your
                 accountant.
               </p>
@@ -315,6 +375,7 @@ export function SupportChat() {
                       }
                     }}
                     rows={1}
+                    maxLength={CHAT_MAX_MESSAGE_CHARS}
                     aria-label="Your question"
                     placeholder="Type a question…"
                     className="flex-1 resize-none"
@@ -331,7 +392,7 @@ export function SupportChat() {
                     <SendIcon />
                   </Button>
                 </form>
-                <div className="px-3 pb-2.5 pt-1.5">
+                <div className="flex items-center justify-between gap-3 px-3 pb-2.5 pt-1.5">
                   <button
                     type="button"
                     onClick={() => setHumanMode(true)}
@@ -339,6 +400,12 @@ export function SupportChat() {
                   >
                     Talk to a human
                   </button>
+                  {/* Only near the limit, so it stays out of the way. */}
+                  {[...input].length > CHAT_MAX_MESSAGE_CHARS - 200 && (
+                    <span className="text-[11px] text-muted tabular-nums">
+                      {CHAT_MAX_MESSAGE_CHARS - [...input].length} left
+                    </span>
+                  )}
                 </div>
               </div>
             )}
