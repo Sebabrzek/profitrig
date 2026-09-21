@@ -14,20 +14,21 @@ Updated 21 Sep 2026. **Read this first in any new session.**
 4. Tell Sebastian, briefly and in plain words, what you understand.
 5. Wait for his instruction.
 
-**Likely next step:** the design rollout (3a–3d), the Ask ProfitRig
-guardrails and the Phase 4A identity are all merged and live. What follows is
-Sebastian's call — the remaining identity work is Phase 5 (signed-out and
-marketing surfaces), and the business work is the carrier-pay order at the
-bottom of this file. **Nothing starts until he says "Go Build".**
+**Likely next step:** the design rollout is finished — 3a–3d, the Ask
+ProfitRig guardrails, the Phase 4A identity and Phase 5 are all merged and
+live. Every screen, signed in and signed out, is now on the system. What
+follows is Sebastian's call, and the business work is the carrier-pay order
+at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (21 Sep 2026)
 
-- Production `main` = `origin/main` = the Phase 4A identity, live.
+- Production `main` = `origin/main` = Phase 5, live.
   `git log --oneline -3` is the truth; this file is a summary.
 - Nothing is waiting to be pushed or merged.
 - Merged branches kept on the remote: `design/03b-surfaces-hierarchy`,
   `design/03c-actions-inputs`, `design/03d-records-lists`,
-  `feature/ai-guardrails`, `security/016-chat-writes`, `design/04a-identity`.
+  `feature/ai-guardrails`, `security/016-chat-writes`, `design/04a-identity`,
+  `design/05-signed-out`.
 - Untracked and **not ours**: two reference images Sebastian dropped into
   `docs/design/assets/references/archive/` (`ProfitRig Design.png`,
   `webpageexample.png`). Nothing references them. Leave them.
@@ -71,6 +72,7 @@ bottom of this file. **Nothing starts until he says "Go Build".**
 | Ask ProfitRig guardrails | `91d5d85`, `2c2c9a9`, `fab6a25` | live (migration 015 applied) |
 | Chat rows server-written only | `2e4def2` | live (migration 016 applied) |
 | Phase 4A — the approved identity | `3379df7` | live |
+| Phase 5 — signed-out surfaces | `460b863` | live |
 
 ## Locked design decisions
 
@@ -114,6 +116,24 @@ bottom of this file. **Nothing starts until he says "Go Build".**
 - The mobile top bar wraps to two rows when signed out, because the lockup
   has a 200px minimum width. Approved 21 Sep 2026 — not a bug to fix.
 
+Phase 5 added four, on questions the design system deliberately leaves open:
+
+- **The subscription price is Satoshi, not JetBrains Mono.** Mono is what a
+  driver's own operating numbers look like; what ProfitRig charges is not
+  one of them, and blurring that would cost the mono figures their meaning.
+- **Nothing goes above the calculator on the landing page.** No brand band,
+  no illustration. A visitor arriving from an ad was promised a calculator,
+  so the calculator is the first thing under the headline. The American Iron
+  illustration stays unshipped; using it would also need a web export, as
+  the master is a 3.6 MB 4K PNG.
+- **From 1024px the login page is two panels:** the form keeps its column
+  and the space beside it is Rig Green with the reversed lockup. Phones keep
+  the single column they always had.
+- **One Profit Green action per screen.** Signed out that is "Save my
+  numbers"; the header's Create Account is dark and the pitch's is
+  secondary. Profit Green is an action or earned money, never decoration —
+  which is also why the hero's second line and its ticks are Rig Green.
+
 ## Ask ProfitRig — how it is protected
 
 The browser sends one question and nothing else; the server decides
@@ -131,10 +151,14 @@ everything (`src/lib/aiGuard.ts` holds the rules, and they are tested).
 - Cancellation is best effort: Vercel usually lets a request finish, so an
   abandoned answer may still complete. Do not claim otherwise.
 
-## Still to do on the identity
+## Still open
 
-- **Phase 5:** signed-out and marketing surfaces (VisitorPitch, login,
-  landing). The PWA theme colour and the wordmark vector are done.
+- The design rollout is **complete**: every screen, signed in and signed
+  out, is on the system. There is no Phase 6.
+- The Phase 1 compatibility colour aliases (`--brand`, `--brand-dark`,
+  `--brand-soft`, `text-muted`, `border-border`) are still used by about
+  thirty files, including the shared components. Retiring them is its own
+  task and needs approval; it is not a side effect of anything else.
 - The Admin view of `ai_usage` is not built. Sebastian's own test chat and
   its 12 usage rows are deliberately still in the database.
 - Supabase "Confirm email" is still unverified. Do not enable it before
