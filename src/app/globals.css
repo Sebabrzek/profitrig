@@ -1451,192 +1451,109 @@ input[type="number"] {
 }
 
 /* =========================================================================
-   THE HERO (Phase 4, revised)
-   Ivory paper with an engraving emerging out of it — not a photograph with
-   a green overlay. There is no scrim here: the copy sits on the paper field
-   and the plate keeps its own ivory sky, so the two are one surface.
+   THE HERO (Phase 4)
+   One continuous illustrated composition on ivory paper — not a text column
+   beside a picture. The plate spans the whole field; its left side dissolves
+   into the paper so the copy can sit on open ground, and the mountains, road
+   and engraving lines carry faintly across behind the words.
 
-   The transition between them is made of the engraving language itself.
-   Four bands of ivory hatching, each with a looser duty cycle than the last,
-   dissolve the plate's edge into the field in hard-edged steps. It is line
-   work, not a smooth alpha ramp, and it costs nothing at runtime.
+   There is no mask and no filter here. The dissolve is baked into the
+   plate's own alpha channel as an irregular, noise-driven stipple across the
+   middle third, so at runtime this is just an image on a coloured surface.
+   Nothing to composite, nothing to repaint.
    ========================================================================= */
 @layer components {
   :root {
-    /* Read off the artwork's own sky (median rgb(244,241,227)), so the field
-       and the plate are literally the same paper. Not a new brand colour:
-       Off White is still the product's surface everywhere else. */
+    /* Read off the artwork's own sky, so the paper the copy sits on and the
+       paper in the illustration are the same paper. */
     --pr-hero-ivory: #f4f1e3;
     /* The product's muted grey was mixed for Off White and lands at 4.39:1
-       on this warmer paper — just under AA at 14px. This is Charcoal eased
-       back toward the paper instead: 6.6:1, and still clearly secondary. */
+       on this warmer stock — under AA at 14px. Charcoal eased back toward
+       the paper instead: 6.6:1, and still clearly secondary. */
     --pr-hero-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-hero-ivory));
-    --pr-hero-seam: 96px;
   }
 
   .pr-hero {
     position: relative;
+    isolation: isolate;
     background: var(--pr-hero-ivory);
     overflow: clip;
   }
 
-  .pr-hero-copy {
-    padding-inline: var(--pr-space-4);
-  }
-  @media (min-width: 640px) {
-    .pr-hero-copy {
-      padding-inline: var(--pr-space-8);
-    }
-  }
-  .pr-hero-copy-inner {
-    max-width: 34rem;
-    padding-block: var(--pr-space-8) var(--pr-space-12);
-  }
-
   .pr-hero-plate {
-    position: relative;
-    aspect-ratio: 16 / 9;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
   }
-  .pr-hero-plate picture,
   .pr-hero-plate img {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    /* Weight to the lower right: the tractor keeps the corner, the sky is
+       what gets trimmed when the field is shallow. */
+    /* Any trimming takes sky off the top, never the tractor off the side. */
+    object-position: right bottom;
   }
 
-  /* Phones: the plate is a band under the copy, so the truck is never
-     behind the headline. The dissolve runs along its top edge. */
-  .pr-hero-seam {
-    position: absolute;
-    inset-inline: 0;
-    top: 0;
-    height: calc(var(--pr-hero-seam) * 0.6);
-    pointer-events: none;
-    background-repeat: no-repeat;
-    background-size: 100% 25%;
-    background-position:
-      0 0,
-      0 33.34%,
-      0 66.67%,
-      0 100%;
-    background-image:
-      repeating-linear-gradient(
-        180deg,
-        var(--pr-hero-ivory) 0 6px,
-        transparent 6px 8px
-      ),
-      repeating-linear-gradient(
-        180deg,
-        var(--pr-hero-ivory) 0 4px,
-        transparent 4px 8px
-      ),
-      repeating-linear-gradient(
-        180deg,
-        var(--pr-hero-ivory) 0 2.5px,
-        transparent 2.5px 8px
-      ),
-      repeating-linear-gradient(
-        180deg,
-        var(--pr-hero-ivory) 0 1px,
-        transparent 1px 8px
-      );
+  .pr-hero-copy {
+    position: relative;
+    z-index: 1;
+    padding-block: var(--pr-space-10) var(--pr-space-12);
+  }
+  .pr-hero-copy-inner {
+    max-width: 34rem;
   }
 
-  @media (min-width: 1024px) {
-    .pr-hero-body {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
-      align-items: stretch;
-      min-height: 560px;
+  /* Phones: the plate leaves the background and becomes a band under the
+     copy, so nothing sits behind the headline. Its own top edge dissolves
+     into the same paper. */
+  .pr-hero-band {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    margin-top: calc(var(--pr-space-6) * -1);
+  }
+  .pr-hero-band img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center bottom;
+  }
+
+  /* The full composition needs a wide frame: below 1280px the hero would
+     have to be cropped horizontally to fill its height, and that drags the
+     tractor back under the headline. Narrower screens get the band instead,
+     which is the same plate framed on the tractor. */
+  @media (min-width: 1280px) {
+    .pr-hero {
+      display: flex;
+      flex-direction: column;
+      /* Track the plate's own 2.18:1 so it is never cropped sideways. */
+      min-height: clamp(560px, 45.9vw, 780px);
     }
     .pr-hero-copy {
+      flex: 1;
       display: flex;
       align-items: center;
-      /* Left edge lines up with the page's content column. */
-      padding-left: max(var(--pr-space-8), calc((100vw - 1120px) / 2));
-      padding-right: var(--pr-space-10);
+      padding-block: var(--pr-space-16);
     }
     .pr-hero-copy-inner {
-      padding-block: var(--pr-space-12);
+      max-width: 41rem;
     }
-    /* The hero headline shares its row with the plate, so it runs a step
-       below the full marketing-hero size. The closing band, which has the
-       width to itself, keeps the larger setting. */
+    /* Big enough to be the page's statement, small enough that "KNOW YOUR
+       NUMBERS." stays on one line. */
     .pr-hero .pr-mk-h1 {
-      font-size: 52px;
+      font-size: 56px;
     }
   }
-  @media (min-width: 1280px) {
+  @media (min-width: 1600px) {
     .pr-hero .pr-mk-h1 {
-      font-size: 60px;
+      font-size: 64px;
     }
-    .pr-hero-plate {
-      aspect-ratio: auto;
-    }
-    .pr-hero-plate img {
-      /* Hold the truck as the plate narrows: the open valley crops away
-         before the tractor does, and a few per cent off the left keeps air
-         around the bumper rather than pinning it to the edge. */
-      object-position: 6% center;
-    }
-    /* The dissolve turns vertical, running down the plate's left edge. */
-    .pr-hero-seam {
-      inset-block: 0;
-      inset-inline: auto;
-      left: 0;
-      width: var(--pr-hero-seam);
-      height: auto;
-      background-size: 25% 100%;
-      background-position:
-        0 0,
-        33.34% 0,
-        66.67% 0,
-        100% 0;
-      background-image:
-        repeating-linear-gradient(
-          90deg,
-          var(--pr-hero-ivory) 0 6px,
-          transparent 6px 8px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          var(--pr-hero-ivory) 0 4px,
-          transparent 4px 8px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          var(--pr-hero-ivory) 0 2.5px,
-          transparent 2.5px 8px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          var(--pr-hero-ivory) 0 1px,
-          transparent 1px 8px
-        );
-    }
-  }
-
-  /* One set of Rig Green hairlines over the dissolve, at a tenth strength:
-     enough to read as engraved rather than merely faded. */
-  .pr-hero-seam::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    opacity: 0.06;
-    background-image: repeating-linear-gradient(
-      180deg,
-      var(--pr-rig-green) 0 1px,
-      transparent 1px 9px
-    );
-  }
-  @media (min-width: 1024px) {
-    .pr-hero-seam::after {
-      background-image: repeating-linear-gradient(
-        90deg,
-        var(--pr-rig-green) 0 1px,
-        transparent 1px 9px
-      );
+    .pr-hero-copy-inner {
+      max-width: 46rem;
     }
   }
 }

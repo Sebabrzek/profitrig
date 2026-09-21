@@ -12,7 +12,7 @@ import { Wordmark } from "@/components/Wordmark";
  */
 export function MarketingHeader() {
   return (
-    <header className="pr-mk-inner flex flex-wrap items-center gap-x-3 gap-y-3 pt-5 pb-2 sm:pt-6">
+    <header className="pr-mk-inner relative z-10 flex flex-wrap items-center gap-x-3 gap-y-3 pt-5 pb-2 sm:pt-6">
       <Link
         href="/"
         aria-label="ProfitRig home"
