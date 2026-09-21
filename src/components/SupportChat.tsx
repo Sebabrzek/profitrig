@@ -87,7 +87,8 @@ export function SupportChat() {
     };
   }, [open, historyLoaded]);
 
-  // Closing the chat stops the answer — and stops paying for it.
+  // Closing the chat drops the answer. It also asks the server to stop
+  // generating, though the host may let that request finish.
   useEffect(() => {
     if (!open) answerRef.current?.abort();
   }, [open]);

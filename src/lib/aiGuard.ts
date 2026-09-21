@@ -174,6 +174,26 @@ export function screenUserMessage(message: string): ScreenResult {
 // ─────────────────────────────────────────────────────────────────────
 
 export type StoredMessage = { role: string; content: string };
+
+/** A stored row as the database hands it back. */
+export type StoredRow = StoredMessage & { created_at?: string; id?: string };
+
+/**
+ * Stored messages in the order they were said: oldest first, and a question
+ * ahead of the answer it got. Two rows can share a timestamp to the
+ * millisecond (several questions sent at once), so the id breaks any
+ * remaining tie — the same rows always come back in the same order.
+ */
+export function orderStoredMessages<T extends StoredRow>(rows: T[]): T[] {
+  const rank = (role: string) => (role === "assistant" ? 1 : 0);
+  return [...rows].sort((a, b) => {
+    const byTime = (a.created_at ?? "").localeCompare(b.created_at ?? "");
+    if (byTime !== 0) return byTime;
+    const byRole = rank(a.role) - rank(b.role);
+    if (byRole !== 0) return byRole;
+    return (a.id ?? "").localeCompare(b.id ?? "");
+  });
+}
 export type ModelMessage = { role: "user" | "assistant"; content: string };
 
 /**

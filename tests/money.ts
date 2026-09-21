@@ -119,6 +119,7 @@ import {
   buildConversation,
   estimateCostUsd,
   limitsForPlan,
+  orderStoredMessages,
   screenUserMessage,
   validateUserMessage,
 } from "../src/lib/aiGuard";
@@ -1394,6 +1395,51 @@ check(
         "new"
       );
       return c[1].content.length === 1200;
+    })()
+  );
+}
+{
+  // Several questions can land in the same millisecond (a driver tapping
+  // fast, or a burst). The order they come back in must never wander.
+  const t = "2026-09-21T14:00:00.000Z";
+  const sameMs = [
+    { id: "f", role: "assistant", content: "a2", created_at: t },
+    { id: "c", role: "user", content: "q2", created_at: t },
+    { id: "a", role: "user", content: "q1", created_at: t },
+    { id: "d", role: "assistant", content: "a1", created_at: t },
+  ];
+  const ordered = orderStoredMessages(sameMs).map((m) => m.content).join(",");
+  check(
+    "messages saved in the same millisecond come back questions-first, always in the same order",
+    ordered === "q1,q2,a1,a2" &&
+      orderStoredMessages([...sameMs].reverse()).map((m) => m.content).join(",") === ordered,
+    ordered
+  );
+  check(
+    "ordinary messages stay in the order they were said",
+    orderStoredMessages([
+      { id: "z", role: "assistant", content: "second", created_at: "2026-09-21T14:00:02.000Z" },
+      { id: "a", role: "user", content: "first", created_at: "2026-09-21T14:00:01.000Z" },
+    ])
+      .map((m) => m.content)
+      .join(",") === "first,second"
+  );
+  check(
+    "ordering a stored conversation keeps each answer with its question",
+    (() => {
+      const convo = buildConversation(
+        orderStoredMessages([
+          { id: "b", role: "assistant", content: "answer one", created_at: t },
+          { id: "a", role: "user", content: "question one", created_at: t },
+        ]),
+        "next"
+      );
+      return (
+        convo.length === 3 &&
+        convo[0].content === "question one" &&
+        convo[1].content === "answer one" &&
+        convo[2].content === "next"
+      );
     })()
   );
 }

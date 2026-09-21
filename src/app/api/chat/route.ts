@@ -15,6 +15,7 @@ import {
   estimateCostUsd,
   estimateOutputTokens,
   limitsForPlan,
+  orderStoredMessages,
   screenUserMessage,
   validateUserMessage,
   type Plan,
@@ -173,18 +174,21 @@ export async function POST(request: Request) {
   ).toISOString();
   const { data: priorRows, error: historyError } = await admin
     .from("support_chats")
-    .select("role,content")
+    .select("id,role,content,created_at")
     .eq("user_id", user.id)
     .eq("trusted", true)
     .gte("created_at", since)
+    // Newest first to take the last few, then put back in the order they
+    // were said. The id keeps rows saved in the same millisecond stable.
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(CHAT_CONTEXT_MESSAGES * 2);
   if (historyError) {
     // A missing history is a worse answer, not a wrong one: carry on.
     console.error("ask-profitrig: could not read history", historyError);
   }
   const conversation = buildConversation(
-    (priorRows ?? []).slice().reverse(),
+    orderStoredMessages(priorRows ?? []),
     message
   );
 
@@ -224,7 +228,9 @@ export async function POST(request: Request) {
       ],
       messages: conversation,
     },
-    // Stops generating (and billing) if the driver closes the chat.
+    // Best effort: if the platform tells us the driver left, stop
+    // generating. Vercel usually lets a request finish, so an abandoned
+    // answer may complete — capped at CHAT_MAX_TOKENS, and still recorded.
     { signal: request.signal }
   );
 
@@ -293,7 +299,8 @@ export async function POST(request: Request) {
       }
     },
     async cancel() {
-      // The driver closed the chat: stop the model mid-sentence.
+      // The driver closed the chat. Ask the provider to stop; whether it
+      // does depends on the platform reporting the disconnect at all.
       messageStream.abort();
       if (settled) return;
       settled = true;
