@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOutAction } from "@/app/actions";
+import { ButtonLink } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 
 /**
@@ -21,20 +22,25 @@ export function AccountActions({
   isAdmin?: boolean;
 }) {
   if (!signedIn) {
+    // Dark, not Profit Green: the signed-out page already has one green
+    // action in the bar at the foot of the calculator, and a screen gets
+    // one obvious primary.
     return (
       <div className="flex items-center gap-2">
         <Link
           href="/login"
-          className="inline-flex items-center min-h-11 -my-2.5 text-sm font-semibold text-brand hover:text-brand-dark whitespace-nowrap"
+          className="inline-flex items-center min-h-11 -my-2.5 text-sm font-semibold text-[var(--pr-rig-green)] hover:text-[var(--pr-action-dark-hover)] whitespace-nowrap"
         >
           Sign In
         </Link>
-        <Link
+        <ButtonLink
           href="/login"
-          className="inline-flex items-center justify-center h-9 px-3 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-bold whitespace-nowrap"
+          variant="dark"
+          size="sm"
+          className="whitespace-nowrap"
         >
           Create Account
-        </Link>
+        </ButtonLink>
       </div>
     );
   }

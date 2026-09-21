@@ -1,24 +1,27 @@
-import Link from "next/link";
+import { ButtonLink } from "@/components/ui/Button";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
 
 /**
  * Conversion section shown to signed-out visitors BELOW the calculator.
  * By this point they've seen their own number — this is the "now what?"
  * moment, so it pitches the paid tracker rather than re-explaining the
  * calculator.
+ *
+ * The plan panel is flat Rig Green: a dark surface carries meaning here
+ * (what Pro is), and gradients are not part of the system. The price is
+ * Satoshi, not JetBrains Mono — mono is what a driver's own operating
+ * numbers look like, and what ProfitRig charges is not one of them.
  */
 export function VisitorPitch() {
   return (
     <div className="mt-6 space-y-4">
-      <div className="bg-white border border-border rounded-2xl p-5">
-        <h2 className="text-xl font-black leading-tight">
-          You know your number. Now make sure every load beats it.
-        </h2>
-        <p className="text-sm text-muted mt-1.5 leading-snug">
-          Knowing your cost per mile is step one. ProfitRig Pro tracks what
-          you actually made, load by load, so the number stops being a guess.
-        </p>
+      <Card>
+        <CardHeader
+          title="You know your number. Now make sure every load beats it."
+          description="Knowing your cost per mile is step one. ProfitRig Pro tracks what you actually made, load by load, so the number stops being a guess."
+        />
 
-        <ul className="mt-4 space-y-3.5">
+        <ul className="space-y-3.5">
           <Feature title="Every load, real profit">
             Log a load in under a minute. See what you truly cleared after
             fuel, tolls, lumpers, and that load&apos;s share of your monthly
@@ -38,31 +41,32 @@ export function VisitorPitch() {
             answer without digging through a help site.
           </Feature>
         </ul>
-      </div>
+      </Card>
 
-      <div className="bg-gradient-to-br from-brand to-brand-dark text-white rounded-2xl p-5">
-        <p className="text-xs uppercase tracking-wider opacity-80 font-semibold">
+      <section className="rounded-[var(--pr-radius-card)] bg-[var(--pr-surface-dark)] text-white p-4 sm:p-5 lg:p-6">
+        <p className="font-display text-xs font-bold uppercase tracking-[0.12em] text-[var(--pr-sage)]">
           ProfitRig Pro
         </p>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0 mt-1">
-          <span className="text-4xl font-black leading-none">$99</span>
-          <span className="text-base font-semibold opacity-90">/ year</span>
-          <span className="text-sm opacity-75">or $9.99 / month</span>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0 mt-2">
+          <span className="font-display text-[length:var(--pr-text-3xl)] font-bold leading-none tracking-tight">
+            $99
+          </span>
+          <span className="font-display text-base font-bold">/ year</span>
+          <span className="text-sm text-[var(--pr-sage)]">
+            or $9.99 / month
+          </span>
         </div>
-        <p className="text-sm mt-2 opacity-90 leading-snug">
+        <p className="text-sm mt-3 leading-snug text-white/90">
           Try it free for 7 days. Cancel any time from your profile — no
           phone call, no runaround.
         </p>
-        <Link
-          href="/login"
-          className="mt-4 h-12 w-full inline-flex items-center justify-center rounded-xl bg-white text-brand-dark font-bold hover:bg-brand-soft transition"
-        >
+        <ButtonLink href="/login" variant="secondary" block className="mt-5">
           Create free account
-        </Link>
-        <p className="text-xs opacity-75 mt-2 text-center">
+        </ButtonLink>
+        <p className="text-xs text-[var(--pr-sage)] mt-2.5 text-center">
           The calculator stays free either way.
         </p>
-      </div>
+      </section>
     </div>
   );
 }
@@ -76,7 +80,7 @@ function Feature({
 }) {
   return (
     <li className="flex gap-3">
-      <span className="shrink-0 mt-0.5 text-brand">
+      <span className="shrink-0 mt-0.5 text-[var(--pr-rig-green)]">
         <svg
           width="18"
           height="18"
@@ -86,12 +90,13 @@ function Feature({
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
+          aria-hidden="true"
         >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </span>
       <div>
-        <p className="text-sm font-bold leading-snug">{title}</p>
+        <p className="font-display text-sm font-bold leading-snug">{title}</p>
         <p className="text-sm text-muted leading-snug mt-0.5">{children}</p>
       </div>
     </li>
