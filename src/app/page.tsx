@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <main id="main-content">
+    <main id="main-content" className="pr-mk-page">
       <Hero />
       <ValueStrip />
       <LoadsSection />

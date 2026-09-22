@@ -86,7 +86,7 @@ export function Hero() {
       </div>
 
       <div className="pr-hero-below pr-mk-inner">
-        <p className="pr-mk-lead pr-hero-note max-w-[34rem] text-[var(--pr-hero-muted)]">
+        <p className="pr-mk-lead pr-hero-note max-w-[34rem] text-[var(--pr-mk-paper-muted)]">
           What a mile really costs, what a load really paid, and what is left
           at the end of the week.
         </p>
@@ -102,7 +102,7 @@ export function Hero() {
             Use Free Calculator
           </ButtonLink>
         </div>
-        <p className="pr-hero-note mt-4 max-w-[34rem] text-sm text-[var(--pr-hero-muted)]">
+        <p className="pr-hero-note mt-4 max-w-[34rem] text-sm text-[var(--pr-mk-paper-muted)]">
           The calculator is free and needs no account.
         </p>
       </div>

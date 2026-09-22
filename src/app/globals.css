@@ -1168,6 +1168,23 @@ input[type="number"] {
      3  micro texture — the currency line under a band
    ========================================================================= */
 @layer components {
+  :root {
+    /* The marketing canvas. Warm ivory, read off the hero artwork's own
+       paper, and the default behind every light marketing section — not a
+       hero-only background. The product's Off White stays the product's:
+       cards, demo frames and the application itself are unchanged. */
+    --pr-mk-paper: #f9f5e9;
+    /* The product's muted grey is mixed for Off White and lands at 4.56:1 on
+       this warmer stock — passing, but with nothing spare. Supporting copy
+       that sits directly on the paper uses Charcoal eased back instead. */
+    --pr-mk-paper-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-mk-paper));
+  }
+
+  /* One sheet. Light sections inherit it; the dark bands paint over it. */
+  .pr-mk-page {
+    background: var(--pr-mk-paper);
+  }
+
   /* Full-bleed band inside a normal page container. */
   .pr-mk-band {
     position: relative;
@@ -1404,44 +1421,6 @@ input[type="number"] {
 }
 
 /* =========================================================================
-   THE OPENING, AND WHERE IT ENDS
-   The hero and the five-item strip are one composition on one sheet of
-   paper. The strip therefore sits on the hero's ivory, not on the product's
-   Off White, and the space between them is closed up rather than left as a
-   section break.
-
-   The handoff out of it is a printed rule, not a fade: two interfering
-   engraved waves — the guilloché of a banknote border — laid horizontally
-   across the full width. It is the moment American Iron resolves into the
-   product interface, so it is a mark of punctuation, not decoration. No
-   gradient, no filter, no animation; one tiling SVG and a hairline.
-   ========================================================================= */
-@layer components {
-  .pr-opening {
-    background: var(--pr-hero-ivory);
-  }
-
-  .pr-opening-divider {
-    height: 26px;
-    margin-top: var(--pr-space-10);
-    border-top: 1px solid color-mix(in srgb, var(--pr-sage) 45%, transparent);
-    background-repeat: repeat-x;
-    background-position: center top;
-    background-size: 200px 26px;
-    /* Two mirrored waves crossing at fixed intervals — the lens figure a
-       banknote border is built from. */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='26'%3E%3Cg fill='none' stroke='%23173C2B' stroke-width='0.7'%3E%3Cpath d='M0 13C25 4 75 4 100 13S175 22 200 13'/%3E%3Cpath d='M0 13C25 22 75 22 100 13S175 4 200 13'/%3E%3C/g%3E%3C/svg%3E");
-    opacity: 0.38;
-  }
-
-  @media (forced-colors: active) {
-    .pr-opening-divider {
-      background-image: none;
-    }
-  }
-}
-
-/* =========================================================================
    THE MONEY ACTION
    One treatment, one button: "+ Add a Load". Profit Green underneath, a
    white label on top, and a currency-line guilloché at about 8% presence —
@@ -1505,17 +1484,10 @@ input[type="number"] {
    so the headline sits above the tractor in normal order.
    ========================================================================= */
 @layer components {
-  :root {
-    /* The plate's own paper, so its knocked-out ground and its shadow sit on
-       an identical surface. */
-    --pr-hero-ivory: #f9f5e9;
-    --pr-hero-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-hero-ivory));
-  }
-
   .pr-hero {
     position: relative;
     isolation: isolate;
-    background: var(--pr-hero-ivory);
+    background: var(--pr-mk-paper);
     overflow: clip;
   }
 

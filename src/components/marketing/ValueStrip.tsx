@@ -1,13 +1,11 @@
 /**
  * The five things ProfitRig does, said in five words.
  *
- * It sits on the hero's ivory rather than the product's Off White, and close
- * under it, because the hero and this strip are one opening composition —
- * the statement, then what the statement is about. It is type and a Sage
- * rule and nothing else: no card, no shadow, no panel.
- *
- * The engraved rule at the foot of it is where the opening ends and the
- * product interface begins.
+ * It sits close under the hero, because the two are one opening composition
+ * — the statement, then what the statement is about. It is type and a Sage
+ * rule and nothing else: no card, no shadow, no panel, and no separator.
+ * The whole marketing page is one sheet of paper now, so there is no seam
+ * here to mark.
  */
 const ITEMS = [
   { label: "Real costs", note: "What a mile actually costs you" },
@@ -19,7 +17,7 @@ const ITEMS = [
 
 export function ValueStrip() {
   return (
-    <section className="pr-mk-band pr-opening">
+    <section className="pr-mk-band">
       <div className="pr-mk-inner pt-7 pb-10 sm:pt-11 sm:pb-14">
         <ul className="pr-mk-strip">
           {ITEMS.map((i) => (
@@ -31,7 +29,6 @@ export function ValueStrip() {
             </li>
           ))}
         </ul>
-        <div className="pr-opening-divider" aria-hidden="true" />
       </div>
     </section>
   );
