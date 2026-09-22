@@ -31,7 +31,20 @@ export type Load = {
  */
 export function loadFromRow(r: Record<string, unknown>): Load {
   const num = (v: unknown) => Number(v) || 0;
-  const optional = (v: unknown) => (v == null ? null : Number(v));
+  // A value that is present but not a usable number is treated as absent,
+  // not as zero. Absent means "estimate this one", which is what a blank
+  // field has always meant; zero would assert the load truly cost nothing
+  // and understate its cost. Without the finite check a malformed figure
+  // reached the arithmetic as NaN and turned a load's whole total, and the
+  // week's, into NaN.
+  const optional = (v: unknown) => {
+    if (v == null) return null;
+    // Blank text is absent, not zero: JavaScript reads "" as 0, which would
+    // claim the load truly cost nothing and overstate its profit.
+    if (typeof v === "string" && v.trim() === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
   return {
     id: (r.id as string | undefined) ?? undefined,
     load_date: String(r.load_date ?? ""),
@@ -52,13 +65,29 @@ export function loadFromRow(r: Record<string, unknown>): Load {
 }
 
 /**
- * A carrier percentage the math can trust. Anything that is not a number
- * strictly between 0 and 100 counts as 0 — the driver keeps the whole load —
- * rather than producing negative or runaway revenue.
+ * A carrier percentage the math can trust.
+ *
+ * A percentage that is not a usable number at all — missing, blank, NaN,
+ * text — counts as 0: no split was recorded, so the driver keeps the load.
+ * That is the independent driver's case and it is the only safe reading of
+ * "we don't know".
+ *
+ * Everything else is clamped into 0–100 rather than discarded. A value at or
+ * above 100 used to fall back to 0, which handed the driver the WHOLE load
+ * instead of none of it — an out-of-range percentage overstating revenue, the
+ * one direction that makes a losing load look acceptable. It is now capped at
+ * 100, which zeroes the driver's share instead. A negative percentage is
+ * floored at 0 for the same reason: a negative cut would pay the driver more
+ * than the load did.
+ *
+ * Note the save paths are stricter still and reject anything at or above 100
+ * (app/actions.ts, LoadForm) — this is the last line, for rows that reach the
+ * math some other way.
  */
 export function effectiveCarrierPct(pct: unknown): number {
   const n = Number(pct);
-  return Number.isFinite(n) && n > 0 && n < 100 ? n : 0;
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n > 100 ? 100 : n;
 }
 
 export const EMPTY_LOAD: Load = {

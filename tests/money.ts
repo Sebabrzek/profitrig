@@ -609,8 +609,9 @@ check(
   loadFromRow({ load_date: "2026-08-10", linehaul_pay: 1940 }).carrier_pct === null
 );
 check(
-  "a % outside 0–100 can't invent or destroy revenue",
-  [150, 100, -5, Number.NaN, "abc", null].every((bad) => effectiveCarrierPct(bad) === 0) && effectiveCarrierPct(20) === 20
+  "a % that is not a number at all means no split was recorded",
+  [Number.NaN, "abc", null, undefined, ""].every((bad) => effectiveCarrierPct(bad) === 0) &&
+    effectiveCarrierPct(20) === 20
 );
 check(
   "the tax report still shows what the loads paid, until the 1099 question is settled",
@@ -1800,6 +1801,171 @@ for (const l of independentYear) independentShare += computeLoadEconomics(l, pro
 check(
   "an independent driver sees the same revenue on both screens",
   Math.abs(aggregateRevenue(independentYear).total - independentShare) < 1e-9
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("An out-of-range carrier % can never hand the driver more than the load");
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The save paths reject anything at or above 100 ("Carrier % must be between
+ * 0 and 99"), so this is the last line of defence for a row that reaches the
+ * math some other way. What matters is the DIRECTION of the fallback: a bad
+ * percentage must never leave the driver with more than they earned.
+ *
+ * Before the fix, 100 and above fell back to 0 — the driver kept the whole
+ * load instead of none of it.
+ */
+const pctCases: [unknown, number, string][] = [
+  [0, 0, "no split"],
+  [20, 20, "an ordinary lease split"],
+  [99, 99, "the highest the save paths allow"],
+  [100, 100, "the boundary — the carrier takes it all"],
+  [150, 100, "above 100 is capped, not discarded"],
+  [1e9, 100, "absurdly high is still capped"],
+  [-5, 0, "negative is floored"],
+  [-1e9, 0, "absurdly negative is still floored"],
+  [Number.POSITIVE_INFINITY, 0, "Infinity is not a number we can use"],
+  [Number.NEGATIVE_INFINITY, 0, "-Infinity is not a number we can use"],
+  [Number.NaN, 0, "NaN means nothing was recorded"],
+  [null, 0, "null means nothing was recorded"],
+  ["20", 20, "a numeric string still counts"],
+  ["abc", 0, "text means nothing was recorded"],
+];
+let pctWrong = 0;
+for (const [input, expected, why] of pctCases) {
+  const got = effectiveCarrierPct(input);
+  if (got !== expected) {
+    pctWrong++;
+    check(`carrier % ${JSON.stringify(input)} — ${why}`, false, `expected ${expected}, got ${got}`);
+  }
+}
+check(
+  `every carrier % lands in range (${pctCases.length} cases)`,
+  pctWrong === 0
+);
+
+// The financial consequence, not just the number.
+const fullCut = computeLoadEconomics(load({ carrier_pct: 100 }), profile);
+const overCut = computeLoadEconomics(load({ carrier_pct: 150 }), profile);
+const noCut = computeLoadEconomics(load({ carrier_pct: null }), profile);
+check(
+  "at a 100% split the driver's revenue is zero, not the whole load",
+  fullCut.revenue === 0 && fullCut.carrierCut === fullCut.loadPay
+);
+check(
+  "at a 100% split the load is a loss of exactly its costs",
+  Math.abs(fullCut.profit + fullCut.totalCost) < 1e-9 && fullCut.profit < 0
+);
+check(
+  "a percentage above 100 is treated as 100, never as none",
+  overCut.revenue === 0 && overCut.revenue !== noCut.revenue
+);
+check(
+  "no carrier percentage can pay a driver more than the load did",
+  [0, 1, 20, 99, 100, 150, 1e9, -5, Number.NaN, null, "abc"].every((pct) => {
+    const e = computeLoadEconomics(load({ carrier_pct: pct as number | null }), profile);
+    return e.revenue <= e.loadPay + 1e-9 && e.revenue >= -1e-9 && Number.isFinite(e.revenue);
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("A malformed figure in the database cannot turn a load into NaN");
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * loadFromRow's required fields already fell back to 0 for unusable values.
+ * The optional ones — fuel, tolls, lumpers, carrier % — did not, so a single
+ * malformed figure produced NaN cost, NaN profit, and a NaN week total that
+ * would have reached the screen and the CSV.
+ *
+ * They now read as absent, which is the same as a blank field: estimate it.
+ */
+const MALFORMED: unknown[] = [
+  "not a number", "", "  ", "12.3.4", "$140", "NaN", "Infinity", "-Infinity",
+  Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, {},
+];
+
+let leaked = 0;
+let notAbsent = 0;
+for (const bad of MALFORMED) {
+  for (const field of ["fuel_actual", "tolls_actual", "lumpers_actual", "carrier_pct"]) {
+    const row = loadFromRow({
+      load_date: "2026-09-01",
+      loaded_miles: 500,
+      deadhead_miles: 50,
+      linehaul_pay: 1500,
+      [field]: bad,
+    });
+    const value = (row as unknown as Record<string, unknown>)[field];
+    // Every value in MALFORMED is unusable as a figure, so every one of them
+    // must read as absent.
+    if (value !== null) notAbsent++;
+
+    const e = computeLoadEconomics(row, profile);
+    for (const v of [
+      e.loadPay, e.carrierCut, e.revenue, e.fuelCost, e.tollsCost, e.lumpersCost,
+      e.maintenanceCost, e.tiresCost, e.defCost, e.driverPayCost,
+      e.allocatedFixedCost, e.totalCost, e.profit, e.rpm, e.cpm, e.profitPerMile,
+    ]) {
+      if (!Number.isFinite(v)) leaked++;
+    }
+  }
+}
+check(
+  `a malformed optional figure reads as absent (${MALFORMED.length} values x 4 fields)`,
+  notAbsent === 0,
+  notAbsent ? `${notAbsent} kept an unusable value` : ""
+);
+check(
+  "no malformed figure can produce NaN or Infinity in a load's totals",
+  leaked === 0,
+  leaked ? `${leaked} bad values leaked` : ""
+);
+
+// The specific row from the audit, end to end.
+const auditRow = loadFromRow({
+  load_date: "2026-09-01",
+  loaded_miles: "not a number",
+  linehaul_pay: 1500,
+  fuel_actual: "not a number",
+});
+const auditEcon = computeLoadEconomics(auditRow, profile);
+check(
+  "the row that produced NaN cost and NaN profit no longer does",
+  auditRow.loaded_miles === 0 &&
+    auditRow.fuel_actual === null &&
+    Number.isFinite(auditEcon.totalCost) &&
+    Number.isFinite(auditEcon.profit)
+);
+check(
+  "a malformed fuel figure falls back to the estimate, not to free fuel",
+  computeLoadEconomics(
+    loadFromRow({ load_date: "2026-09-01", loaded_miles: 500, deadhead_miles: 50, linehaul_pay: 1500, fuel_actual: "oops" }),
+    profile
+  ).fuelCost ===
+    computeLoadEconomics(
+      loadFromRow({ load_date: "2026-09-01", loaded_miles: 500, deadhead_miles: 50, linehaul_pay: 1500 }),
+      profile
+    ).fuelCost
+);
+
+// A malformed row must not poison the week it sits in.
+const poisoned = aggregateWeek(
+  [
+    load(),
+    loadFromRow({ load_date: "2026-08-05", loaded_miles: 300, linehaul_pay: 900, tolls_actual: "bad" }),
+    loadFromRow({ load_date: "2026-08-04", loaded_miles: 400, linehaul_pay: 1100, lumpers_actual: "bad" }),
+  ],
+  profile,
+  undefined,
+  0,
+  fridayNight
+);
+check(
+  "a week containing a malformed row still totals to real money",
+  [poisoned.revenue, poisoned.totalCost, poisoned.profit, poisoned.rpm, poisoned.cpm].every(Number.isFinite) &&
+    poisoned.loads === 3
 );
 
 // ─────────────────────────────────────────────────────────────────────
