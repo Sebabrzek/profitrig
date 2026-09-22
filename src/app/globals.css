@@ -1452,24 +1452,19 @@ input[type="number"] {
 
 /* =========================================================================
    THE HERO (Phase 4)
-   One continuous illustrated composition on ivory paper — not a text column
-   beside a picture. The plate spans the whole field; its left side dissolves
-   into the paper so the copy can sit on open ground, and the mountains, road
-   and engraving lines carry faintly across behind the words.
+   FinalHero1 is the locked hero artwork. The fade from engraving into open
+   paper is part of the illustration itself, so there is nothing here that
+   masks, dissolves, tints or overlays it: the plate is placed, and the page
+   behind it is set to the artwork's own paper so the bleed is seamless.
 
-   There is no mask and no filter here. The dissolve is baked into the
-   plate's own alpha channel as an irregular, noise-driven stipple across the
-   middle third, so at runtime this is just an image on a coloured surface.
-   Nothing to composite, nothing to repaint.
+   The copy sits on the quiet ivory the artwork leaves on the left.
    ========================================================================= */
 @layer components {
   :root {
-    /* Read off the artwork's own sky, so the paper the copy sits on and the
-       paper in the illustration are the same paper. */
-    --pr-hero-ivory: #f4f1e3;
-    /* The product's muted grey was mixed for Off White and lands at 4.39:1
-       on this warmer stock — under AA at 14px. Charcoal eased back toward
-       the paper instead: 6.6:1, and still clearly secondary. */
+    /* Read off FinalHero1's own left third, so page and plate are one sheet. */
+    --pr-hero-ivory: #f9f7ed;
+    /* The product's muted grey was mixed for Off White and drops below AA on
+       this warmer stock. Charcoal eased back toward the paper instead. */
     --pr-hero-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-hero-ivory));
   }
 
@@ -1491,10 +1486,7 @@ input[type="number"] {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    /* Weight to the lower right: the tractor keeps the corner, the sky is
-       what gets trimmed when the field is shallow. */
-    /* Any trimming takes sky off the top, never the tractor off the side. */
-    object-position: right bottom;
+    object-position: right center;
   }
 
   .pr-hero-copy {
@@ -1506,12 +1498,11 @@ input[type="number"] {
     max-width: 34rem;
   }
 
-  /* Phones: the plate leaves the background and becomes a band under the
-     copy, so nothing sits behind the headline. Its own top edge dissolves
-     into the same paper. */
+  /* Phones: the plate becomes a band under the copy, framed on the tractor,
+     because a phone has no room for the open paper the desktop copy uses. */
   .pr-hero-band {
     position: relative;
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 1052 / 660;
     margin-top: calc(var(--pr-space-6) * -1);
   }
   .pr-hero-band img {
@@ -1519,41 +1510,46 @@ input[type="number"] {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center bottom;
   }
 
-  /* The full composition needs a wide frame: below 1280px the hero would
-     have to be cropped horizontally to fill its height, and that drags the
-     tractor back under the headline. Narrower screens get the band instead,
-     which is the same plate framed on the tractor. */
-  @media (min-width: 1280px) {
+  @media (min-width: 1024px) {
     .pr-hero {
       display: flex;
       flex-direction: column;
-      /* Track the plate's own 2.18:1 so it is never cropped sideways. */
-      min-height: clamp(560px, 45.9vw, 780px);
+      /* Tracks the plate's height below, so the artwork is shown whole —
+         never cropped, in either direction. */
+      min-height: clamp(480px, 38.8vw, 700px);
+    }
+    /* The plate keeps its own 16:9 and sits against the bottom right at 69%
+       of the width. It is not cropped and not scaled oddly; it simply starts
+       further in, which widens the open paper the copy reads on. Its own
+       left edge is this exact ivory, so nothing shows where it begins. */
+    .pr-hero-plate {
+      inset: auto 0 0 auto;
+      width: 69%;
+      aspect-ratio: 1672 / 941;
     }
     .pr-hero-copy {
       flex: 1;
       display: flex;
-      align-items: center;
-      padding-block: var(--pr-space-16);
+      /* High, not centred: the artwork's open paper is widest along its top
+         edge and narrows as the hills rise, so the copy reads on cleaner
+         ground up here. */
+      align-items: flex-start;
+      padding-block: var(--pr-space-10) var(--pr-space-16);
     }
-    .pr-hero-copy-inner {
-      max-width: 41rem;
-    }
-    /* Big enough to be the page's statement, small enough that "KNOW YOUR
-       NUMBERS." stays on one line. */
+    /* Sized so "KNOW YOUR NUMBERS." stays on one line and still ends before
+       the engraving begins. */
     .pr-hero .pr-mk-h1 {
-      font-size: 56px;
+      font-size: 42px;
     }
   }
-  @media (min-width: 1600px) {
-    .pr-hero .pr-mk-h1 {
-      font-size: 64px;
-    }
+  @media (min-width: 1280px) {
     .pr-hero-copy-inner {
-      max-width: 46rem;
+      max-width: 38rem;
+    }
+    .pr-hero .pr-mk-h1 {
+      font-size: 48px;
     }
   }
 }

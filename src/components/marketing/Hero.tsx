@@ -2,35 +2,31 @@ import { ButtonLink } from "@/components/ui/Button";
 import { MarketingHeader } from "./MarketingHeader";
 
 /**
- * LEVEL 1 — one engraved composition, printed on ivory paper.
+ * LEVEL 1 — the locked hero artwork, FinalHero1.
  *
- * The plate is not a picture beside the copy: it spans the whole hero and
- * dissolves into the page toward the left, so the mountains, road and
- * engraving lines carry faintly across behind the words and there is no
- * edge where "the image starts". That dissolve is baked into the plate's
- * own alpha channel — an irregular, noise-driven stipple across the middle
- * third of the frame — so nothing masks or filters anything at runtime.
+ * The plate is placed and nothing is done to it: no mask, no dissolve, no
+ * scrim, no tint, no mirror, no crop on the desktop frame. The fade from
+ * engraving into open paper is drawn into the illustration itself, and the
+ * page behind it is set to that same paper (#F9F7ED, read off the artwork's
+ * own left third), so the plate bleeds into the page with no edge anywhere.
  *
- * The artwork is mirrored from the approved master so the tractor holds the
- * lower right and the valley opens under the copy. Proportions are
- * untouched; only the handedness changes.
+ * The copy sits on the quiet ivory the artwork already leaves on the left.
+ * Everything readable is live: lockup, navigation, headline, paragraph and
+ * both buttons. Nothing is baked into the image.
  *
- * Everything readable is live: the lockup, the navigation, the headline, the
- * paragraph and both buttons. Nothing is baked into the image.
- *
- * On a phone the plate leaves the background and becomes a band beneath the
- * copy, its top edge dissolving into the same paper, so the headline and
- * both calls to action come first with nothing behind them.
+ * On a phone the plate becomes a band beneath the copy, framed on the
+ * tractor — a phone has no room to spend on the open paper the desktop copy
+ * needs — so the headline and both calls to action come first.
  */
 
 const PLATE_AVIF =
-  "/brand/hero-plate-1200.avif 1200w, /brand/hero-plate-1700.avif 1700w, /brand/hero-plate-2100.avif 2100w";
+  "/brand/hero-final-900.avif 900w, /brand/hero-final-1200.avif 1200w, /brand/hero-final-1672.avif 1672w";
 const PLATE_WEBP =
-  "/brand/hero-plate-1200.webp 1200w, /brand/hero-plate-1700.webp 1700w, /brand/hero-plate-2100.webp 2100w";
+  "/brand/hero-final-900.webp 900w, /brand/hero-final-1200.webp 1200w, /brand/hero-final-1672.webp 1672w";
 const BAND_AVIF =
-  "/brand/hero-plate-mobile-640.avif 640w, /brand/hero-plate-mobile-960.avif 960w, /brand/hero-plate-mobile-1220.avif 1220w";
+  "/brand/hero-final-mobile-640.avif 640w, /brand/hero-final-mobile-900.avif 900w, /brand/hero-final-mobile-1052.avif 1052w";
 const BAND_WEBP =
-  "/brand/hero-plate-mobile-640.webp 640w, /brand/hero-plate-mobile-960.webp 960w, /brand/hero-plate-mobile-1220.webp 1220w";
+  "/brand/hero-final-mobile-640.webp 640w, /brand/hero-final-mobile-900.webp 900w, /brand/hero-final-mobile-1052.webp 1052w";
 
 const PLATE_ALT =
   "A custom long-hood tractor and trailer on a mountain highway, drawn as an engraving.";
@@ -39,15 +35,15 @@ export function Hero() {
   return (
     <section className="pr-hero">
       {/* Desktop: the plate is the field the copy sits on. */}
-      <div className="pr-hero-plate hidden xl:block" aria-hidden="true">
+      <div className="pr-hero-plate hidden lg:block" aria-hidden="true">
         <picture>
           <source type="image/avif" sizes="100vw" srcSet={PLATE_AVIF} />
           <source type="image/webp" sizes="100vw" srcSet={PLATE_WEBP} />
           <img
-            src="/brand/hero-plate-1700.webp"
+            src="/brand/hero-final-1200.webp"
             alt=""
-            width={2394}
-            height={1097}
+            width={1672}
+            height={941}
             decoding="async"
             fetchPriority="high"
           />
@@ -64,7 +60,7 @@ export function Hero() {
             <br />
             Take control.
           </h1>
-          <p className="pr-mk-lead mt-5 max-w-[26rem] text-[var(--pr-hero-muted)]">
+          <p className="pr-mk-lead mt-5 max-w-[21rem] text-[var(--pr-hero-muted)]">
             What a mile really costs, what a load really paid, and what is
             left at the end of the week.
           </p>
@@ -80,22 +76,22 @@ export function Hero() {
               Use Free Calculator
             </ButtonLink>
           </div>
-          <p className="mt-4 max-w-[26rem] text-sm text-[var(--pr-hero-muted)]">
+          <p className="mt-4 max-w-[21rem] text-sm text-[var(--pr-hero-muted)]">
             The calculator is free and needs no account.
           </p>
         </div>
       </div>
 
       {/* Phones: the same plate, framed on the tractor, under the copy. */}
-      <div className="pr-hero-band xl:hidden">
+      <div className="pr-hero-band lg:hidden">
         <picture>
           <source type="image/avif" sizes="100vw" srcSet={BAND_AVIF} />
           <source type="image/webp" sizes="100vw" srcSet={BAND_WEBP} />
           <img
-            src="/brand/hero-plate-mobile-960.webp"
+            src="/brand/hero-final-mobile-900.webp"
             alt={PLATE_ALT}
-            width={1220}
-            height={687}
+            width={1052}
+            height={660}
             decoding="async"
             fetchPriority="high"
           />
