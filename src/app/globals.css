@@ -1404,6 +1404,44 @@ input[type="number"] {
 }
 
 /* =========================================================================
+   THE OPENING, AND WHERE IT ENDS
+   The hero and the five-item strip are one composition on one sheet of
+   paper. The strip therefore sits on the hero's ivory, not on the product's
+   Off White, and the space between them is closed up rather than left as a
+   section break.
+
+   The handoff out of it is a printed rule, not a fade: two interfering
+   engraved waves — the guilloché of a banknote border — laid horizontally
+   across the full width. It is the moment American Iron resolves into the
+   product interface, so it is a mark of punctuation, not decoration. No
+   gradient, no filter, no animation; one tiling SVG and a hairline.
+   ========================================================================= */
+@layer components {
+  .pr-opening {
+    background: var(--pr-hero-ivory);
+  }
+
+  .pr-opening-divider {
+    height: 26px;
+    margin-top: var(--pr-space-10);
+    border-top: 1px solid color-mix(in srgb, var(--pr-sage) 45%, transparent);
+    background-repeat: repeat-x;
+    background-position: center top;
+    background-size: 200px 26px;
+    /* Two mirrored waves crossing at fixed intervals — the lens figure a
+       banknote border is built from. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='26'%3E%3Cg fill='none' stroke='%23173C2B' stroke-width='0.7'%3E%3Cpath d='M0 13C25 4 75 4 100 13S175 22 200 13'/%3E%3Cpath d='M0 13C25 22 75 22 100 13S175 4 200 13'/%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.38;
+  }
+
+  @media (forced-colors: active) {
+    .pr-opening-divider {
+      background-image: none;
+    }
+  }
+}
+
+/* =========================================================================
    THE MONEY ACTION
    One treatment, one button: "+ Add a Load". Profit Green underneath, a
    white label on top, and a currency-line guilloché at about 8% presence —
@@ -1505,7 +1543,7 @@ input[type="number"] {
     position: relative;
     z-index: 2;
     text-align: center;
-    padding-bottom: var(--pr-space-12);
+    padding-bottom: var(--pr-space-8);
   }
   .pr-hero-below .pr-mk-lead,
   .pr-hero-below .pr-hero-note {
