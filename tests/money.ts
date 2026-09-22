@@ -71,6 +71,7 @@ import {
   formatWeekLabel,
   isoDate,
   loadFromRow,
+  loadMonthKey,
   monthRangeForWeek,
   monthStatsByLoad,
   parseDateParam,
@@ -1459,6 +1460,346 @@ check(
     estimateCostUsd("some-other-model", { input_tokens: 1000 }) === 0 &&
     AI_PRICING["claude-haiku-4-5"].inputPerMTok === 1 &&
     AI_PRICING["claude-haiku-4-5"].outputPerMTok === 5
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("One cost formula, several implementations: they must not drift");
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The fixed-cost sum and the cost-per-mile formula are written out four
+ * times in this codebase: computeCalculatorTotals (lib/calculatorTotals),
+ * computeTotals (app/actions, for snapshots), sumFixedMonthly (lib/loads,
+ * reached through computeLoadEconomics) and an inline copy in the Admin
+ * page. Four hand-written copies of one number is four chances to drift,
+ * and a driver's cost per mile is the number everything else is built on.
+ *
+ * These checks run the real implementations against each other over a wide
+ * spread of profiles rather than one driver's numbers, so a divergence
+ * shows up here instead of in somebody's tax records.
+ */
+
+/** Deterministic pseudo-random, so a failure is always reproducible. */
+function seeded(n: number): () => number {
+  let s = n >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function profileSpread(count: number): CostProfile[] {
+  const rnd = seeded(20260921);
+  const out: CostProfile[] = [];
+  // The ordinary case, then the edges that break naive arithmetic.
+  out.push(profile);
+  out.push({ ...profile, monthly_miles: 0 });
+  out.push({ ...profile, mpg: 0 });
+  out.push({ ...profile, monthly_miles: 0, mpg: 0 });
+  out.push({
+    ...profile,
+    truck_payment: 0, trailer_payment: 0, insurance: 0, eld_subscriptions: 0,
+    permits_irp_ifta: 0, office_misc: 0, load_board_per_month: 0,
+    other_monthly_bill: 0,
+  });
+  while (out.length < count) {
+    const money = () => Math.round(rnd() * 400000) / 100;
+    const rate = () => Math.round(rnd() * 200) / 100;
+    out.push({
+      truck_payment: money(), trailer_payment: money(), insurance: money(),
+      eld_subscriptions: money(), permits_irp_ifta: money(), office_misc: money(),
+      load_board_per_month: money(), other_monthly_bill: money(),
+      other_label: "",
+      monthly_miles: Math.round(rnd() * 20000),
+      mpg: Math.round(rnd() * 900) / 100,
+      fuel_price_per_gallon: Math.round(rnd() * 800) / 100,
+      maintenance_per_mile: rate(), tires_per_mile: rate(), def_per_mile: rate(),
+      driver_pay_per_mile: rate(), tolls_misc_per_mile: rate(),
+      desired_profit_per_mile: rate(),
+      real_cpm_override: null,
+    });
+  }
+  return out;
+}
+
+const spread = profileSpread(400);
+const NEAR = 1e-9;
+
+// A load with nothing entered and no month context prices every mile from
+// the saved profile alone, which is exactly what the calculator quotes.
+const plainLoad = load({ loaded_miles: 400, deadhead_miles: 100 });
+
+let cpmDrift = 0;
+let worstCpm = { at: -1, calc: 0, load: 0 };
+let fixedDrift = 0;
+let worstFixed = { at: -1, calc: 0, load: 0 };
+let staleCopyDrift = 0;
+
+spread.forEach((p, i) => {
+  const calc = computeCalculatorTotals(p);
+  const e = computeLoadEconomics(plainLoad, p);
+
+  // What a mile costs, quoted by the calculator vs charged to a load.
+  if (Math.abs(calc.computedCPM - e.cpm) > NEAR) {
+    cpmDrift++;
+    if (Math.abs(calc.computedCPM - e.cpm) > Math.abs(worstCpm.calc - worstCpm.load)) {
+      worstCpm = { at: i, calc: calc.computedCPM, load: e.cpm };
+    }
+  }
+
+  // Recover the fixed sum loads.ts actually used from what it allocated.
+  if (p.monthly_miles > 0) {
+    const loadsFixed = (e.allocatedFixedCost * p.monthly_miles) / e.totalMiles;
+    if (Math.abs(calc.fixed - loadsFixed) > 1e-6) {
+      fixedDrift++;
+      if (Math.abs(calc.fixed - loadsFixed) > Math.abs(worstFixed.calc - worstFixed.load)) {
+        worstFixed = { at: i, calc: calc.fixed, load: loadsFixed };
+      }
+    }
+  }
+
+  // The copy of the formula written inside THIS test file, which an older
+  // check compares against. If it drifts from the real implementation that
+  // check silently starts guarding nothing.
+  if (Math.abs(calculatorCPM(p) - calc.computedCPM) > NEAR) staleCopyDrift++;
+});
+
+check(
+  `the calculator and a load agree on cost per mile across ${spread.length} profiles`,
+  cpmDrift === 0,
+  cpmDrift === 0
+    ? ""
+    : `${cpmDrift} disagree, worst $${worstCpm.calc.toFixed(6)} vs $${worstCpm.load.toFixed(6)}`
+);
+check(
+  "the calculator and a load agree on the monthly fixed-cost sum",
+  fixedDrift === 0,
+  fixedDrift === 0
+    ? ""
+    : `${fixedDrift} disagree, worst $${worstFixed.calc.toFixed(4)} vs $${worstFixed.load.toFixed(4)}`
+);
+check(
+  "this file's own copy of the formula still matches the real one",
+  staleCopyDrift === 0,
+  staleCopyDrift === 0 ? "" : `${staleCopyDrift} profiles disagree`
+);
+
+// The snapshot writer deliberately ignores a manual override, because
+// cost_profile_snapshots has no column for it. Pin that difference so it
+// stays a decision rather than becoming a surprise.
+const withOverride: CostProfile = { ...profile, real_cpm_override: 1.42 };
+const overrideTotals = computeCalculatorTotals(withOverride);
+check(
+  "a manual override changes what the calculator reports",
+  overrideTotals.totalCPM === 1.42 &&
+    overrideTotals.computedCPM !== 1.42 &&
+    overrideTotals.requiredRate === 1.42 + withOverride.desired_profit_per_mile
+);
+check(
+  "a manual override does not change what a load is charged",
+  Math.abs(
+    computeLoadEconomics(plainLoad, withOverride).cpm -
+      computeLoadEconomics(plainLoad, profile).cpm
+  ) < NEAR
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("Every figure adds up to its own parts");
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Arithmetic that must hold for every load and every week, whatever the
+ * inputs: a total is the sum of its parts, profit is revenue less cost, and
+ * nothing is ever NaN or Infinity. These are the failures that would put a
+ * wrong number in front of a driver without anything looking broken.
+ */
+const loadSpread: Load[] = [];
+{
+  const rnd = seeded(773311);
+  loadSpread.push(load());
+  loadSpread.push(load({ loaded_miles: 0, deadhead_miles: 0 }));
+  loadSpread.push(load({ loaded_miles: 0, deadhead_miles: 0, linehaul_pay: 0 }));
+  loadSpread.push(load({ fuel_actual: 0, tolls_actual: 0, lumpers_actual: 0 }));
+  loadSpread.push(load({ carrier_pct: 100 }));
+  loadSpread.push(load({ carrier_pct: 0 }));
+  while (loadSpread.length < 200) {
+    const pick = <T,>(...xs: T[]) => xs[Math.floor(rnd() * xs.length)];
+    loadSpread.push(
+      load({
+        loaded_miles: Math.round(rnd() * 2500),
+        deadhead_miles: Math.round(rnd() * 400),
+        linehaul_pay: Math.round(rnd() * 600000) / 100,
+        fuel_surcharge: Math.round(rnd() * 40000) / 100,
+        accessorials: Math.round(rnd() * 20000) / 100,
+        fuel_actual: pick(null, 0, Math.round(rnd() * 90000) / 100),
+        tolls_actual: pick(null, 0, Math.round(rnd() * 20000) / 100),
+        lumpers_actual: pick(null, 0, Math.round(rnd() * 30000) / 100),
+        carrier_pct: pick(null, 0, 18, 20, 25, 100),
+      })
+    );
+  }
+}
+
+let partsDrift = 0;
+let notFinite = 0;
+let revenueDrift = 0;
+let profitDrift = 0;
+let perMileDrift = 0;
+
+for (const p of spread.slice(0, 40)) {
+  for (const l of loadSpread) {
+    const e = computeLoadEconomics(l, p);
+
+    for (const v of [
+      e.totalMiles, e.deadheadPct, e.loadPay, e.carrierCut, e.revenue,
+      e.fuelCost, e.maintenanceCost, e.tiresCost, e.defCost, e.driverPayCost,
+      e.allocatedFixedCost, e.tollsCost, e.lumpersCost, e.totalCost,
+      e.profit, e.rpm, e.cpm, e.profitPerMile,
+    ]) {
+      if (!Number.isFinite(v)) notFinite++;
+    }
+
+    if (Math.abs(e.revenue - (e.loadPay - e.carrierCut)) > NEAR) revenueDrift++;
+
+    const parts =
+      e.fuelCost + e.maintenanceCost + e.tiresCost + e.defCost +
+      e.driverPayCost + e.allocatedFixedCost + e.tollsCost + e.lumpersCost;
+    if (Math.abs(e.totalCost - parts) > NEAR) partsDrift++;
+
+    if (Math.abs(e.profit - (e.revenue - e.totalCost)) > NEAR) profitDrift++;
+
+    if (e.totalMiles > 0) {
+      if (Math.abs(e.rpm * e.totalMiles - e.revenue) > 1e-6) perMileDrift++;
+      if (Math.abs(e.cpm * e.totalMiles - e.totalCost) > 1e-6) perMileDrift++;
+    } else if (e.rpm !== 0 || e.cpm !== 0 || e.profitPerMile !== 0) {
+      perMileDrift++;
+    }
+  }
+}
+
+const combos = spread.slice(0, 40).length * loadSpread.length;
+check(`no load figure is ever NaN or Infinity (${combos} combinations)`, notFinite === 0, notFinite ? `${notFinite} bad values` : "");
+check("a load's revenue is its pay less the carrier's cut", revenueDrift === 0, revenueDrift ? `${revenueDrift} disagree` : "");
+check("a load's total cost is the sum of its named costs", partsDrift === 0, partsDrift ? `${partsDrift} disagree` : "");
+check("a load's profit is its revenue less its total cost", profitDrift === 0, profitDrift ? `${profitDrift} disagree` : "");
+check("per-mile figures multiply back to their totals", perMileDrift === 0, perMileDrift ? `${perMileDrift} disagree` : "");
+
+// A week must be exactly the sum of the loads inside it.
+let weekDrift = 0;
+const weekSamples: Load[][] = [
+  [],
+  [loadSpread[1]],
+  week,
+  midWeek,
+  loadSpread.slice(0, 9),
+  loadSpread.slice(20, 41),
+];
+for (const p of spread.slice(0, 12)) {
+  for (const ls of weekSamples) {
+    const stats = monthStatsByLoad(ls);
+    const w = aggregateWeek(ls, p, stats, 137.25, fridayNight);
+    let revenue = 0, loadPay = 0, carrierCut = 0, cost = 0, miles = 0;
+    for (const l of ls) {
+      const own = Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
+      const s = stats.get(loadMonthKey(l.load_date));
+      const e = computeLoadEconomics(
+        l,
+        p,
+        s ? buildMtdContext(l.load_date, Math.max(0, s.miles - own), s.firstDay, fridayNight) : undefined
+      );
+      revenue += e.revenue; loadPay += e.loadPay; carrierCut += e.carrierCut;
+      cost += e.totalCost; miles += e.totalMiles;
+    }
+    const bad =
+      Math.abs(w.revenue - revenue) > NEAR ||
+      Math.abs(w.loadPay - loadPay) > NEAR ||
+      Math.abs(w.carrierCut - carrierCut) > NEAR ||
+      Math.abs(w.loadCost - cost) > NEAR ||
+      Math.abs(w.totalMiles - miles) > NEAR ||
+      w.totalMiles !== w.loadedMiles + w.deadheadMiles ||
+      Math.abs(w.totalCost - (w.loadCost + w.roadExpenses)) > NEAR ||
+      Math.abs(w.profit - (w.revenue - w.totalCost)) > NEAR ||
+      w.loads !== ls.length ||
+      !Number.isFinite(w.rpm) || !Number.isFinite(w.cpm) || !Number.isFinite(w.profit);
+    if (bad) weekDrift++;
+  }
+}
+check(
+  `a week is exactly the sum of its loads (${spread.slice(0, 12).length * weekSamples.length} weeks)`,
+  weekDrift === 0,
+  weekDrift ? `${weekDrift} weeks disagree` : ""
+);
+
+const emptyWeek = aggregateWeek([], profile, monthStatsByLoad([]), 0, fridayNight);
+check(
+  "a week with no loads is all zeros, not NaN",
+  emptyWeek.loads === 0 && emptyWeek.revenue === 0 && emptyWeek.totalCost === 0 &&
+    emptyWeek.profit === 0 && emptyWeek.rpm === 0 && emptyWeek.cpm === 0 &&
+    emptyWeek.deadheadPct === 0
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("Loads and Tax describe revenue differently — on purpose, by exactly the carrier's cut");
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The Loads tab reports a leased driver's SHARE of a load. The tax report
+ * reports the load's GROSS pay, because what belongs in Box 1 of a 1099 is
+ * still an open question (docs/phase0-carrier-pay.md, D4). So the same year
+ * of the same loads shows two different revenue figures on two screens.
+ *
+ * That is a decision, not a defect — but it is worth exactly the carrier's
+ * cut and nothing else. These checks pin that, so if the two ever drift
+ * apart by some other amount it is caught here rather than by an accountant.
+ */
+function leasedYear(pct: number | null): Load[] {
+  const out: Load[] = [];
+  for (let i = 0; i < 60; i++) {
+    out.push(
+      load({
+        load_date: `2026-${String((i % 12) + 1).padStart(2, "0")}-15`,
+        loaded_miles: 900 + i,
+        deadhead_miles: 80,
+        linehaul_pay: 1800 + i * 7,
+        fuel_surcharge: 140,
+        accessorials: 45,
+        carrier_pct: pct,
+      })
+    );
+  }
+  return out;
+}
+
+for (const pct of [null, 0, 18, 20, 25]) {
+  const ls = leasedYear(pct);
+  const stats = monthStatsByLoad(ls);
+  const taxGross = aggregateRevenue(ls).total;
+  let share = 0;
+  let cuts = 0;
+  for (const l of ls) {
+    const own = Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
+    const st = stats.get(loadMonthKey(l.load_date));
+    const e = computeLoadEconomics(
+      l,
+      profile,
+      st ? buildMtdContext(l.load_date, Math.max(0, st.miles - own), st.firstDay, fridayNight) : undefined
+    );
+    share += e.revenue;
+    cuts += e.carrierCut;
+  }
+  check(
+    `at ${pct === null ? "no" : pct + "%"} carrier split, Tax exceeds Loads by exactly the cut`,
+    Math.abs(taxGross - share - cuts) < 1e-9,
+    `tax $${taxGross.toFixed(2)} − loads $${share.toFixed(2)} = $${(taxGross - share).toFixed(2)}, cut $${cuts.toFixed(2)}`
+  );
+}
+
+const independentYear = leasedYear(null);
+let independentShare = 0;
+for (const l of independentYear) independentShare += computeLoadEconomics(l, profile).revenue;
+check(
+  "an independent driver sees the same revenue on both screens",
+  Math.abs(aggregateRevenue(independentYear).total - independentShare) < 1e-9
 );
 
 // ─────────────────────────────────────────────────────────────────────
