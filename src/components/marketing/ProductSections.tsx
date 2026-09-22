@@ -188,7 +188,6 @@ export function FuelSection() {
 export function TaxSection() {
   return (
     <Band>
-      <hr className="pr-mk-rule mb-14 opacity-40" />
       <div className="pr-mk-split pr-mk-split-ui-left">
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">

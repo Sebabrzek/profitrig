@@ -1175,14 +1175,24 @@ input[type="number"] {
        cards, demo frames and the application itself are unchanged. */
     --pr-mk-paper: #f9f5e9;
     /* The product's muted grey is mixed for Off White and lands at 4.56:1 on
-       this warmer stock — passing, but with nothing spare. Supporting copy
-       that sits directly on the paper uses Charcoal eased back instead. */
-    --pr-mk-paper-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-mk-paper));
+       this warmer stock — passing, with nothing spare. Marketing prose on the
+       paper uses Charcoal eased back toward it instead: 5.3:1, comfortably
+       clear rather than barely over the line. */
+    --pr-mk-paper-muted: color-mix(in srgb, var(--pr-text) 70%, var(--pr-mk-paper));
   }
 
   /* One sheet. Light sections inherit it; the dark bands paint over it. */
   .pr-mk-page {
     background: var(--pr-mk-paper);
+    /* Secondary marketing copy on this page reads against the paper, so it
+       is rebound here rather than globally — the application keeps the
+       product's own muted grey. */
+    --muted: var(--pr-mk-paper-muted);
+  }
+  /* Inside a demo frame we are showing the real interface, so it keeps the
+     real interface's greys. */
+  .pr-mk-page .pr-mk-screen {
+    --muted: var(--pr-text-muted);
   }
 
   /* Full-bleed band inside a normal page container. */
@@ -1397,20 +1407,6 @@ input[type="number"] {
     .pr-mk-screen {
       padding: var(--pr-space-5);
     }
-  }
-
-  /* LEVEL 3 — micro texture. Engraved currency lines, barely there, used
-     to close a band rather than to decorate a surface. */
-  .pr-mk-rule {
-    height: 10px;
-    border: 0;
-    margin: 0;
-    opacity: 0.5;
-    background-image: repeating-linear-gradient(
-      90deg,
-      var(--pr-sage) 0 1px,
-      transparent 1px 7px
-    );
   }
 
   /* LEVEL 2 — accent. A small engraved detail beside a marketing figure. */

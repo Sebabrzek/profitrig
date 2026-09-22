@@ -18,7 +18,7 @@ const ITEMS = [
 export function ValueStrip() {
   return (
     <section className="pr-mk-band">
-      <div className="pr-mk-inner pt-7 pb-10 sm:pt-11 sm:pb-14">
+      <div className="pr-mk-inner pt-7 pb-5 sm:pt-11 sm:pb-6">
         <ul className="pr-mk-strip">
           {ITEMS.map((i) => (
             <li key={i.label} className="pr-mk-strip-item">
