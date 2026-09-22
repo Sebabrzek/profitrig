@@ -1452,20 +1452,25 @@ input[type="number"] {
 
 /* =========================================================================
    THE HERO (Phase 4)
-   HERO2edited is the hero artwork: a centred engraved tractor on open paper,
-   its edges already faded to that same paper. Nothing here masks, dissolves,
-   tints or overlays it — the plate is placed and the page behind it is set to
-   the artwork's own stock, so its edges disappear into the page.
+   Hero4edited is a studio portrait of the tractor on plain paper, so the
+   hero is built as a poster rather than a landscape: the statement is set
+   large across the top, the tractor stands in front of it, and the actions
+   sit on clean paper beneath.
 
-   The truck is centred, so the copy is too: it sits in the open sky above,
-   which the artwork keeps almost entirely free of ink.
+   The layering is the point. The plate's background has been knocked out to
+   transparency — the drawing itself is untouched — so the headline can sit
+   BEHIND the exhaust stacks. Across the plate's top quarter the only ink is
+   two stacks about 2% of the width each and two hair-thin antennas, which
+   is narrow enough to read as depth rather than as an obstruction.
+
+   Phones get no overlap: at that size the stacks would cross the type badly,
+   so the headline sits above the tractor in normal order.
    ========================================================================= */
 @layer components {
   :root {
-    /* The artwork's own paper. */
-    --pr-hero-ivory: #f9f7ed;
-    /* The product's muted grey drops below AA on this warmer stock; Charcoal
-       eased back toward the paper instead. */
+    /* The plate's own paper, so its knocked-out ground and its shadow sit on
+       an identical surface. */
+    --pr-hero-ivory: #f9f5e9;
     --pr-hero-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-hero-ivory));
   }
 
@@ -1476,79 +1481,82 @@ input[type="number"] {
     overflow: clip;
   }
 
-  .pr-hero-plate {
-    position: absolute;
-    inset: auto 0 0 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-  .pr-hero-plate img {
-    display: block;
-    /* Capped rather than bled edge to edge. The artwork's own edges are
-       already faded to this paper, so stopping short shows no boundary — and
-       holding it back keeps more pixels per inch in the linework, and leaves
-       more sky above for the copy. */
-    width: min(100%, 1280px);
-    height: auto;
+  /* The stage holds the words and the tractor in the same coordinate space,
+     so the overlap is fixed to the artwork rather than to the viewport. */
+  .pr-hero-stage {
+    position: relative;
     margin-inline: auto;
+    width: min(92%, 1120px);
   }
-
-  .pr-hero-copy {
+  .pr-hero-truck {
     position: relative;
     z-index: 1;
-    padding-block: var(--pr-space-10) var(--pr-space-12);
-  }
-  .pr-hero-copy-inner {
-    max-width: 34rem;
-  }
-
-  /* Phones: the wide plate would leave the tractor tiny, so the band is a
-     crop framed on it, under the copy. */
-  .pr-hero-band {
-    position: relative;
-    aspect-ratio: 854 / 615;
-    margin-top: calc(var(--pr-space-4) * -1);
-  }
-  .pr-hero-band img {
     display: block;
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
+  }
+  .pr-hero-words {
+    position: relative;
+    z-index: 0;
+    text-align: center;
   }
 
-  @media (min-width: 1024px) {
-    .pr-hero {
-      /* Room for the plate at its own 2.4:1 against the bottom, plus the sky
-         the copy needs above it. */
-      /* The stacks rise well above the cab, so the sky allowance is set
-         against them rather than against the average clean zone. */
-      min-height: clamp(620px, calc(min(100vw, 1280px) / 2.4 + 330px), 900px);
-    }
-    .pr-hero-copy {
-      text-align: center;
-      padding-block: var(--pr-space-10) var(--pr-space-16);
-    }
-    .pr-hero-copy-inner {
-      margin-inline: auto;
-      max-width: 44rem;
-    }
-    .pr-hero-copy-inner .pr-mk-lead,
-    .pr-hero-copy-inner .pr-hero-note {
-      margin-inline: auto;
-    }
+  .pr-hero-below {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding-bottom: var(--pr-space-12);
+  }
+  .pr-hero-below .pr-mk-lead,
+  .pr-hero-below .pr-hero-note {
+    margin-inline: auto;
+  }
+  .pr-hero-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pr-space-3);
+    margin-top: var(--pr-space-6);
+  }
+
+  @media (min-width: 640px) {
     .pr-hero-actions {
+      flex-direction: row;
       justify-content: center;
+      align-items: center;
+    }
+  }
+
+  /* From here the words move up behind the tractor. Everything above the
+     cab roof — the plate's top quarter — is open paper but for the stacks. */
+  @media (min-width: 1024px) {
+    /* Drop the whole stage so the statement is not crowding the navigation;
+       the words and the tractor move together, which keeps the headline's
+       clearance over the cab roof exactly where it was measured. */
+    .pr-hero-stage {
+      margin-top: var(--pr-space-8);
+    }
+    .pr-hero-words {
+      position: absolute;
+      inset-inline: 0;
+      top: 0;
+    }
+    .pr-hero-words-inner {
+      margin-inline: auto;
+      max-width: 46rem;
     }
     .pr-hero .pr-mk-h1 {
-      font-size: 48px;
+      font-size: 44px;
+    }
+    .pr-hero-below {
+      margin-top: calc(var(--pr-space-4) * -1);
     }
   }
   @media (min-width: 1280px) {
     .pr-hero .pr-mk-h1 {
-      font-size: 56px;
+      font-size: 52px;
     }
-    .pr-hero-copy-inner {
-      max-width: 48rem;
+    .pr-hero-words-inner {
+      max-width: 52rem;
     }
   }
 }

@@ -2,99 +2,109 @@ import { ButtonLink } from "@/components/ui/Button";
 import { MarketingHeader } from "./MarketingHeader";
 
 /**
- * LEVEL 1 — the hero artwork, HERO2edited.
+ * LEVEL 1 — the hero, built as a poster around Hero4edited.
  *
- * The plate is placed and nothing is done to it: no mask, no dissolve, no
- * scrim, no tint, no mirror. Its edges are already faded to its own paper,
- * and the page behind it is set to that same stock (#F9F7ED), so the plate
- * has no edge anywhere — it simply stops being ink.
+ * The artwork is a studio portrait of the tractor on plain paper, not a
+ * landscape, so there is no scene to sit inside. Instead the statement is
+ * set across the top, the tractor stands in front of it, and the actions sit
+ * on clean paper beneath.
  *
- * The tractor is centred, so the copy is centred above it, in the open sky
- * the artwork keeps almost free of ink (0.00% across its top third). Every
- * word and control is live HTML; nothing is baked into the image.
+ * From 1024px the headline is behind the truck. The plate's background has
+ * been knocked out to transparency — the drawing is untouched — and across
+ * its top quarter the only ink is two exhaust stacks roughly 2% of the width
+ * each, plus two hair-thin antennas. They cross the words the way a real
+ * object crosses something behind it, which is the whole idea.
  *
- * On a phone the plate becomes a band beneath the copy, cropped close on the
- * tractor — at 2.4:1 the full plate would leave it too small to read — so
- * the headline and both calls to action come first.
+ * Phones get the plain order: headline, tractor, actions. At that width the
+ * stacks would cut the type instead of layering with it.
+ *
+ * Everything readable is live HTML. Nothing is baked into the image.
  */
 
-const PLATE_AVIF =
-  "/brand/hero2-1000.avif 1000w, /brand/hero2-1400.avif 1400w, /brand/hero2-1942.avif 1942w";
-const PLATE_WEBP =
-  "/brand/hero2-1000.webp 1000w, /brand/hero2-1400.webp 1400w, /brand/hero2-1942.webp 1942w";
-const BAND_AVIF =
-  "/brand/hero2-mobile-560.avif 560w, /brand/hero2-mobile-840.avif 840w, /brand/hero2-mobile-1080.avif 1080w";
-const BAND_WEBP =
-  "/brand/hero2-mobile-560.webp 560w, /brand/hero2-mobile-840.webp 840w, /brand/hero2-mobile-1080.webp 1080w";
+const TRUCK_AVIF =
+  "/brand/hero4-truck-720.avif 720w, /brand/hero4-truck-1000.avif 1000w, /brand/hero4-truck-1400.avif 1400w";
+const TRUCK_WEBP =
+  "/brand/hero4-truck-720.webp 720w, /brand/hero4-truck-1000.webp 1000w, /brand/hero4-truck-1400.webp 1400w";
+const TRUCK_MOBILE_AVIF =
+  "/brand/hero4-truck-mobile-520.avif 520w, /brand/hero4-truck-mobile-780.avif 780w, /brand/hero4-truck-mobile-1040.avif 1040w";
+const TRUCK_MOBILE_WEBP =
+  "/brand/hero4-truck-mobile-520.webp 520w, /brand/hero4-truck-mobile-780.webp 780w, /brand/hero4-truck-mobile-1040.webp 1040w";
 
-const PLATE_ALT =
-  "A custom long-hood tractor and trailer on an open highway, drawn as an engraving.";
+const TRUCK_ALT =
+  "A custom long-hood conventional tractor, drawn as an engraving.";
 
 export function Hero() {
   return (
     <section className="pr-hero">
-      {/* Desktop: the plate sits against the bottom, the copy in its sky. */}
-      <div className="pr-hero-plate hidden lg:block" aria-hidden="true">
-        <picture>
-          <source type="image/avif" sizes="100vw" srcSet={PLATE_AVIF} />
-          <source type="image/webp" sizes="100vw" srcSet={PLATE_WEBP} />
-          <img
-            src="/brand/hero2-1400.webp"
-            alt=""
-            width={1942}
-            height={809}
-            decoding="async"
-            fetchPriority="high"
-          />
-        </picture>
-      </div>
-
       <MarketingHeader />
 
-      <div className="pr-hero-copy pr-mk-inner">
-        <div className="pr-hero-copy-inner">
-          <p className="pr-mk-eyebrow">American Iron × Financial Precision</p>
-          <h1 className="pr-mk-h1 mt-4 text-[var(--pr-rig-green)]">
-            Know your numbers.
-            <br />
-            Take control.
-          </h1>
-          <p className="pr-mk-lead pr-hero-note mt-5 max-w-[30rem] text-[var(--pr-hero-muted)]">
-            What a mile really costs, what a load really paid, and what is
-            left at the end of the week.
-          </p>
-          <div className="pr-hero-actions mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <ButtonLink href="/login" variant="primary" className="sm:w-auto">
-              Start Free
-            </ButtonLink>
-            <ButtonLink
-              href="/calculator"
-              variant="secondary"
-              className="sm:w-auto"
-            >
-              Use Free Calculator
-            </ButtonLink>
+      <div className="pr-hero-stage">
+        <div className="pr-hero-words">
+          <div className="pr-hero-words-inner">
+            <p className="pr-mk-eyebrow">American Iron × Financial Precision</p>
+            <h1 className="pr-mk-h1 mt-3 text-[var(--pr-rig-green)]">
+              Know your numbers.
+              <br />
+              Take control.
+            </h1>
           </div>
-          <p className="pr-hero-note mt-4 max-w-[30rem] text-sm text-[var(--pr-hero-muted)]">
-            The calculator is free and needs no account.
-          </p>
         </div>
-      </div>
 
-      {/* Phones: the tractor, framed close, under the copy. */}
-      <div className="pr-hero-band lg:hidden">
         <picture>
-          <source type="image/avif" sizes="100vw" srcSet={BAND_AVIF} />
-          <source type="image/webp" sizes="100vw" srcSet={BAND_WEBP} />
+          <source
+            type="image/avif"
+            media="(min-width: 1024px)"
+            sizes="min(92vw, 1120px)"
+            srcSet={TRUCK_AVIF}
+          />
+          <source
+            type="image/webp"
+            media="(min-width: 1024px)"
+            sizes="min(92vw, 1120px)"
+            srcSet={TRUCK_WEBP}
+          />
+          <source
+            type="image/avif"
+            sizes="92vw"
+            srcSet={TRUCK_MOBILE_AVIF}
+          />
+          <source
+            type="image/webp"
+            sizes="92vw"
+            srcSet={TRUCK_MOBILE_WEBP}
+          />
           <img
-            src="/brand/hero2-mobile-840.webp"
-            alt={PLATE_ALT}
-            width={854}
-            height={615}
+            className="pr-hero-truck"
+            src="/brand/hero4-truck-1000.webp"
+            alt={TRUCK_ALT}
+            width={1424}
+            height={771}
             decoding="async"
             fetchPriority="high"
           />
         </picture>
+      </div>
+
+      <div className="pr-hero-below pr-mk-inner">
+        <p className="pr-mk-lead pr-hero-note max-w-[34rem] text-[var(--pr-hero-muted)]">
+          What a mile really costs, what a load really paid, and what is left
+          at the end of the week.
+        </p>
+        <div className="pr-hero-actions">
+          <ButtonLink href="/login" variant="primary" className="sm:w-auto">
+            Start Free
+          </ButtonLink>
+          <ButtonLink
+            href="/calculator"
+            variant="secondary"
+            className="sm:w-auto"
+          >
+            Use Free Calculator
+          </ButtonLink>
+        </div>
+        <p className="pr-hero-note mt-4 max-w-[34rem] text-sm text-[var(--pr-hero-muted)]">
+          The calculator is free and needs no account.
+        </p>
       </div>
     </section>
   );
