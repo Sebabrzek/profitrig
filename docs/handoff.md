@@ -20,11 +20,17 @@ live. Every screen, signed in and signed out, is now on the system. What
 follows is Sebastian's call, and the business work is the carrier-pay order
 at the bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (21 Sep 2026)
+## Repository state (22 Sep 2026)
 
-- Production `main` = `origin/main` = Phase 5, live.
+- Production `main` = `origin/main` = `2f8b6ef` (Phase 5), live.
   `git log --oneline -3` is the truth; this file is a summary.
-- Nothing is waiting to be pushed or merged.
+- **Waiting to merge: `design/04-marketing`** — the marketing homepage and
+  the financial fixes, 11 commits ahead of `main`, latest `834c4a3`.
+  **Not merged, not in production.** The last two commits — `0270ff5` (the
+  calculation audit) and `834c4a3` (the two correctness fixes) — are **local
+  only**; the remote branch is still at `eba79e8`, so a push comes first.
+- The landing page is approved and ready for final push, merge and deploy
+  now that the financial patch is approved.
 - Merged branches kept on the remote: `design/03b-surfaces-hierarchy`,
   `design/03c-actions-inputs`, `design/03d-records-lists`,
   `feature/ai-guardrails`, `security/016-chat-writes`, `design/04a-identity`,
@@ -73,6 +79,9 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Chat rows server-written only | `2e4def2` | live (migration 016 applied) |
 | Phase 4A — the approved identity | `3379df7` | live |
 | Phase 5 — signed-out surfaces | `460b863` | live |
+| Phase 4 — marketing homepage | `3379df7`…`eba79e8` | on `design/04-marketing`, approved, **not merged** |
+| Calculation audit (tests only) | `0270ff5` | local only, 195 → 213 checks |
+| Financial correctness fixes | `834c4a3` | local only, approved, 213 → 223 checks |
 
 ## Locked design decisions
 
@@ -150,6 +159,52 @@ everything (`src/lib/aiGuard.ts` holds the rules, and they are tested).
   driver cannot forge an earlier answer to argue with.
 - Cancellation is best effort: Vercel usually lets a request finish, so an
   abandoned answer may still complete. Do not claim otherwise.
+
+## The financial fixes — what was decided, 22 Sep 2026
+
+The calculation audit grew the suite from **195 to 213 to 223 passing
+checks**. It proved the three importable copies of the cost-per-mile formula
+agree across 400 profiles, that no load or week figure can be NaN or
+Infinity across 8,000 combinations, and that a week is exactly the sum of its
+loads. It found two real defects, both fixed in **`834c4a3`** and approved.
+
+- **`effectiveCarrierPct` no longer falls back to 0 for out-of-domain
+  values.** Anything at or above 100 used to be discarded, which handed the
+  driver the *whole* load instead of none of it — an invalid percentage
+  overstating revenue, the direction that makes a losing load look
+  acceptable. Values are clamped into 0–100: 100 stays 100 and zeroes the
+  driver's share, above 100 caps at 100, negative floors at 0. A value that
+  is not a usable number at all still reads as 0, because no split was
+  recorded and that is the independent driver's case.
+- **The UI and save validation still limit carrier percentage to 0–99**, on
+  purpose. `LoadForm` and `saveLoadAction` reject anything at or above 100
+  ("Carrier % must be between 0 and 99"). The clamp is the last line for rows
+  that reach the math some other way. **Do not widen the domain in this
+  release** — the two layers disagreeing about 100 is a deliberate decision,
+  not an oversight.
+- **Malformed optional numeric values on a load resolve to null**, which
+  means "estimate this one" — the same path a blank field has always taken.
+  They used to pass through as NaN and turn a load's total cost, its profit
+  and its whole week into NaN. Zero was rejected as the fallback: it would
+  assert the load truly cost nothing and overstate its profit.
+- **Blank and whitespace-only optional values are treated as absent, not as
+  a literal zero**, because JavaScript reads `""` as 0 — the same dangerous
+  direction.
+- **No other formula changed.** Only `effectiveCarrierPct` and
+  `loadFromRow`'s `optional()` were touched, eight lines between them.
+
+Deferred on purpose, none of them blocking release:
+
+- **The Admin CPM is still a fourth, inline copy** of the cost formula in
+  `app/admin/page.tsx`. It cannot be imported, so nothing guards it; it was
+  read line by line and matches. Extracting it into `lib/` is its own task.
+- **Loads and Tax still report different revenue for the same year** — the
+  tab a leased driver's share, the tax report the gross — pending D4. The gap
+  is now pinned by test as exactly the carrier's cut, so it cannot drift into
+  something else.
+- **The marketing design is approved and good enough to release.**
+- **The closing CTA still carries the older, heavier two-truck artwork.** It
+  is a future visual refinement, not a release blocker.
 
 ## Still open
 
