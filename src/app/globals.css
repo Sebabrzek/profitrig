@@ -1452,19 +1452,20 @@ input[type="number"] {
 
 /* =========================================================================
    THE HERO (Phase 4)
-   FinalHero1 is the locked hero artwork. The fade from engraving into open
-   paper is part of the illustration itself, so there is nothing here that
-   masks, dissolves, tints or overlays it: the plate is placed, and the page
-   behind it is set to the artwork's own paper so the bleed is seamless.
+   HERO2edited is the hero artwork: a centred engraved tractor on open paper,
+   its edges already faded to that same paper. Nothing here masks, dissolves,
+   tints or overlays it — the plate is placed and the page behind it is set to
+   the artwork's own stock, so its edges disappear into the page.
 
-   The copy sits on the quiet ivory the artwork leaves on the left.
+   The truck is centred, so the copy is too: it sits in the open sky above,
+   which the artwork keeps almost entirely free of ink.
    ========================================================================= */
 @layer components {
   :root {
-    /* Read off FinalHero1's own left third, so page and plate are one sheet. */
+    /* The artwork's own paper. */
     --pr-hero-ivory: #f9f7ed;
-    /* The product's muted grey was mixed for Off White and drops below AA on
-       this warmer stock. Charcoal eased back toward the paper instead. */
+    /* The product's muted grey drops below AA on this warmer stock; Charcoal
+       eased back toward the paper instead. */
     --pr-hero-muted: color-mix(in srgb, var(--pr-text) 78%, var(--pr-hero-ivory));
   }
 
@@ -1477,16 +1478,19 @@ input[type="number"] {
 
   .pr-hero-plate {
     position: absolute;
-    inset: 0;
+    inset: auto 0 0 0;
     z-index: 0;
     pointer-events: none;
   }
   .pr-hero-plate img {
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: right center;
+    /* Capped rather than bled edge to edge. The artwork's own edges are
+       already faded to this paper, so stopping short shows no boundary — and
+       holding it back keeps more pixels per inch in the linework, and leaves
+       more sky above for the copy. */
+    width: min(100%, 1280px);
+    height: auto;
+    margin-inline: auto;
   }
 
   .pr-hero-copy {
@@ -1498,12 +1502,12 @@ input[type="number"] {
     max-width: 34rem;
   }
 
-  /* Phones: the plate becomes a band under the copy, framed on the tractor,
-     because a phone has no room for the open paper the desktop copy uses. */
+  /* Phones: the wide plate would leave the tractor tiny, so the band is a
+     crop framed on it, under the copy. */
   .pr-hero-band {
     position: relative;
-    aspect-ratio: 1052 / 660;
-    margin-top: calc(var(--pr-space-6) * -1);
+    aspect-ratio: 854 / 615;
+    margin-top: calc(var(--pr-space-4) * -1);
   }
   .pr-hero-band img {
     display: block;
@@ -1514,42 +1518,37 @@ input[type="number"] {
 
   @media (min-width: 1024px) {
     .pr-hero {
-      display: flex;
-      flex-direction: column;
-      /* Tracks the plate's height below, so the artwork is shown whole —
-         never cropped, in either direction. */
-      min-height: clamp(480px, 38.8vw, 700px);
-    }
-    /* The plate keeps its own 16:9 and sits against the bottom right at 69%
-       of the width. It is not cropped and not scaled oddly; it simply starts
-       further in, which widens the open paper the copy reads on. Its own
-       left edge is this exact ivory, so nothing shows where it begins. */
-    .pr-hero-plate {
-      inset: auto 0 0 auto;
-      width: 69%;
-      aspect-ratio: 1672 / 941;
+      /* Room for the plate at its own 2.4:1 against the bottom, plus the sky
+         the copy needs above it. */
+      /* The stacks rise well above the cab, so the sky allowance is set
+         against them rather than against the average clean zone. */
+      min-height: clamp(620px, calc(min(100vw, 1280px) / 2.4 + 330px), 900px);
     }
     .pr-hero-copy {
-      flex: 1;
-      display: flex;
-      /* High, not centred: the artwork's open paper is widest along its top
-         edge and narrows as the hills rise, so the copy reads on cleaner
-         ground up here. */
-      align-items: flex-start;
+      text-align: center;
       padding-block: var(--pr-space-10) var(--pr-space-16);
     }
-    /* Sized so "KNOW YOUR NUMBERS." stays on one line and still ends before
-       the engraving begins. */
-    .pr-hero .pr-mk-h1 {
-      font-size: 42px;
-    }
-  }
-  @media (min-width: 1280px) {
     .pr-hero-copy-inner {
-      max-width: 38rem;
+      margin-inline: auto;
+      max-width: 44rem;
+    }
+    .pr-hero-copy-inner .pr-mk-lead,
+    .pr-hero-copy-inner .pr-hero-note {
+      margin-inline: auto;
+    }
+    .pr-hero-actions {
+      justify-content: center;
     }
     .pr-hero .pr-mk-h1 {
       font-size: 48px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .pr-hero .pr-mk-h1 {
+      font-size: 56px;
+    }
+    .pr-hero-copy-inner {
+      max-width: 48rem;
     }
   }
 }
