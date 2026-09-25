@@ -14,6 +14,7 @@ import {
   type Load,
 } from "@/lib/loads";
 import { driverToday } from "@/lib/driverClock";
+import { groupTrips, tripLabel } from "@/lib/partials";
 import { fetchDriverSettings } from "@/lib/driverSettings";
 import { fetchSubscription, isPro } from "@/lib/subscription";
 import type { CostProfile } from "@/app/actions";
@@ -76,6 +77,10 @@ const HEADERS = [
   "CPM",
   "Profit/Mile",
   "Notes",
+  // Last, so a spreadsheet built on the earlier columns keeps its places.
+  // A partial's row holds only the miles it ADDED to the trip, so its RPM
+  // and CPM are per extra mile — the row names the load it rode with.
+  "Partial Of",
 ];
 
 function num(n: number, decimals = 2): string {
@@ -211,6 +216,14 @@ export async function GET(request: Request) {
     (l) => l.load_date >= from && l.load_date <= to
   );
   const monthStats = monthStatsByLoad(fetched);
+  // Each primary followed by its partials, and the load each partial rode
+  // with named on its row. Totals below still add up every row exactly once.
+  const trips = groupTrips(loads);
+  const ordered = trips.flatMap((t) => [t.primary, ...t.partials]);
+  const partialOfLabel = new Map<string, string>();
+  for (const t of trips) {
+    for (const p of t.partials) partialOfLabel.set(String(p.id), tripLabel(t.primary));
+  }
 
   // Accumulators for totals row
   let tLoaded = 0;
@@ -233,7 +246,7 @@ export async function GET(request: Request) {
 
   const rows: string[] = [csvRow(HEADERS)];
 
-  for (const load of loads) {
+  for (const load of ordered) {
     const ownMiles =
       Number(load.loaded_miles || 0) + Number(load.deadhead_miles || 0);
     const stats = monthStats.get(loadMonthKey(load.load_date));
@@ -279,6 +292,9 @@ export async function GET(request: Request) {
         num(e.cpm),
         num(e.profitPerMile),
         load.notes,
+        load.parent_load_id
+          ? partialOfLabel.get(String(load.id)) ?? "a load outside this range"
+          : "",
       ])
     );
 

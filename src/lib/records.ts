@@ -47,6 +47,44 @@ export function loadRecordFigures(e: LoadRecordEconomics) {
 }
 
 /**
+ * A partial as it sits under its primary. Its numbers are MARGINAL — what
+ * it added to the trip — so they are said as additions ("+40 mi", "adds
+ * +$612") and never laid out in the ledger's Revenue / Cost / Profit
+ * columns, where they would read as a load's own rate.
+ */
+export function partialRecordFigures(e: LoadRecordEconomics) {
+  return {
+    extraMiles: `+${e.totalMiles.toLocaleString()} mi`,
+    pay: formatMoney(e.revenue),
+    share:
+      e.carrierPct > 0
+        ? `${pctLabel(100 - e.carrierPct)} of ${formatMoney(e.loadPay)}`
+        : null,
+    adds: formatMoney(e.profit, { signed: true }),
+    outcome: outcomeOf(e.profit),
+  };
+}
+
+/** A whole trip — a primary and its partials — as one line of totals. */
+export type TripLineTotals = {
+  totalMiles: number;
+  revenue: number;
+  rpm: number;
+  profit: number;
+};
+
+export function tripLineFigures(t: TripLineTotals, partials: number) {
+  return {
+    label: partials === 1 ? "Trip with 1 partial" : `Trip with ${partials} partials`,
+    miles: `${t.totalMiles.toLocaleString()} mi`,
+    revenue: formatMoney(t.revenue),
+    rate: formatRate(t.rpm, { unit: "mi" }),
+    profit: formatMoney(t.profit, { signed: true }),
+    outcome: outcomeOf(t.profit),
+  };
+}
+
+/**
  * A fuel week's reading and state. A measured week shows its MPG as a
  * reading; a state (starting point, check, odometer) is said in words.
  */

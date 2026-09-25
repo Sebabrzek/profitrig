@@ -22,6 +22,14 @@ export type Load = {
    */
   carrier_pct: number | null;
   notes: string;
+  /**
+   * The primary load this one rode with, when it is a partial; null for an
+   * ordinary load. A partial records what it ADDED to the trip — its full
+   * pay, but only its extra miles, stored as deadhead — so every total that
+   * adds rows up is already right. See lib/partials and migration 017.
+   * Optional so the many places that build a Load by hand need not name it.
+   */
+  parent_load_id?: string | null;
 };
 
 /**
@@ -61,6 +69,11 @@ export function loadFromRow(r: Record<string, unknown>): Load {
     lumpers_actual: optional(r.lumpers_actual),
     carrier_pct: optional(r.carrier_pct),
     notes: (r.notes as string | null) ?? "",
+    // Absent before migration 017 runs, and null on every ordinary load.
+    parent_load_id:
+      typeof r.parent_load_id === "string" && r.parent_load_id
+        ? r.parent_load_id
+        : null,
   };
 }
 
@@ -108,6 +121,7 @@ export const EMPTY_LOAD: Load = {
   lumpers_actual: null,
   carrier_pct: null,
   notes: "",
+  parent_load_id: null,
 };
 
 export function todayIso(): string {

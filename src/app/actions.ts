@@ -457,6 +457,7 @@ export async function deleteSnapshotAction(
 }
 
 import type { Load } from "@/lib/loads";
+import { MAX_PARTIALS, asPartial, partialsEnabledFor } from "@/lib/partials";
 import { isRoadCategory } from "@/lib/roadExpenses";
 
 function nullableNum(v: number | null): number | null {
@@ -465,13 +466,63 @@ function nullableNum(v: number | null): number | null {
 }
 
 export async function saveLoadAction(
-  load: Load
+  input: Load
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
+
+  // Whether this is a partial is decided here, not by the browser: an edit
+  // keeps whatever primary the saved row already has, so a crafted request
+  // cannot quietly turn a partial back into a full-mileage load.
+  let parentId: string | null = input.parent_load_id || null;
+  if (input.id) {
+    const { data: existing } = await supabase
+      .from("loads")
+      .select("*")
+      .eq("id", input.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (existing && typeof existing.parent_load_id === "string") {
+      parentId = existing.parent_load_id;
+    }
+  }
+
+  // Checked before a partial's miles are folded into one figure, so a
+  // negative entry is refused rather than quietly clamped to zero.
+  if (input.loaded_miles < 0 || input.deadhead_miles < 0) {
+    return { ok: false, error: "Miles can't be negative." };
+  }
+
+  let load = input;
+  if (parentId) {
+    if (!partialsEnabledFor(user.email)) {
+      return { ok: false, error: "Partials aren't turned on for your account yet." };
+    }
+    const { data: primary } = await supabase
+      .from("loads")
+      .select("*")
+      .eq("id", parentId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!primary) return { ok: false, error: "That load no longer exists." };
+    if (primary.parent_load_id) {
+      return { ok: false, error: "A partial can't be added to another partial." };
+    }
+    if (!input.id) {
+      const { count } = await supabase
+        .from("loads")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("parent_load_id", parentId);
+      if ((count ?? 0) >= MAX_PARTIALS) {
+        return { ok: false, error: `A load can carry at most ${MAX_PARTIALS} partials.` };
+      }
+    }
+    load = asPartial(input, { id: parentId, load_date: String(primary.load_date) });
+  }
 
   if (!load.load_date) return { ok: false, error: "Pick a date." };
   if (load.loaded_miles < 0 || load.deadhead_miles < 0) {
@@ -506,6 +557,9 @@ export async function saveLoadAction(
       ? { carrier_pct: Math.round(load.carrier_pct * 100) / 100 }
       : {}),
     notes: load.notes.trim() || null,
+    // Sent only for a partial, so an ordinary save never names the column
+    // and keeps working before migration 017 runs.
+    ...(parentId ? { parent_load_id: parentId } : {}),
     updated_at: new Date().toISOString(),
   };
 
@@ -517,6 +571,7 @@ export async function saveLoadAction(
       .eq("user_id", user.id);
     if (error) return { ok: false, error: error.message };
     revalidatePath("/loads");
+    if (parentId) revalidatePath(`/loads/${parentId}`);
     return { ok: true, id: load.id };
   }
 
@@ -527,6 +582,7 @@ export async function saveLoadAction(
     .single();
   if (error) return { ok: false, error: error.message };
   revalidatePath("/loads");
+  if (parentId) revalidatePath(`/loads/${parentId}`);
   return { ok: true, id: data.id };
 }
 

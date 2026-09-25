@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/ui/Surfaces";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
@@ -15,7 +15,8 @@ import {
 } from "@/lib/loads";
 import { driverToday } from "@/lib/driverClock";
 import { fetchDriverSettings } from "@/lib/driverSettings";
-import { LoadForm } from "../LoadForm";
+import { LoadForm, type PartialOf } from "../LoadForm";
+import { MAX_PARTIALS, partialsEnabledFor, tripLabel } from "@/lib/partials";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -42,7 +43,7 @@ const EMPTY_PROFILE: CostProfile = {
 export default async function NewLoadPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; partial_of?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createSupabaseServerClient();
@@ -60,7 +61,37 @@ export default async function NewLoadPage({
     driverToday(),
     fetchDriverSettings(supabase, user.id),
   ]);
-  const newLoadDate = params.date ? new Date(params.date + "T12:00:00") : now;
+
+  // Adding a partial: the load it rides with decides its date, its month and
+  // its carrier split. Anything that makes a partial impossible here — not
+  // turned on for this account, migration 017 not run yet, a primary that is
+  // itself a partial, or one already carrying two — goes back to that load.
+  let primary: Record<string, unknown> | null = null;
+  if (params.partial_of) {
+    const back = `/loads/${params.partial_of}`;
+    if (!partialsEnabledFor(user.email)) redirect(back);
+    const { data } = await supabase
+      .from("loads")
+      .select("*")
+      .eq("id", params.partial_of)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!data) notFound();
+    if (!("parent_load_id" in data) || data.parent_load_id) redirect(back);
+    const { count } = await supabase
+      .from("loads")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("parent_load_id", params.partial_of);
+    if ((count ?? 0) >= MAX_PARTIALS) redirect(back);
+    primary = data;
+  }
+
+  const newLoadDate = primary
+    ? new Date(String(primary.load_date) + "T12:00:00")
+    : params.date
+      ? new Date(params.date + "T12:00:00")
+      : now;
   const monthFrom = startOfMonth(newLoadDate);
   const monthTo = endOfMonth(newLoadDate);
 
@@ -122,12 +153,41 @@ export default async function NewLoadPage({
       }
     : EMPTY_PROFILE;
 
-  const initial: Load = {
-    ...EMPTY_LOAD,
-    load_date: params.date || today,
-    // A leased driver's split, filled in so they don't retype it per load.
-    carrier_pct: settings.carrierPct,
-  };
+  const initial: Load = primary
+    ? {
+        ...EMPTY_LOAD,
+        parent_load_id: String(primary.id),
+        load_date: String(primary.load_date),
+        // The same carrier split as the load it rides with, as a start.
+        carrier_pct:
+          primary.carrier_pct == null
+            ? settings.carrierPct
+            : Number(primary.carrier_pct),
+      }
+    : {
+        ...EMPTY_LOAD,
+        load_date: params.date || today,
+        // A leased driver's split, filled in so they don't retype it per load.
+        carrier_pct: settings.carrierPct,
+      };
+
+  const partialOf: PartialOf | undefined = primary
+    ? {
+        id: String(primary.id),
+        label: tripLabel({
+          broker: String(primary.broker ?? ""),
+          origin: String(primary.origin ?? ""),
+          destination: String(primary.destination ?? ""),
+        }),
+        dateLabel: new Date(
+          String(primary.load_date) + "T12:00:00"
+        ).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+      }
+    : undefined;
 
   return (
     <AppShell
@@ -139,10 +199,10 @@ export default async function NewLoadPage({
       }}
     >
         <PageHeader
-          title="Add a Load"
+          title={partialOf ? "Add a Partial" : "Add a Load"}
           action={
             <Link
-              href="/loads"
+              href={partialOf ? `/loads/${partialOf.id}` : "/loads"}
               className="pr-link pr-hit text-sm"
             >
               ← Back
@@ -155,6 +215,7 @@ export default async function NewLoadPage({
           otherMonthMiles={otherMonthMiles}
           monthFirstDay={monthFirstDay}
           leased={settings.carrierPct != null}
+          partialOf={partialOf}
         />
     </AppShell>
   );

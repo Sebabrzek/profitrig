@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import {
   Card,
@@ -46,7 +47,18 @@ import { fetchDriverSettings } from "@/lib/driverSettings";
 import { RoadExpenseCard } from "@/components/RoadExpenseCard";
 import { sumRoadExpenses, type RoadExpense } from "@/lib/roadExpenses";
 import { WeekStartToggle } from "./WeekStartToggle";
-import { LoadLedger, LoadRecord } from "./LoadRecord";
+import {
+  LoadLedger,
+  LoadRecord,
+  PartialRecord,
+  TripLine,
+} from "./LoadRecord";
+import {
+  countPartials,
+  groupTrips,
+  isPartial,
+  tripTotals,
+} from "@/lib/partials";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -362,7 +374,19 @@ export default async function LoadsPage({
                 )
               }
             />
-            <Reading label="Loads" figure={false} value={String(totals.loads)} />
+            <Reading
+              label="Loads"
+              figure={false}
+              value={String(totals.loads)}
+              context={
+                countPartials(loads) > 0 && (
+                  <>
+                    incl. {countPartials(loads)}{" "}
+                    {countPartials(loads) === 1 ? "partial" : "partials"}
+                  </>
+                )
+              }
+            />
             <Reading
               label="Total miles"
               figure={false}
@@ -473,21 +497,27 @@ export default async function LoadsPage({
           </EmptyState>
         ) : (
           <LoadLedger>
-            {loads.map((load) => {
-              const ownMiles =
-                Number(load.loaded_miles || 0) +
-                Number(load.deadhead_miles || 0);
-              const stats = monthStats.get(loadMonthKey(load.load_date));
-              const e = computeLoadEconomics(
-                load,
-                profile,
-                buildMtdContext(
-                  load.load_date,
-                  Math.max(0, (stats?.miles ?? 0) - ownMiles),
-                  stats?.firstDay ?? 1,
-                  now
-                )
-              );
+            {/* Each primary, then the partials that rode with it, then the
+                trip they made together. The week's totals above never read
+                from this grouping — they add up the rows themselves. */}
+            {groupTrips(loads).map((trip) => {
+              const economicsOf = (load: Load) => {
+                const ownMiles =
+                  Number(load.loaded_miles || 0) +
+                  Number(load.deadhead_miles || 0);
+                const stats = monthStats.get(loadMonthKey(load.load_date));
+                return computeLoadEconomics(
+                  load,
+                  profile,
+                  buildMtdContext(
+                    load.load_date,
+                    Math.max(0, (stats?.miles ?? 0) - ownMiles),
+                    stats?.firstDay ?? 1,
+                    now
+                  )
+                );
+              };
+              const load = trip.primary;
               const dateLabel = new Date(
                 load.load_date + "T12:00:00"
               ).toLocaleDateString("en-US", {
@@ -495,17 +525,40 @@ export default async function LoadsPage({
                 month: "short",
                 day: "numeric",
               });
-              return (
-                <LoadRecord
-                  key={load.id}
-                  id={String(load.id)}
-                  href={`/loads/${load.id}`}
-                  dateLabel={dateLabel}
-                  broker={load.broker}
-                  origin={load.origin}
-                  destination={load.destination}
-                  economics={e}
+              const partialRecord = (p: Load) => (
+                <PartialRecord
+                  key={p.id}
+                  id={String(p.id)}
+                  href={`/loads/${p.id}`}
+                  broker={p.broker}
+                  origin={p.origin}
+                  destination={p.destination}
+                  economics={economicsOf(p)}
                 />
+              );
+              return (
+                <Fragment key={load.id}>
+                  {isPartial(load) ? (
+                    partialRecord(load)
+                  ) : (
+                    <LoadRecord
+                      id={String(load.id)}
+                      href={`/loads/${load.id}`}
+                      dateLabel={dateLabel}
+                      broker={load.broker}
+                      origin={load.origin}
+                      destination={load.destination}
+                      economics={economicsOf(load)}
+                    />
+                  )}
+                  {trip.partials.map(partialRecord)}
+                  {trip.partials.length > 0 && (
+                    <TripLine
+                      totals={tripTotals(trip, profile, monthStats, now)}
+                      partials={trip.partials.length}
+                    />
+                  )}
+                </Fragment>
               );
             })}
           </LoadLedger>

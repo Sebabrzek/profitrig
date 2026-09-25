@@ -14,7 +14,8 @@ import {
   type Load,
 } from "@/lib/loads";
 import { fetchDriverSettings } from "@/lib/driverSettings";
-import { LoadForm } from "../LoadForm";
+import { LoadForm, type PartialOf } from "../LoadForm";
+import { MAX_PARTIALS, partialsEnabledFor, tripLabel } from "@/lib/partials";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -100,6 +101,55 @@ export default async function EditLoadPage({
 
   const initial: Load = loadFromRow(r);
 
+  // Migration 017 adds parent_load_id to every row; until it runs there is
+  // no such key, and partials do not exist yet.
+  const partialsReady = "parent_load_id" in r;
+  const dateLabelOf = (iso: string) =>
+    new Date(iso + "T12:00:00").toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+
+  // A partial is edited as one, and names the load it rides with.
+  let partialOf: PartialOf | undefined;
+  if (initial.parent_load_id) {
+    const { data: primary } = await supabase
+      .from("loads")
+      .select("id,load_date,broker,origin,destination")
+      .eq("id", initial.parent_load_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    partialOf = {
+      id: initial.parent_load_id,
+      label: primary
+        ? tripLabel({
+            broker: primary.broker ?? "",
+            origin: primary.origin ?? "",
+            destination: primary.destination ?? "",
+          })
+        : "the load it rides with",
+      dateLabel: dateLabelOf(primary?.load_date ?? initial.load_date),
+    };
+  }
+
+  // A primary shows its trip and its partials — where partials apply at all:
+  // an account they are turned on for, or a load that already carries some.
+  let trip: { partials: Load[]; canAdd: boolean } | undefined;
+  if (partialsReady && !partialOf) {
+    const { data: partialRows } = await supabase
+      .from("loads")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("parent_load_id", id)
+      .order("created_at", { ascending: true });
+    const partials = (partialRows ?? []).map((row) => loadFromRow(row));
+    const enabled = partialsEnabledFor(user.email);
+    if (enabled || partials.length > 0) {
+      trip = { partials, canAdd: enabled && partials.length < MAX_PARTIALS };
+    }
+  }
+
   const costData = costRes.data;
   const profile: CostProfile = costData
     ? {
@@ -139,10 +189,10 @@ export default async function EditLoadPage({
       }}
     >
         <PageHeader
-          title="Edit Load"
+          title={partialOf ? "Edit Partial" : "Edit Load"}
           action={
             <Link
-              href="/loads"
+              href={partialOf ? `/loads/${partialOf.id}` : "/loads"}
               className="pr-link pr-hit text-sm"
             >
               ← Back
@@ -156,6 +206,8 @@ export default async function EditLoadPage({
           otherMonthMiles={otherMonthMiles}
           monthFirstDay={monthFirstDay}
           leased={settings.carrierPct != null}
+          partialOf={partialOf}
+          trip={trip}
         />
     </AppShell>
   );

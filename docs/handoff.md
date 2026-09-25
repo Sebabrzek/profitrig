@@ -20,17 +20,18 @@ live. Every screen, signed in and signed out, is now on the system. What
 follows is Sebastian's call, and the business work is the carrier-pay order
 at the bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (22 Sep 2026)
+## Repository state (25 Sep 2026)
 
-- Production `main` = `origin/main` = `2f8b6ef` (Phase 5), live.
-  `git log --oneline -3` is the truth; this file is a summary.
-- **Waiting to merge: `design/04-marketing`** — the marketing homepage and
-  the financial fixes, 11 commits ahead of `main`, latest `834c4a3`.
-  **Not merged, not in production.** The last two commits — `0270ff5` (the
-  calculation audit) and `834c4a3` (the two correctness fixes) — are **local
-  only**; the remote branch is still at `eba79e8`, so a push comes first.
-- The landing page is approved and ready for final push, merge and deploy
-  now that the financial patch is approved.
+- Production `main` = `origin/main` = `386f071`, live: the marketing
+  homepage and both financial fixes. `git log --oneline -3` is the truth;
+  this file is a summary.
+- **In review: `feature/partial-loads`** — partials under a primary load.
+  Needs migration 017 run by hand, and `PARTIAL_LOADS_EMAILS` set in Vercel,
+  before anyone but an admin sees it. Not merged.
+- **Parked, not forgotten: `design/06-money-and-canvas`** — the ivory
+  canvas, the PWA `start_url`, and the dollar-wave money button (`7a0e420`).
+  Local only, unpushed; Sebastian put it aside on 23 Sep to do partials
+  first. It overlaps this branch only in `loads/page.tsx` and this file.
 - Merged branches kept on the remote: `design/03b-surfaces-hierarchy`,
   `design/03c-actions-inputs`, `design/03d-records-lists`,
   `feature/ai-guardrails`, `security/016-chat-writes`, `design/04a-identity`,
@@ -205,6 +206,34 @@ Deferred on purpose, none of them blocking release:
 - **The marketing design is approved and good enough to release.**
 - **The closing CTA still carries the older, heavier two-truck artwork.** It
   is a future visual refinement, not a release blocker.
+
+## Partial loads — what was decided, 25 Sep 2026
+
+A partial is a second load riding in the same trailer as one already booked
+(the primary). It is an ordinary `loads` row with `parent_load_id` set.
+
+- **It records what it ADDED to the trip, not what it is.** Full pay; only
+  the extra miles (the drive to pick it up, plus anything past the primary's
+  delivery), in one box, stored as deadhead with no loaded miles. Every total
+  that adds rows up — week, month, Tax tab, exports, per diem — is therefore
+  already right and needed no change. Sebastian chose one number over two.
+- **The database enforces it** (migration 017): own primary only, one level,
+  at most two per primary (primary row locked while counting), no loaded
+  miles, the primary's date — and it follows the primary's date. Deleting a
+  primary deletes its partials; the confirmation names them.
+- **Fuel and tolls on a partial are always estimated** from its extra miles,
+  so a real trip fuel figure can never pay for the same road twice.
+- **Screens:** the partial sits under its primary on the Loads list with a
+  trip line beneath (`lib/partials` groups; totals never read from the
+  grouping). Its figures are marginal — "+40 mi · adds +$770" — and are
+  deliberately kept out of the ledger's Revenue / Cost / Profit columns. A
+  primary's own page shows a live Trip panel and the Partials card with
+  **+ Add Partial**.
+- **Who sees it:** admins, plus the comma-separated `PARTIAL_LOADS_EMAILS`
+  env var. The server action checks it too. Everyone else sees no change.
+- **Not in this pass:** auto-filling miles from cities (needs a routing
+  provider — PC\*Miler is what brokers pay on; an LLM must never be the
+  source of a mileage figure), and turning an existing load into a partial.
 
 ## Still open
 

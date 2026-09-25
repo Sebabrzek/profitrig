@@ -3,7 +3,10 @@ import type { ReactNode } from "react";
 import { LossTag } from "@/components/ui/Records";
 import {
   loadRecordFigures,
+  partialRecordFigures,
+  tripLineFigures,
   type LoadRecordEconomics,
+  type TripLineTotals,
 } from "@/lib/records";
 
 /**
@@ -129,6 +132,103 @@ export function LoadRecord({
           </span>
         </p>
       </Link>
+    </li>
+  );
+}
+
+function toneOf(outcome: ReturnType<typeof partialRecordFigures>["outcome"]) {
+  return outcome === "profit"
+    ? "pr-amount-profit"
+    : outcome === "loss"
+    ? "pr-amount-loss"
+    : "";
+}
+
+/**
+ * A partial, tucked under the load it rode with. Deliberately not a ledger
+ * row: its figures are what it ADDED to the trip, and in the Revenue / Cost
+ * / Profit columns they would read as a load's own — $900 over 40 miles is a
+ * spectacular marginal result and a nonsense rate.
+ */
+export function PartialRecord({
+  id,
+  href,
+  broker,
+  origin,
+  destination,
+  economics,
+}: {
+  id: string;
+  href: string;
+  broker: string;
+  origin: string;
+  destination: string;
+  economics: LoadRecordEconomics;
+}) {
+  const f = partialRecordFigures(economics);
+  const k = `partial-${id}`;
+  const hasRoute = Boolean(origin || destination);
+  return (
+    <li className="pr-load-partial">
+      <Link
+        href={href}
+        className="pr-record pr-record-link pr-load-partial-link"
+        aria-labelledby={`${k}-kind ${k}-title${hasRoute ? ` ${k}-route` : ""} ${k}-adds`}
+        aria-describedby={`${k}-detail`}
+      >
+        <div className="pr-load-partial-id">
+          <p id={`${k}-kind`} className="pr-load-partial-kind">
+            Partial
+          </p>
+          <p id={`${k}-title`} className="pr-load-title">
+            {broker || "Untitled partial"}
+          </p>
+          {hasRoute && (
+            <p id={`${k}-route`} className="pr-load-route">
+              {origin || "—"} <span aria-hidden="true">→</span>
+              <span className="sr-only">to</span> {destination || "—"}
+            </p>
+          )}
+        </div>
+        <div className="pr-load-partial-figures">
+          <p id={`${k}-detail`} className="pr-load-context">
+            {f.extraMiles} · {f.share ?? `${f.pay} pay`}
+          </p>
+          {/* 15px: too small for Profit Green or Loss Red to pass (design
+              system §B), so the sign carries the meaning, in Charcoal. */}
+          <p id={`${k}-adds`} className="pr-load-partial-adds">
+            <span className="pr-load-context">adds </span>
+            <span className="pr-load-value">{f.adds}</span>
+          </p>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+/** The whole trip, under a primary's partials: what the truck really did. */
+export function TripLine({
+  totals,
+  partials,
+}: {
+  totals: TripLineTotals;
+  partials: number;
+}) {
+  const f = tripLineFigures(totals, partials);
+  return (
+    <li className="pr-load-trip">
+      <div className="pr-load-trip-inner">
+        <p className="pr-load-trip-label">{f.label}</p>
+        <p className="pr-load-context">
+          {f.miles} · {f.revenue} · {f.rate}
+        </p>
+        {/* The trip's result is the one that counts, so it is set at the
+            record's hero size — large enough for its colour to pass. */}
+        <p className="pr-load-trip-profit">
+          <span className="sr-only">Trip profit </span>
+          <span className={`pr-load-hero ${toneOf(f.outcome)}`}>{f.profit}</span>
+        </p>
+      </div>
     </li>
   );
 }

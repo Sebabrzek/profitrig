@@ -1132,6 +1132,72 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
   }
 }
 
+@layer components {
+  /* --- Partials and trips ---------------------------------------------------
+     A partial hangs off the load it rode with: indented, on Off White, a
+     Sage rule down its leading edge, pulled up close under its primary. It
+     is never laid into the ledger's Revenue / Cost / Profit columns — its
+     figures are what it ADDED to the trip, and in those columns they would
+     read as a load's own rate. The trip line beneath is the whole truck's
+     result, marked with Rig Green because it is the total that counts.
+     Each spans the full ledger row when the list becomes a grid. */
+  .pr-load-partial,
+  .pr-load-trip {
+    margin-top: calc(var(--pr-space-1) * -1);
+    margin-left: var(--pr-space-4);
+  }
+  .pr-load-partial > *,
+  .pr-load-trip > * {
+    grid-column: 1 / -1;
+  }
+  .pr-load-partial-link {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--pr-space-1) var(--pr-space-4);
+    padding: var(--pr-space-3) var(--pr-space-4);
+    border-left: 3px solid var(--pr-sage);
+    border-radius: var(--pr-radius-input);
+    background: var(--pr-surface-muted);
+  }
+  .pr-load-partial-id {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .pr-load-partial-kind,
+  .pr-load-trip-label {
+    font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--pr-rig-green);
+  }
+  .pr-load-partial-figures {
+    text-align: right;
+  }
+  .pr-load-partial-adds {
+    white-space: nowrap;
+  }
+  .pr-load-trip-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--pr-space-1) var(--pr-space-3);
+    padding: var(--pr-space-2) var(--pr-space-4);
+    border-left: 3px solid var(--pr-rig-green);
+    border-radius: var(--pr-radius-input);
+    background: var(--pr-surface-muted);
+  }
+  .pr-load-trip-profit {
+    margin-left: auto;
+  }
+}
+
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

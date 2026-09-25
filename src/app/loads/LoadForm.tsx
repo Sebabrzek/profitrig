@@ -1,13 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState, useTransition } from "react";
 import {
   MTD_FALLBACK_THRESHOLD_MILES,
   type Load,
+  type MonthStats,
   buildMtdContext,
   computeLoadEconomics,
+  loadMonthKey,
 } from "@/lib/loads";
+import {
+  MAX_PARTIALS,
+  partialExtraMiles,
+  tripTotals,
+} from "@/lib/partials";
+import { partialRecordFigures } from "@/lib/records";
 import type { CostProfile } from "../actions";
 import { deleteLoadAction, saveLoadAction } from "../actions";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
@@ -150,6 +159,15 @@ function Section({
   );
 }
 
+/** The primary a partial rides with, as the partial form needs to show it. */
+export type PartialOf = {
+  id: string;
+  /** "Landstar · Laredo, TX → Memphis, TN" */
+  label: string;
+  /** "Thu, Sep 18" */
+  dateLabel: string;
+};
+
 export function LoadForm({
   initial,
   costProfile,
@@ -157,10 +175,27 @@ export function LoadForm({
   otherMonthMiles = 0,
   monthFirstDay = 1,
   leased = false,
+  partialOf,
+  trip,
 }: {
   initial: Load;
   costProfile: CostProfile;
   loadId?: string;
+  /**
+   * Set when this form is a partial: it then asks for the extra miles the
+   * partial added instead of loaded and deadhead, keeps the primary's date,
+   * and leaves fuel and tolls on the estimate for those extra miles.
+   */
+  partialOf?: PartialOf;
+  /**
+   * A primary's partials, and whether another can be added. Present only
+   * where partials apply: an account they are turned on for, or a load that
+   * already has some.
+   */
+  trip?: {
+    partials: Load[];
+    canAdd: boolean;
+  };
   /**
    * Total miles already logged in this load's calendar month for every
    * OTHER load. Used so this form can preview the MTD-allocated fixed
@@ -180,6 +215,13 @@ export function LoadForm({
 }) {
   const router = useRouter();
   const [load, setLoad] = useState<Load>({ ...initial, id: loadId });
+  const isPartialForm = Boolean(partialOf);
+  const partialCount = trip?.partials.length ?? 0;
+  // A partial goes back to the trip it belongs to; anything else to Loads.
+  const backHref = partialOf ? `/loads/${partialOf.id}` : "/loads";
+  // A partial's extra miles, whichever field a saved row happened to hold.
+  const extraMiles =
+    (Number(load.loaded_miles) || 0) + (Number(load.deadhead_miles) || 0);
   // Shown for leased drivers, and on any load that already carries a split
   // — so a driver who later goes independent can still see and fix it.
   const showCarrierPct = leased || (initial.carrier_pct ?? 0) > 0;
@@ -215,19 +257,21 @@ export function LoadForm({
         setError(r.error);
         return;
       }
-      router.push("/loads");
+      router.push(backHref);
       router.refresh();
     });
   }
 
   function remove() {
     if (!loadId) return;
-    if (
-      !confirm(
-        "Delete this load? This cannot be undone."
-      )
-    )
-      return;
+    // Deleting a primary takes its partials with it (migration 017): a
+    // partial on its own holds only its extra miles. Say so before it goes.
+    const message = isPartialForm
+      ? "Delete this partial? The load it rode with stays. This cannot be undone."
+      : partialCount > 0
+        ? `Delete this load and its ${partialCount === 1 ? "partial" : `${partialCount} partials`}? A partial can't stand on its own. This cannot be undone.`
+        : "Delete this load? This cannot be undone.";
+    if (!confirm(message)) return;
     setError(null);
     startDelete(async () => {
       const r = await deleteLoadAction(loadId);
@@ -235,7 +279,7 @@ export function LoadForm({
         setError(r.error);
         return;
       }
-      router.push("/loads");
+      router.push(backHref);
       router.refresh();
     });
   }
@@ -247,13 +291,13 @@ export function LoadForm({
       <InstrumentPanel>
         <Reading
           size="hero"
-          label="Profit this load"
+          label={isPartialForm ? "Profit this partial adds" : "Profit this load"}
           value={formatMoney(e.profit, { signed: true })}
           outcome={outcomeOf(e.profit)}
         />
         <ReadingGrid wideColumns={2}>
           <Reading
-            label="Rate achieved"
+            label={isPartialForm ? "Pay per extra mile" : "Rate achieved"}
             value={e.totalMiles > 0 ? formatRate(e.rpm) : "—"}
             unit={e.totalMiles > 0 ? "/ mi" : undefined}
             context={
@@ -271,10 +315,11 @@ export function LoadForm({
             }
           />
           <Reading
-            label="Miles"
+            label={isPartialForm ? "Extra miles" : "Miles"}
             figure={false}
             value={e.totalMiles.toLocaleString()}
             context={
+              !isPartialForm &&
               e.totalMiles > 0 && <>{e.deadheadPct.toFixed(0)}% deadhead</>
             }
           />
@@ -289,23 +334,71 @@ export function LoadForm({
           />
           <Reading label="Cost" value={formatMoney(e.totalCost)} />
         </ReadingGrid>
-        {e.totalMiles > 0 && (
+        {isPartialForm ? (
           <PanelNote>
-            Net {formatRate(e.profitPerMile, { signed: true, unit: "mi" })}
+            What this partial added on top of the load it rode with — its pay,
+            less the cost of its extra miles. The whole trip is on the load.
           </PanelNote>
+        ) : (
+          e.totalMiles > 0 && (
+            <PanelNote>
+              Net {formatRate(e.profitPerMile, { signed: true, unit: "mi" })}
+            </PanelNote>
+          )
         )}
       </InstrumentPanel>
+      {trip && trip.partials.length > 0 && (
+        <TripPanel
+          primary={load}
+          partials={trip.partials}
+          costProfile={costProfile}
+          otherMonthMiles={otherMonthMiles}
+          monthFirstDay={monthFirstDay}
+        />
+      )}
 
       </AnswerColumn>
       <WorkColumn>
-      <Section title="Trip info">
-        <Field label="Date">
-          <TextInput
-            type="date"
-            value={load.load_date}
-            onChange={(ev) => setField("load_date")(ev.target.value)}
-          />
-        </Field>
+      {trip && loadId && (
+        <PartialsCard
+          loadId={loadId}
+          partials={trip.partials}
+          canAdd={trip.canAdd}
+          economicsOf={(p) =>
+            computeLoadEconomics(
+              p,
+              costProfile,
+              buildMtdContext(
+                p.load_date,
+                Math.max(0, otherMonthMiles + e.totalMiles - partialExtraMiles(p)),
+                monthFirstDay
+              )
+            )
+          }
+        />
+      )}
+      <Section
+        title={isPartialForm ? "Partial info" : "Trip info"}
+        subtitle={partialOf ? `Rides with ${partialOf.label}` : undefined}
+      >
+        {partialOf ? (
+          <div className="pr-field">
+            <span className="pr-field-label">Date</span>
+            <span className="pr-field-hint">
+              Same day as the load it rides with. Change that load&apos;s date
+              and this moves with it.
+            </span>
+            <div className="pr-estimate">{partialOf.dateLabel}</div>
+          </div>
+        ) : (
+          <Field label="Date">
+            <TextInput
+              type="date"
+              value={load.load_date}
+              onChange={(ev) => setField("load_date")(ev.target.value)}
+            />
+          </Field>
+        )}
         <Field label="Broker / customer">
           <TextInput
             type="text"
@@ -332,6 +425,24 @@ export function LoadForm({
         </Field>
       </Section>
 
+      {isPartialForm ? (
+      <Section
+        title="Miles"
+        subtitle="Only the miles this partial added. The road you drive anyway is already on the load it rides with."
+      >
+        <div className="sm:col-span-2">
+          <NumInput
+            label="Extra miles for this partial"
+            hint="The miles you're adding to the trip for this partial: the drive to pick it up, plus any miles past the primary's delivery if it drops somewhere else. Enter 0 if it's right on your way."
+            value={extraMiles}
+            onChange={(n) =>
+              setLoad((s) => ({ ...s, loaded_miles: 0, deadhead_miles: n }))
+            }
+            suffix="mi"
+          />
+        </div>
+      </Section>
+      ) : (
       <Section
         title="Miles"
         subtitle="Profit is always calculated on TOTAL miles (loaded + deadhead)."
@@ -369,6 +480,7 @@ export function LoadForm({
           </span>
         </div>
       </Section>
+      )}
 
       <Section
         title="Revenue"
@@ -438,8 +550,14 @@ export function LoadForm({
 
       <Section
         title="Actual costs"
-        subtitle="Optional. If you leave them on Estimate, we use your saved MPG & cost-per-mile values."
+        subtitle={
+          isPartialForm
+            ? "Fuel and tolls for a partial are always estimated from its extra miles, so the same road is never paid for twice. Enter lumpers if this partial had its own."
+            : "Optional. If you leave them on Estimate, we use your saved MPG & cost-per-mile values."
+        }
       >
+        {!isPartialForm && (
+        <>
         <OptionalMoneyInput
           label="Fuel"
           hint={`Estimate uses ${
@@ -456,6 +574,8 @@ export function LoadForm({
           estimate={e.tollsIsEstimated ? e.tollsCost : 0}
           onChange={setField("tolls_actual")}
         />
+        </>
+        )}
         <div className="sm:col-span-2">
           <OptionalMoneyInput
             label="Lumpers / unloading fees"
@@ -543,7 +663,7 @@ export function LoadForm({
             {deletePending ? "Deleting…" : "Delete"}
           </Button>
         )}
-        <ButtonLink href="/loads" variant="secondary">
+        <ButtonLink href={backHref} variant="secondary">
           Cancel
         </ButtonLink>
         <Button
@@ -553,10 +673,168 @@ export function LoadForm({
           pending={pending}
           disabled={deletePending}
         >
-          {pending ? "Saving…" : loadId ? "Save changes" : "Save load"}
+          {pending
+            ? "Saving…"
+            : loadId
+              ? "Save changes"
+              : isPartialForm
+                ? "Save partial"
+                : "Save load"}
         </Button>
       </div>
       </WorkColumn>
     </AnswerLayout>
+  );
+}
+
+/**
+ * The month the trip sits in, as the week's arithmetic wants it: every
+ * other load's miles plus this trip's, live as the primary is edited. A
+ * primary and its partials always share a date (migration 017), so one
+ * month covers all of them.
+ */
+function tripMonth(
+  primary: Load,
+  otherMonthMiles: number,
+  monthFirstDay: number
+): Map<string, MonthStats> {
+  const primaryMiles =
+    (Number(primary.loaded_miles) || 0) + (Number(primary.deadhead_miles) || 0);
+  // otherMonthMiles already holds the partials (they are other loads to the
+  // primary's form); only the primary's live miles are added.
+  return new Map([
+    [
+      loadMonthKey(primary.load_date),
+      { miles: Math.max(0, otherMonthMiles) + primaryMiles, firstDay: monthFirstDay },
+    ],
+  ]);
+}
+
+/** The whole trip — this load and its partials — as one result. */
+function TripPanel({
+  primary,
+  partials,
+  costProfile,
+  otherMonthMiles,
+  monthFirstDay,
+}: {
+  primary: Load;
+  partials: Load[];
+  costProfile: CostProfile;
+  otherMonthMiles: number;
+  monthFirstDay: number;
+}) {
+  const t = tripTotals(
+    { primary, partials },
+    costProfile,
+    tripMonth(primary, otherMonthMiles, monthFirstDay)
+  );
+  const extra = partials.reduce((sum, p) => sum + partialExtraMiles(p), 0);
+  return (
+    <InstrumentPanel>
+      <Reading
+        size="hero"
+        label="Trip profit"
+        value={formatMoney(t.profit, { signed: true })}
+        outcome={outcomeOf(t.profit)}
+      />
+      <ReadingGrid wideColumns={2}>
+        <Reading
+          label="Trip rate"
+          value={t.totalMiles > 0 ? formatRate(t.rpm) : "—"}
+          unit={t.totalMiles > 0 ? "/ mi" : undefined}
+          context={t.totalMiles > 0 && <>{formatRate(t.cpm)} cost</>}
+        />
+        <Reading
+          label="Trip miles"
+          figure={false}
+          value={t.totalMiles.toLocaleString()}
+          context={<>incl. {extra.toLocaleString()} extra for partials</>}
+        />
+        <Reading label="Trip revenue" value={formatMoney(t.revenue)} />
+        <Reading label="Trip cost" value={formatMoney(t.totalCost)} />
+      </ReadingGrid>
+      <PanelNote>
+        This load and its {partials.length === 1 ? "partial" : "partials"}{" "}
+        together: what the truck actually drove and earned.
+      </PanelNote>
+    </InstrumentPanel>
+  );
+}
+
+/** A primary's partials, and the way to add one. */
+function PartialsCard({
+  loadId,
+  partials,
+  canAdd,
+  economicsOf,
+}: {
+  loadId: string;
+  partials: Load[];
+  canAdd: boolean;
+  economicsOf: (p: Load) => ReturnType<typeof computeLoadEconomics>;
+}) {
+  const full = partials.length >= MAX_PARTIALS;
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Partials"
+        description={
+          partials.length === 0
+            ? "Half a trailer? Add the partial that rides with this load. It records what it adds to the trip: its pay, and only the extra miles."
+            : "What each partial added on top of this load."
+        }
+      />
+      {partials.length > 0 && (
+        <ul className="mb-3 flex flex-col gap-2">
+          {partials.map((p) => {
+            const f = partialRecordFigures(economicsOf(p));
+            const route =
+              p.origin || p.destination
+                ? `${p.origin || "—"} → ${p.destination || "—"}`
+                : null;
+            return (
+              <li key={p.id}>
+                <Link
+                  href={`/loads/${p.id}`}
+                  className="pr-record pr-record-link pr-load-partial-link"
+                >
+                  <div className="pr-load-partial-id">
+                    <p className="pr-load-title">{p.broker || "Untitled partial"}</p>
+                    {route && <p className="pr-load-route">{route}</p>}
+                  </div>
+                  <div className="pr-load-partial-figures">
+                    <p className="pr-load-context">
+                      {f.extraMiles} · {f.share ?? `${f.pay} pay`}
+                    </p>
+                    <p className="pr-load-partial-adds">
+                      <span className="pr-load-context">adds </span>
+                      {/* Too small for a result colour to pass; the sign
+                          carries it. */}
+                      <span className="pr-load-value">{f.adds}</span>
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {full ? (
+        <p className="text-sm text-muted">
+          Two partials is the most a load can carry.
+        </p>
+      ) : (
+        canAdd && (
+          <ButtonLink
+            href={`/loads/new?partial_of=${loadId}`}
+            variant="dark"
+            size="sm"
+          >
+            + Add Partial
+          </ButtonLink>
+        )
+      )}
+    </Card>
   );
 }

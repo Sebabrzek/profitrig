@@ -109,7 +109,7 @@ import {
 } from "../src/lib/numericInput";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LoadLedger, LoadRecord } from "../src/app/loads/LoadRecord";
+import { LoadLedger, LoadRecord, PartialRecord, TripLine } from "../src/app/loads/LoadRecord";
 import { RecordDeleteButton } from "../src/components/ui/Records";
 import { AskProfitRigButton } from "../src/components/shell/AskProfitRigButton";
 import { readFileSync } from "node:fs";
@@ -127,9 +127,23 @@ import {
 import {
   fuelEntryPresentation,
   loadRecordFigures,
+  partialRecordFigures,
   roadExpenseDeleteLabel,
+  tripLineFigures,
   type LoadRecordEconomics,
 } from "../src/lib/records";
+import {
+  MAX_PARTIALS,
+  asPartial,
+  countPartials,
+  groupTrips,
+  isPartial,
+  partialExtraMiles,
+  partialsEnabledFor,
+  tripLabel,
+  tripTotals,
+} from "../src/lib/partials";
+import { suggestNightsFromLoads } from "../src/lib/tax/perDiem";
 
 let failures = 0;
 let checks = 0;
@@ -1967,6 +1981,167 @@ check(
   [poisoned.revenue, poisoned.totalCost, poisoned.profit, poisoned.rpm, poisoned.cpm].every(Number.isFinite) &&
     poisoned.loads === 3
 );
+
+
+// ─────────────────────────────────────────────────────────────────────
+section("A partial records what it added to the trip, never what it is");
+// A second load in the same trailer. Its pay is real money, recorded in
+// full; its miles are only the extra miles the truck drove because of it.
+// If it carried its own city-to-city mileage the truck would be charged for
+// road it never drove, and the month's inflated miles would quietly lower
+// the fixed-cost share of every other load in it.
+// ─────────────────────────────────────────────────────────────────────
+
+const tripDate = "2026-09-18";
+const primaryLoad = load({
+  id: "p-1",
+  load_date: tripDate,
+  broker: "Landstar",
+  origin: "Laredo, TX",
+  destination: "Memphis, TN",
+  loaded_miles: 1040,
+  deadhead_miles: 0,
+  linehaul_pay: 2860,
+});
+// Entered the way the partial form sends it: the extra miles in one box.
+const partialLoad = asPartial(
+  load({
+    id: "q-1",
+    load_date: "2026-09-01", // whatever the browser sent, the trip's date wins
+    broker: "Example Freight",
+    origin: "Laredo, TX",
+    destination: "Memphis, TN",
+    loaded_miles: 0,
+    deadhead_miles: 40,
+    linehaul_pay: 900,
+    fuel_actual: 55, // a real trip fuel figure — must not be paid for twice
+    tolls_actual: 12,
+    lumpers_actual: 60,
+  }),
+  primaryLoad
+);
+
+check("a partial names the load it rode with", partialLoad.parent_load_id === "p-1" && isPartial(partialLoad));
+check("and takes its date, whatever date it was sent with", partialLoad.load_date === tripDate);
+check("its extra miles are deadhead, with no loaded miles of its own",
+  partialLoad.loaded_miles === 0 && partialLoad.deadhead_miles === 40 && partialExtraMiles(partialLoad) === 40);
+check("its fuel and tolls are left on the estimate for its extra miles",
+  partialLoad.fuel_actual === null && partialLoad.tolls_actual === null);
+check("its own lumpers are kept", partialLoad.lumpers_actual === 60);
+check("a primary is not a partial", !isPartial(primaryLoad));
+check(
+  "folding miles into one figure keeps the total the driver typed",
+  partialExtraMiles(asPartial(load({ loaded_miles: 30, deadhead_miles: 10 }), primaryLoad)) === 40
+);
+
+// The truck drove Laredo to Memphis once, plus a 40-mile detour.
+const tripMonthStats = monthStatsByLoad([primaryLoad, partialLoad]);
+check(
+  "the month holds 1,080 miles — the road driven once, plus the detour — not 1,680",
+  tripMonthStats.get("2026-09")?.miles === 1080,
+  `${tripMonthStats.get("2026-09")?.miles}`
+);
+
+const tripOne = { primary: primaryLoad, partials: [partialLoad] };
+const tripT = tripTotals(tripOne, profile, tripMonthStats, fridayNight);
+const byRows = aggregateWeek([primaryLoad, partialLoad], profile, tripMonthStats, 0, fridayNight);
+check("the trip is priced by the week's own arithmetic over its rows",
+  tripT.revenue === byRows.revenue && tripT.totalCost === byRows.totalCost && tripT.profit === byRows.profit);
+check("the trip earns both loads' pay: $2,860 + $900 = $3,760", Math.abs(tripT.revenue - 3760) < 1e-9, `${tripT.revenue}`);
+check("over the 1,080 miles actually driven", tripT.totalMiles === 1080);
+check("so its rate is $3,760 / 1,080 mi", Math.abs(tripT.rpm - 3760 / 1080) < 1e-9, formatRate(tripT.rpm));
+
+// Each row priced alone, the way the list prices it, adds up to the trip.
+const priceAlone = (l: Load) => {
+  const st = tripMonthStats.get(loadMonthKey(l.load_date))!;
+  const own = l.loaded_miles + l.deadhead_miles;
+  return computeLoadEconomics(l, profile, buildMtdContext(l.load_date, st.miles - own, st.firstDay, fridayNight));
+};
+const eP = priceAlone(primaryLoad), eQ = priceAlone(partialLoad);
+check("the primary's line plus the partial's line is exactly the trip",
+  Math.abs(eP.profit + eQ.profit - tripT.profit) < 1e-9 && Math.abs(eP.totalCost + eQ.totalCost - tripT.totalCost) < 1e-9);
+check("the partial pays fuel on its 40 extra miles only",
+  Math.abs(eQ.fuelCost - (40 / profile.mpg) * profile.fuel_price_per_gallon) < 1e-9 && eQ.fuelIsEstimated);
+check("and carries fixed costs in proportion to the miles it added",
+  Math.abs(eQ.allocatedFixedCost - eP.allocatedFixedCost * (40 / 1040)) < 1e-9);
+check("what it added is its pay less the cost of its extra miles", Math.abs(eQ.profit - (eQ.revenue - eQ.totalCost)) < 1e-9);
+
+// A partial right on the way: nothing extra driven.
+const onTheWay = asPartial(load({ deadhead_miles: 0, loaded_miles: 0, linehaul_pay: 600, lumpers_actual: 45 }), primaryLoad);
+const eZero = computeLoadEconomics(onTheWay, profile, buildMtdContext(tripDate, 1040, 18, fridayNight));
+check("a partial with 0 extra miles prices without NaN or a divide by zero",
+  [eZero.profit, eZero.rpm, eZero.cpm, eZero.totalCost, eZero.profitPerMile].every(Number.isFinite));
+check("and costs only its own lumpers — no miles, no mileage costs",
+  eZero.totalMiles === 0 && Math.abs(eZero.totalCost - 45) < 1e-9 && Math.abs(eZero.profit - 555) < 1e-9);
+
+// Per diem suggests a night for each load with 250+ loaded miles. A partial
+// rides the same night as its primary and must never add one.
+const nights = suggestNightsFromLoads([primaryLoad, partialLoad, asPartial(load({ deadhead_miles: 600 }), primaryLoad)], 2026);
+check("a partial never adds a per-diem night, however far its detour",
+  nights.periodANights + nights.periodBNights === 1, JSON.stringify(nights));
+
+// The list groups; the totals never read from the grouping.
+const secondPartial = asPartial(load({ id: "q-2", deadhead_miles: 25, linehaul_pay: 600 }), primaryLoad);
+const other = load({ id: "o-1", load_date: "2026-09-16", loaded_miles: 400, linehaul_pay: 1100 });
+const orphan = load({ id: "q-9", parent_load_id: "gone", deadhead_miles: 15, linehaul_pay: 300 });
+const listed = [secondPartial, partialLoad, primaryLoad, other, orphan]; // newest first, as the page lists
+const trips = groupTrips(listed);
+check("partials are tucked under their primary", trips[0].primary.id === "p-1" && trips[0].partials.length === 2);
+check("in the order the list gave them", trips[0].partials[0].id === "q-2" && trips[0].partials[1].id === "q-1");
+check("an ordinary load is a trip of its own", trips[1].primary.id === "o-1" && trips[1].partials.length === 0);
+check("a partial whose primary is not listed is still shown, never dropped", trips.some((t) => t.primary.id === "q-9"));
+const shown = trips.flatMap((t) => [t.primary, ...t.partials]).map((l) => l.id).sort();
+check("every row appears exactly once", JSON.stringify(shown) === JSON.stringify(listed.map((l) => l.id).sort()));
+const weekOfAll = aggregateWeek(listed, profile, monthStatsByLoad(listed), 0, fridayNight);
+const sumOfTrips = trips.reduce((acc, t) => acc + tripTotals(t, profile, monthStatsByLoad(listed), fridayNight).profit, 0);
+check("the week's profit equals the sum of its trips'", Math.abs(weekOfAll.profit - sumOfTrips) < 1e-6);
+check("and a partial still counts as a load booked", weekOfAll.loads === 5 && countPartials(listed) === 3);
+check("two partials is the most a primary can carry", MAX_PARTIALS === 2);
+
+// What the screens say.
+const pf = partialRecordFigures(eQ);
+check("a partial reads as what it added: '+40 mi' and 'adds +$…'",
+  pf.extraMiles === "+40 mi" && pf.adds.startsWith("+$") && pf.outcome === "profit", `${pf.extraMiles} / ${pf.adds}`);
+check("a trip line says how many partials",
+  tripLineFigures(tripT, 1).label === "Trip with 1 partial" && tripLineFigures(tripT, 2).label === "Trip with 2 partials");
+check("a partial names its primary by broker and route",
+  tripLabel(primaryLoad) === "Landstar · Laredo, TX → Memphis, TN" && tripLabel(load({ broker: "" })) === "your load");
+
+// Reading rows: before migration 017 the column is absent.
+check("a row from before migration 017 is an ordinary load", loadFromRow({ load_date: tripDate }).parent_load_id === null);
+check("a partial's row keeps its primary", loadFromRow({ load_date: tripDate, parent_load_id: "p-1" }).parent_load_id === "p-1");
+check("a blank primary is no primary", loadFromRow({ load_date: tripDate, parent_load_id: "" }).parent_load_id === null);
+
+// The rows themselves: every name a row points screen readers at exists.
+{
+  const html = renderToStaticMarkup(
+    React.createElement(LoadLedger, null,
+      React.createElement(PartialRecord, {
+        id: "q-1", href: "/loads/q-1", broker: "Example Freight",
+        origin: "Laredo, TX", destination: "Memphis, TN", economics: eQ,
+      }),
+      React.createElement(TripLine, { totals: tripT, partials: 1 })
+    )
+  );
+  const refs = [...html.matchAll(/aria-(?:labelledby|describedby)="([^"]+)"/g)].flatMap((m) => m[1].split(" "));
+  check("a partial's row names itself from parts that are all there",
+    refs.length > 0 && refs.every((ref) => html.includes(`id="${ref}"`)), refs.join(" "));
+  check("it says Partial, and what it added, and the trip beneath says the whole",
+    html.includes(">Partial<") && html.includes("+40 mi") && html.includes("Trip with 1 partial") && html.includes("1,080 mi"));
+  check("and it links to the partial, not the load it rode with", html.includes('href="/loads/q-1"'));
+}
+
+// Who can add partials while they are tried out.
+const savedEnv = { admin: process.env.ADMIN_EMAILS, partial: process.env.PARTIAL_LOADS_EMAILS };
+process.env.ADMIN_EMAILS = "owner@profitrig.com";
+process.env.PARTIAL_LOADS_EMAILS = " Driver@Example.com , ";
+check("an admin can add partials", partialsEnabledFor("owner@profitrig.com"));
+check("a listed driver can, whatever the capitals", partialsEnabledFor("driver@example.COM"));
+check("nobody else can", !partialsEnabledFor("someone@else.com") && !partialsEnabledFor("") && !partialsEnabledFor(null));
+process.env.ADMIN_EMAILS = savedEnv.admin;
+process.env.PARTIAL_LOADS_EMAILS = savedEnv.partial;
+if (savedEnv.admin === undefined) delete process.env.ADMIN_EMAILS;
+if (savedEnv.partial === undefined) delete process.env.PARTIAL_LOADS_EMAILS;
 
 // ─────────────────────────────────────────────────────────────────────
 
