@@ -96,26 +96,85 @@ export function computePerDiem(
 }
 
 /**
- * Suggest a nights-away count from the user's logged loads in a given tax
- * year. A naive heuristic: each load is one night away if it spans regions
- * (we don't know origin/destination distance precisely here, so we use
- * loaded_miles >= 250 as a "this was an overnight" threshold).
+ * A starting figure for nights away, from the loads the driver has logged.
+ * Pure suggestion — the driver confirms or overrides it on the worksheet.
  *
- * Pure suggestion; the user can override on the per-diem worksheet.
+ * It used to count one night per LOAD with 250+ loaded miles. That counted
+ * loads, not nights: a two-day haul suggested one night, and two long loads
+ * on the same day suggested two. Now it counts DAYS ON THE ROAD:
+ *
+ *   - A trip is a load plus the extra miles of any partials riding with it
+ *     (a partial never starts a trip of its own; its detour lengthens its
+ *     primary's).
+ *   - A trip is a road trip if its load has 250+ loaded miles — the same
+ *     threshold as before, so a local run still counts no night.
+ *   - A road trip keeps the truck out for one day per ROAD_MILES_PER_DAY of
+ *     its total miles, at least one, starting on its load date.
+ *   - Each calendar day covered by any road trip counts once, so loads on
+ *     the same or overlapping days are not counted twice.
+ *   - Only days inside the tax year count, split at Oct 1 as before. A trip
+ *     that starts in late December of the year before can still put nights
+ *     into January, so callers should pass those loads too.
+ *
+ * It is deliberately conservative: days spent waiting between loads are not
+ * counted, so it can understate nights but should not overstate them. An
+ * overstated deduction is the risky direction with the IRS.
  */
-export type LoadDateMiles = { load_date: string; loaded_miles: number };
+/** Hours-of-service allow 11 hours of driving a day; at a ~50 mph average
+ *  that is about 550 miles. */
+export const ROAD_MILES_PER_DAY = 550;
+/** Below this many loaded miles a load is a local run: home that night. */
+export const ROAD_TRIP_LOADED_MILES = 250;
+
+export type LoadDateMiles = {
+  id?: string;
+  load_date: string;
+  loaded_miles: number;
+  deadhead_miles?: number;
+  /** Set on a partial: its miles are extra miles on this load's trip. */
+  parent_load_id?: string | null;
+};
+
+const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 export function suggestNightsFromLoads(
   loads: LoadDateMiles[],
   taxYear: number
 ): { periodANights: number; periodBNights: number } {
+  const miles = (l: LoadDateMiles) =>
+    Math.max(0, Number(l.loaded_miles) || 0) +
+    Math.max(0, Number(l.deadhead_miles) || 0);
+
+  // Each partial's extra miles, added to the trip of the load it rode with.
+  const extraFor = new Map<string, number>();
+  for (const l of loads) {
+    if (l.parent_load_id) {
+      extraFor.set(l.parent_load_id, (extraFor.get(l.parent_load_id) ?? 0) + miles(l));
+    }
+  }
+
+  const days = new Set<string>();
+  for (const l of loads) {
+    if (l.parent_load_id) continue; // part of its primary's trip
+    if ((Number(l.loaded_miles) || 0) < ROAD_TRIP_LOADED_MILES) continue;
+    const tripMiles = miles(l) + (l.id ? extraFor.get(l.id) ?? 0 : 0);
+    const span = Math.max(1, Math.ceil(tripMiles / ROAD_MILES_PER_DAY));
+    // Noon UTC, so adding days can never slip across a date line.
+    const start = new Date(`${l.load_date}T12:00:00Z`);
+    if (Number.isNaN(start.getTime())) continue;
+    for (let i = 0; i < span; i++) {
+      const d = new Date(start);
+      d.setUTCDate(start.getUTCDate() + i);
+      days.add(dayKey(d));
+    }
+  }
+
   let a = 0;
   let b = 0;
-  for (const l of loads) {
-    if (!l.load_date.startsWith(String(taxYear))) continue;
-    if ((l.loaded_miles ?? 0) < 250) continue; // skip same-day local runs
-    const m = parseInt(l.load_date.slice(5, 7), 10);
-    if (m >= 10) b += 1;
+  const year = String(taxYear);
+  for (const k of days) {
+    if (!k.startsWith(year)) continue;
+    if (parseInt(k.slice(5, 7), 10) >= 10) b += 1;
     else a += 1;
   }
   return { periodANights: a, periodBNights: b };

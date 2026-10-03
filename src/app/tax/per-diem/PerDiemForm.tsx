@@ -100,8 +100,10 @@ export function PerDiemForm({
           <Notice title="From your logged loads" className="mb-3">
             <p className="text-xs text-muted leading-snug mb-2">
               Suggested: {suggestedNights.periodANights} nights Jan 1 – Sep 30,{" "}
-              {suggestedNights.periodBNights} nights Oct 1 – Dec 31 (loads with
-              250+ loaded miles). Confirm and override if needed.
+              {suggestedNights.periodBNights} nights Oct 1 – Dec 31 — each day
+              a load of 250+ loaded miles kept you on the road, at about 550
+              miles a day. Days waiting between loads aren&apos;t counted, so
+              add any we missed.
             </p>
             <Button variant="secondary" size="sm" onClick={useSuggested}>
               Use suggested nights

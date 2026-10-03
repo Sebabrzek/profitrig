@@ -1,4 +1,6 @@
 import "server-only";
+import { computeCalculatorTotals } from "@/lib/calculatorTotals";
+import { costProfileFromRow } from "@/lib/costProfile";
 import { AppShell } from "@/components/shell/AppShell";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
@@ -181,8 +183,10 @@ ADMIN_EMAILS = ${user.email}`}
   const chatQuestions = chatRows.filter((c) => c.role === "user");
   const profileByUser = new Map(profiles.map((p) => [p.user_id, p]));
 
-  // Build per-user CPM map. Same math as the Calculator: fixed monthly /
-  // monthly miles + per-mile variables. Override (if set) wins for totalCPM.
+  // Per-user CPM: each saved profile priced by computeCalculatorTotals —
+  // the Calculator's own function, not a copy of it — so Admin can never
+  // show a driver a different cost per mile than their Calculator does.
+  // Override (if set) wins for totalCPM, exactly as it does there.
   type CpmRow = {
     totalCPM: number;
     computedCPM: number;
@@ -194,38 +198,15 @@ ADMIN_EMAILS = ${user.email}`}
   const cpmByUser = new Map<string, CpmRow>();
   for (const row of costProfilesRes.data ?? []) {
     const r = row as Record<string, unknown>;
-    const n = (k: string) => Number(r[k]) || 0;
-    const fixed =
-      n("truck_payment") +
-      n("trailer_payment") +
-      n("insurance") +
-      n("eld_subscriptions") +
-      n("permits_irp_ifta") +
-      n("office_misc") +
-      n("load_board_per_month") +
-      n("other_monthly_bill");
-    const mpg = n("mpg");
-    const fuelPerMile =
-      mpg > 0 ? n("fuel_price_per_gallon") / mpg : 0;
-    const variablePerMile =
-      fuelPerMile +
-      n("maintenance_per_mile") +
-      n("tires_per_mile") +
-      n("def_per_mile") +
-      n("driver_pay_per_mile") +
-      n("tolls_misc_per_mile");
-    const monthlyMiles = n("monthly_miles");
-    const fixedPerMile = monthlyMiles > 0 ? fixed / monthlyMiles : 0;
-    const computedCPM = fixedPerMile + variablePerMile;
-    const override = r.real_cpm_override == null ? null : Number(r.real_cpm_override);
-    const totalCPM = override != null && override > 0 ? override : computedCPM;
-    const requiredRate = totalCPM + n("desired_profit_per_mile");
+    const profile = costProfileFromRow(r);
+    const t = computeCalculatorTotals(profile);
     cpmByUser.set(String(r.user_id), {
-      totalCPM,
-      computedCPM,
-      requiredRate,
-      monthlyMiles,
-      hasOverride: override != null && override > 0,
+      totalCPM: t.totalCPM,
+      computedCPM: t.computedCPM,
+      requiredRate: t.requiredRate,
+      monthlyMiles: profile.monthly_miles,
+      hasOverride:
+        profile.real_cpm_override != null && profile.real_cpm_override > 0,
       updatedAt: (r.updated_at as string | null) ?? null,
     });
   }

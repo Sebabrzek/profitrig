@@ -142,7 +142,11 @@ import {
   tripLabel,
   tripTotals,
 } from "../src/lib/partials";
-import { suggestNightsFromLoads } from "../src/lib/tax/perDiem";
+import {
+  ROAD_MILES_PER_DAY,
+  suggestNightsFromLoads,
+} from "../src/lib/tax/perDiem";
+import { costProfileFromRow } from "../src/lib/costProfile";
 
 let failures = 0;
 let checks = 0;
@@ -2073,11 +2077,14 @@ check("a partial with 0 extra miles prices without NaN or a divide by zero",
 check("and costs only its own lumpers — no miles, no mileage costs",
   eZero.totalMiles === 0 && Math.abs(eZero.totalCost - 45) < 1e-9 && Math.abs(eZero.profit - 555) < 1e-9);
 
-// Per diem suggests a night for each load with 250+ loaded miles. A partial
-// rides the same night as its primary and must never add one.
-const nights = suggestNightsFromLoads([primaryLoad, partialLoad, asPartial(load({ deadhead_miles: 600 }), primaryLoad)], 2026);
-check("a partial never adds a per-diem night, however far its detour",
-  nights.periodANights + nights.periodBNights === 1, JSON.stringify(nights));
+// Per diem counts days on the road. A partial never starts a trip of its
+// own; its extra miles lengthen the trip of the load it rode with.
+const nights = suggestNightsFromLoads([
+  { ...primaryLoad, id: "p-1" },
+  { ...partialLoad, id: "q-1" },
+], 2026);
+check("a partial lengthens its load's trip instead of adding one: 1,080 mi is 2 days on the road",
+  nights.periodANights + nights.periodBNights === 2, JSON.stringify(nights));
 
 // The list groups; the totals never read from the grouping.
 const secondPartial = asPartial(load({ id: "q-2", deadhead_miles: 25, linehaul_pay: 600 }), primaryLoad);
@@ -2131,6 +2138,98 @@ check("a blank primary is no primary", loadFromRow({ load_date: tripDate, parent
 }
 
 
+
+// ─────────────────────────────────────────────────────────────────────
+section("Per diem counts days on the road, not loads");
+// It used to suggest one night per load with 250+ loaded miles: a two-day
+// haul was one night, two long loads on one day were two. It is a figure
+// the driver confirms, but it is money on their taxes.
+// ─────────────────────────────────────────────────────────────────────
+{
+  const L = (o: Partial<{ id: string; load_date: string; loaded_miles: number; deadhead_miles: number; parent_load_id: string | null }>) =>
+    ({ load_date: "2026-03-10", loaded_miles: 0, deadhead_miles: 0, ...o });
+  const total = (r: { periodANights: number; periodBNights: number }) => r.periodANights + r.periodBNights;
+
+  check("a day's driving is about 550 miles (11 hours of HOS at ~50 mph)", ROAD_MILES_PER_DAY === 550);
+  check("a local run under 250 loaded miles is no night", total(suggestNightsFromLoads([L({ loaded_miles: 200 })], 2026)) === 0);
+  check("a 300-mile load is one day on the road", total(suggestNightsFromLoads([L({ loaded_miles: 300 })], 2026)) === 1);
+  check("a 1,040-mile haul is two, not one", total(suggestNightsFromLoads([L({ loaded_miles: 1040 })], 2026)) === 2);
+  check("two long loads on the same day are one day, not two",
+    total(suggestNightsFromLoads([L({ loaded_miles: 300 }), L({ loaded_miles: 320 })], 2026)) === 1);
+  check("overlapping trips share their days: Mon 1,040 mi + Tue 400 mi is Mon–Tue",
+    total(suggestNightsFromLoads([L({ load_date: "2026-03-09", loaded_miles: 1040 }), L({ load_date: "2026-03-10", loaded_miles: 400 })], 2026)) === 2);
+  check("deadhead counts toward the days a trip takes",
+    total(suggestNightsFromLoads([L({ loaded_miles: 500, deadhead_miles: 100 })], 2026)) === 2);
+
+  // The Owner's real trip: Halls, TN → Branchburg, NJ, 1,081 miles, plus a
+  // partial to Blasdell, NY that added 600.
+  const owner = suggestNightsFromLoads([
+    L({ id: "trip", load_date: "2026-09-25", loaded_miles: 1021, deadhead_miles: 60 }),
+    L({ id: "part", load_date: "2026-09-25", loaded_miles: 0, deadhead_miles: 600, parent_load_id: "trip" }),
+  ], 2026);
+  check("the Owner's 1,681-mile trip with its partial is 4 days, Sep 25–28 — the old rule said 1",
+    owner.periodANights === 4 && owner.periodBNights === 0, JSON.stringify(owner));
+  check("a partial on its own never starts a trip",
+    total(suggestNightsFromLoads([L({ loaded_miles: 0, deadhead_miles: 900, parent_load_id: "missing" })], 2026)) === 0);
+
+  const split = suggestNightsFromLoads([L({ load_date: "2026-09-30", loaded_miles: 1040 })], 2026);
+  check("a trip across Oct 1 puts its nights on each side of the rate change",
+    split.periodANights === 1 && split.periodBNights === 1, JSON.stringify(split));
+  const newYear = suggestNightsFromLoads([L({ load_date: "2026-12-30", loaded_miles: 1600 })], 2026);
+  check("days that run past Dec 31 are not counted in this year", newYear.periodBNights === 2 && newYear.periodANights === 0, JSON.stringify(newYear));
+  const intoJan = suggestNightsFromLoads([L({ load_date: "2025-12-31", loaded_miles: 1040 })], 2026);
+  check("a haul that starts Dec 31 of last year puts its Jan 1 night in this year", intoJan.periodANights === 1, JSON.stringify(intoJan));
+  check("a malformed date is skipped, not a crash", total(suggestNightsFromLoads([L({ load_date: "not a date", loaded_miles: 900 })], 2026)) === 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+section("Admin prices a driver with the Calculator's own formula");
+// Admin used to carry its own copy of the cost-per-mile arithmetic — line
+// for line the Calculator's, with nothing keeping it so. It now reads a
+// profile with costProfileFromRow and prices it with computeCalculatorTotals.
+// The old copy is kept HERE, once, to prove the switch moved no number.
+// ─────────────────────────────────────────────────────────────────────
+{
+  // Admin's formula as it stood until 3 Oct 2026, verbatim.
+  const adminBefore = (r: Record<string, unknown>) => {
+    const n = (k: string) => Number(r[k]) || 0;
+    const fixed = n("truck_payment") + n("trailer_payment") + n("insurance") + n("eld_subscriptions") +
+      n("permits_irp_ifta") + n("office_misc") + n("load_board_per_month") + n("other_monthly_bill");
+    const mpg = n("mpg");
+    const fuelPerMile = mpg > 0 ? n("fuel_price_per_gallon") / mpg : 0;
+    const variablePerMile = fuelPerMile + n("maintenance_per_mile") + n("tires_per_mile") + n("def_per_mile") +
+      n("driver_pay_per_mile") + n("tolls_misc_per_mile");
+    const monthlyMiles = n("monthly_miles");
+    const computedCPM = (monthlyMiles > 0 ? fixed / monthlyMiles : 0) + variablePerMile;
+    const override = r.real_cpm_override == null ? null : Number(r.real_cpm_override);
+    const totalCPM = override != null && override > 0 ? override : computedCPM;
+    return { computedCPM, totalCPM, requiredRate: totalCPM + n("desired_profit_per_mile") };
+  };
+  let seed = 20261003;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const junk = [null, undefined, "", "abc", "12.5", 0, -3, "NaN"];
+  const pick = (scale: number) => { const x = rnd(); return x < 0.12 ? junk[Math.floor(rnd() * junk.length)] : Math.round(x * scale * 100) / 100; };
+  let same = 0, worst = 0;
+  const N = 600;
+  for (let i = 0; i < N; i++) {
+    const row: Record<string, unknown> = {
+      truck_payment: pick(3000), trailer_payment: pick(900), insurance: pick(1800), eld_subscriptions: pick(80),
+      permits_irp_ifta: pick(300), office_misc: pick(250), load_board_per_month: pick(200), other_monthly_bill: pick(400),
+      monthly_miles: pick(14000), mpg: pick(9), fuel_price_per_gallon: pick(5), maintenance_per_mile: pick(0.3),
+      tires_per_mile: pick(0.08), def_per_mile: pick(0.05), driver_pay_per_mile: pick(0.8), tolls_misc_per_mile: pick(0.06),
+      desired_profit_per_mile: pick(1), real_cpm_override: rnd() < 0.3 ? pick(3) : null,
+    };
+    const a = adminBefore(row), b = computeCalculatorTotals(costProfileFromRow(row));
+    const d = Math.max(Math.abs(a.computedCPM - b.computedCPM), Math.abs(a.totalCPM - b.totalCPM), Math.abs(a.requiredRate - b.requiredRate));
+    worst = Math.max(worst, Number.isNaN(d) ? Infinity : d);
+    if (d < 1e-12) same++;
+  }
+  check(`Admin's numbers are unchanged for ${N} profiles, malformed figures included`, same === N, `${same}/${N}, worst ${worst}`);
+  const blank = costProfileFromRow({});
+  check("an empty row reads as zeros with no override, never NaN",
+    Object.entries(blank).every(([k, v]) => k === "other_label" ? v === "" : k === "real_cpm_override" ? v === null : v === 0));
+  check("and prices to $0 rather than NaN", computeCalculatorTotals(blank).totalCPM === 0);
+}
 // ─────────────────────────────────────────────────────────────────────
 
 console.log(

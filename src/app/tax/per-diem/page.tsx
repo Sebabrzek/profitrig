@@ -43,11 +43,14 @@ export default async function PerDiemPage({
       .from("per_diem_rates")
       .select("effective_date,conus_rate,ooc_rate,notice")
       .order("effective_date", { ascending: true }),
+    // From late December of the year before: a long haul that starts then
+    // can still keep the truck out into January. Every column, so a partial's
+    // link to its load is there to read.
     supabase
       .from("loads")
-      .select("load_date,loaded_miles")
+      .select("*")
       .eq("user_id", user.id)
-      .gte("load_date", `${taxYear}-01-01`)
+      .gte("load_date", `${taxYear - 1}-12-20`)
       .lte("load_date", `${taxYear}-12-31`),
   ]);
 
@@ -68,8 +71,12 @@ export default async function PerDiemPage({
 
   const suggested = suggestNightsFromLoads(
     (loadsRes.data ?? []).map((r) => ({
-      load_date: r.load_date,
+      id: String(r.id),
+      load_date: String(r.load_date),
       loaded_miles: Number(r.loaded_miles) || 0,
+      deadhead_miles: Number(r.deadhead_miles) || 0,
+      parent_load_id:
+        typeof r.parent_load_id === "string" ? r.parent_load_id : null,
     })),
     taxYear
   );
