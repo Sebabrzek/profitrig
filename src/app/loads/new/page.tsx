@@ -16,7 +16,7 @@ import {
 import { driverToday } from "@/lib/driverClock";
 import { fetchDriverSettings } from "@/lib/driverSettings";
 import { LoadForm, type PartialOf } from "../LoadForm";
-import { MAX_PARTIALS, partialsEnabledFor, tripLabel } from "@/lib/partials";
+import { MAX_PARTIALS, tripLabel } from "@/lib/partials";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -63,13 +63,12 @@ export default async function NewLoadPage({
   ]);
 
   // Adding a partial: the load it rides with decides its date, its month and
-  // its carrier split. Anything that makes a partial impossible here — not
-  // turned on for this account, migration 017 not run yet, a primary that is
-  // itself a partial, or one already carrying two — goes back to that load.
+  // its carrier split. Anything that makes a partial impossible here — a
+  // primary that is itself a partial, or one already carrying two — goes back
+  // to that load.
   let primary: Record<string, unknown> | null = null;
   if (params.partial_of) {
     const back = `/loads/${params.partial_of}`;
-    if (!partialsEnabledFor(user.email)) redirect(back);
     const { data } = await supabase
       .from("loads")
       .select("*")

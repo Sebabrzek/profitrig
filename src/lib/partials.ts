@@ -23,29 +23,10 @@
  * one level, at most two, no loaded miles, the primary's date.
  */
 import type { CostProfile } from "@/app/actions";
-import { adminEmails } from "./admin";
 import { aggregateWeek, type Load, type MonthStats, type WeekTotals } from "./loads";
 
 /** The most partials one primary can carry. Also enforced by migration 017. */
 export const MAX_PARTIALS = 2;
-
-/**
- * Who can add partials while they are being tried out. Admins always can;
- * anyone else is named in PARTIAL_LOADS_EMAILS, a comma-separated list in
- * the same shape as ADMIN_EMAILS. Everyone else sees no change at all.
- */
-export function partialLoadsEmails(): string[] {
-  return (process.env.PARTIAL_LOADS_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function partialsEnabledFor(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const e = email.toLowerCase();
-  return adminEmails().includes(e) || partialLoadsEmails().includes(e);
-}
 
 export function isPartial(load: Pick<Load, "parent_load_id">): boolean {
   return Boolean(load.parent_load_id);

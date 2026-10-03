@@ -15,7 +15,7 @@ import {
 } from "@/lib/loads";
 import { fetchDriverSettings } from "@/lib/driverSettings";
 import { LoadForm, type PartialOf } from "../LoadForm";
-import { MAX_PARTIALS, partialsEnabledFor, tripLabel } from "@/lib/partials";
+import { MAX_PARTIALS, tripLabel } from "@/lib/partials";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -133,8 +133,7 @@ export default async function EditLoadPage({
     };
   }
 
-  // A primary shows its trip and its partials — where partials apply at all:
-  // an account they are turned on for, or a load that already carries some.
+  // A primary shows its trip, its partials, and the way to add one.
   let trip: { partials: Load[]; canAdd: boolean } | undefined;
   if (partialsReady && !partialOf) {
     const { data: partialRows } = await supabase
@@ -144,10 +143,7 @@ export default async function EditLoadPage({
       .eq("parent_load_id", id)
       .order("created_at", { ascending: true });
     const partials = (partialRows ?? []).map((row) => loadFromRow(row));
-    const enabled = partialsEnabledFor(user.email);
-    if (enabled || partials.length > 0) {
-      trip = { partials, canAdd: enabled && partials.length < MAX_PARTIALS };
-    }
+    trip = { partials, canAdd: partials.length < MAX_PARTIALS };
   }
 
   const costData = costRes.data;

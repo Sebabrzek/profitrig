@@ -139,7 +139,6 @@ import {
   groupTrips,
   isPartial,
   partialExtraMiles,
-  partialsEnabledFor,
   tripLabel,
   tripTotals,
 } from "../src/lib/partials";
@@ -2131,17 +2130,6 @@ check("a blank primary is no primary", loadFromRow({ load_date: tripDate, parent
   check("and it links to the partial, not the load it rode with", html.includes('href="/loads/q-1"'));
 }
 
-// Who can add partials while they are tried out.
-const savedEnv = { admin: process.env.ADMIN_EMAILS, partial: process.env.PARTIAL_LOADS_EMAILS };
-process.env.ADMIN_EMAILS = "owner@profitrig.com";
-process.env.PARTIAL_LOADS_EMAILS = " Driver@Example.com , ";
-check("an admin can add partials", partialsEnabledFor("owner@profitrig.com"));
-check("a listed driver can, whatever the capitals", partialsEnabledFor("driver@example.COM"));
-check("nobody else can", !partialsEnabledFor("someone@else.com") && !partialsEnabledFor("") && !partialsEnabledFor(null));
-process.env.ADMIN_EMAILS = savedEnv.admin;
-process.env.PARTIAL_LOADS_EMAILS = savedEnv.partial;
-if (savedEnv.admin === undefined) delete process.env.ADMIN_EMAILS;
-if (savedEnv.partial === undefined) delete process.env.PARTIAL_LOADS_EMAILS;
 
 // ─────────────────────────────────────────────────────────────────────
 

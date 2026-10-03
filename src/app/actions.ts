@@ -457,7 +457,7 @@ export async function deleteSnapshotAction(
 }
 
 import type { Load } from "@/lib/loads";
-import { MAX_PARTIALS, asPartial, partialsEnabledFor } from "@/lib/partials";
+import { MAX_PARTIALS, asPartial } from "@/lib/partials";
 import { isRoadCategory } from "@/lib/roadExpenses";
 
 function nullableNum(v: number | null): number | null {
@@ -498,9 +498,6 @@ export async function saveLoadAction(
 
   let load = input;
   if (parentId) {
-    if (!partialsEnabledFor(user.email)) {
-      return { ok: false, error: "Partials aren't turned on for your account yet." };
-    }
     const { data: primary } = await supabase
       .from("loads")
       .select("*")
