@@ -91,6 +91,7 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Partials for every Pro driver | `678ef95` | on `fix/partials-pwa-accuracy`, **not merged** |
 | PWA opens on /calculator; ivory canvas | `f8935e5` | on `fix/partials-pwa-accuracy`, **not merged** |
 | Per diem counts days on the road; Admin CPM shared | `d96de91` | on `fix/partials-pwa-accuracy`, **not merged**, 259 → 275 checks |
+| Admin: one page per driver, read-only, everything they entered | — | on `fix/partials-pwa-accuracy`, **not merged**, 275 → 298 checks |
 
 ## Locked design decisions
 
@@ -278,6 +279,13 @@ be planned.
 - The Loads-vs-Tax revenue difference (D4) still needs Sebastian's call.
 
 ## Still open
+
+- **Login copy now overstates privacy.** The login card says "Your numbers
+  stay private to you." Since 3 Oct, an admin can read every driver's
+  entries (read-only, `/admin/users/[id]`) to help them. Sebastian to decide
+  the wording — e.g. "Your numbers stay private — only you, and ProfitRig
+  support when you ask for help, can see them" — and whether the privacy
+  policy needs the same line.
 
 - The design rollout is **complete**: every screen, signed in and signed
   out, is on the system. There is no Phase 6.

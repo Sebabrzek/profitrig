@@ -147,6 +147,12 @@ import {
   suggestNightsFromLoads,
 } from "../src/lib/tax/perDiem";
 import { costProfileFromRow } from "../src/lib/costProfile";
+import {
+  adminWeeks,
+  findLookalikes,
+  loadChecks,
+  profileChecks,
+} from "../src/lib/adminView";
 
 let failures = 0;
 let checks = 0;
@@ -2230,6 +2236,85 @@ section("Admin prices a driver with the Calculator's own formula");
     Object.entries(blank).every(([k, v]) => k === "other_label" ? v === "" : k === "real_cpm_override" ? v === null : v === 0));
   check("and prices to $0 rather than NaN", computeCalculatorTotals(blank).totalCPM === 0);
 }
+
+// ─────────────────────────────────────────────────────────────────────
+section("Admin shows a driver exactly the numbers they see");
+// The Admin driver page is read-only and introduces no formula: weeks are
+// priced by aggregateWeek and loads by computeLoadEconomics, with fixed
+// costs over each load's whole month — the inputs the Loads tab uses.
+// ─────────────────────────────────────────────────────────────────────
+{
+  const mk = (o: Partial<Load>): Load => load({ id: o.id ?? `L${Math.random()}`, ...o });
+  const rows: Load[] = [
+    mk({ id: "a", load_date: "2026-09-14", broker: "Landstar", loaded_miles: 600, deadhead_miles: 40, linehaul_pay: 1700 }),
+    mk({ id: "b", load_date: "2026-09-16", broker: "TQL", loaded_miles: 450, deadhead_miles: 30, linehaul_pay: 1250 }),
+    mk({ id: "c", load_date: "2026-09-22", broker: "CH Robinson", loaded_miles: 1081, deadhead_miles: 0, linehaul_pay: 5000, carrier_pct: 20 }),
+    mk({ id: "d", load_date: "2026-09-22", broker: "Been Mac", loaded_miles: 0, deadhead_miles: 600, linehaul_pay: 3500, carrier_pct: 20, parent_load_id: "c" }),
+  ];
+  const road: RoadExpense[] = [{ id: "r1", spent_on: "2026-09-15", category: "food" as RoadExpense["category"], amount: 42, note: "" }];
+  const now = new Date(2026, 8, 30, 12);
+  const weeks = adminWeeks(rows, road, profile, "monday", now);
+  check("weeks come newest first, cut on the driver's own week start", weeks.map((w) => w.weekStart).join(",") === "2026-09-21,2026-09-14");
+  const months = monthStatsByLoad(rows);
+  const asLoadsTab = aggregateWeek(rows.filter((l) => l.load_date >= "2026-09-14" && l.load_date <= "2026-09-20"), profile, months, 42, now);
+  const w14 = weeks.find((w) => w.weekStart === "2026-09-14")!;
+  check("a week's figures are the Loads tab's own, to the cent",
+    w14.totals.profit === asLoadsTab.profit && w14.totals.revenue === asLoadsTab.revenue && w14.totals.totalCost === asLoadsTab.totalCost);
+  check("its other expenses are in it", w14.totals.roadExpenses === 42 && w14.roadExpenses.length === 1);
+  check("partials are counted in their week", weeks[0].partials === 1 && weeks[0].totals.loads === 2);
+  const sunday = adminWeeks(rows, road, profile, "sunday", now);
+  check("a Sunday-week driver is shown Sunday weeks", sunday.every((w) => new Date(`${w.weekStart}T12:00:00`).getDay() === 0));
+  check("no load is lost or counted twice across weeks", weeks.reduce((n, w) => n + w.loads.length, 0) === rows.length);
+
+  // Lookalikes: the same freight saved twice.
+  const twice = [
+    mk({ id: "x1", load_date: "2026-09-10", broker: "Echo", destination: "Atlanta, GA", linehaul_pay: 850 }),
+    mk({ id: "x2", load_date: "2026-09-11", broker: "echo ", destination: "Atlanta, GA", linehaul_pay: 850 }),
+    mk({ id: "x3", load_date: "2026-09-20", broker: "Echo", linehaul_pay: 850 }),
+  ];
+  const look = findLookalikes(twice);
+  check("the same pay and broker a day apart is flagged as possibly saved twice", look.get("x1") === "x2" && look.get("x2") === "x1");
+  check("the same pay ten days later is not", !look.has("x3"));
+  check("a partial and the load it rides with are never paired",
+    !findLookalikes([mk({ id: "p", broker: "A", linehaul_pay: 900 }), mk({ id: "q", broker: "A", linehaul_pay: 900, parent_load_id: "p" })]).size);
+
+  // Checks on one load.
+  const ctx = { fuelEstimate: 300, today: "2026-09-30" };
+  const econ = (l: Load) => computeLoadEconomics(l, profile, undefined);
+  const clean = mk({ loaded_miles: 600, deadhead_miles: 40, linehaul_pay: 1700 });
+  check("an ordinary load raises nothing", loadChecks(clean, econ(clean), ctx).length === 0, loadChecks(clean, econ(clean), ctx).join("; "));
+  const typo = mk({ loaded_miles: 104, deadhead_miles: 0, linehaul_pay: 2860 });
+  check("1,040 miles typed as 104 is caught by its rate", loadChecks(typo, econ(typo), ctx).some((c) => c.includes("/mi")));
+  const noPay = mk({ loaded_miles: 500, linehaul_pay: 0 });
+  check("a load with no pay is caught", loadChecks(noPay, econ(noPay), ctx).includes("No pay entered"));
+  const dh = mk({ loaded_miles: 100, deadhead_miles: 300, linehaul_pay: 400 });
+  check("more deadhead than loaded is caught", loadChecks(dh, econ(dh), ctx).includes("More deadhead than loaded miles"));
+  const fuelTypo = mk({ loaded_miles: 600, linehaul_pay: 1700, fuel_actual: 40 });
+  check("a fuel figure a tenth of what the miles burn is caught", loadChecks(fuelTypo, econ(fuelTypo), ctx).some((c) => c.startsWith("Fuel entered")));
+  const future = mk({ load_date: "2026-10-09", loaded_miles: 600, linehaul_pay: 1700 });
+  check("a load dated in the future is caught", loadChecks(future, econ(future), ctx).includes("Dated in the future"));
+  const bigPartial = mk({ loaded_miles: 0, deadhead_miles: 900, linehaul_pay: 1500, parent_load_id: "p" });
+  check("a partial with whole-trip 'extra miles' is caught",
+    loadChecks(bigPartial, econ(bigPartial), { ...ctx, primaryMiles: 1000 }).some((c) => c.includes("not the partial's whole trip")));
+  const ownersPartial = mk({ loaded_miles: 0, deadhead_miles: 600, linehaul_pay: 3500, parent_load_id: "c" });
+  check("but the Owner's 600 on a 1,081-mile trip is above the line too — and says so plainly, as a question",
+    loadChecks(ownersPartial, econ(ownersPartial), { ...ctx, primaryMiles: 1081 }).some((c) => c.startsWith("600 extra miles")));
+  check("a partial is never flagged for having no loaded miles",
+    !loadChecks(bigPartial, econ(bigPartial), { ...ctx, primaryMiles: 1000 }).some((c) => c.includes("No miles") || c.includes("deadhead than loaded")));
+
+  // Checks on the Calculator.
+  const good = computeCalculatorTotals(profile);
+  check("a sensible Calculator raises nothing", profileChecks(profile, good, null).length === 0, profileChecks(profile, good, null).join("; "));
+  const bad = { ...profile, monthly_miles: 0, mpg: 0, insurance: 0 };
+  const badChecks = profileChecks(bad, computeCalculatorTotals(bad), null);
+  check("missing monthly miles, MPG and insurance are each caught",
+    badChecks.some((c) => c.startsWith("Monthly miles not set")) && badChecks.some((c) => c.startsWith("MPG not set")) && badChecks.includes("Insurance is $0"));
+  check("a Calculator MPG far from the fuel log's is caught", profileChecks({ ...profile, mpg: 7.5 }, good, 5.9).some((c) => c.includes("fuel log averages 5.9")));
+  check("one close to it is not", !profileChecks({ ...profile, mpg: 6.2 }, good, 6.0).some((c) => c.includes("fuel log")));
+  const manual = { ...profile, real_cpm_override: good.computedCPM * 1.6 };
+  check("a manual cost per mile far from their own inputs is caught", profileChecks(manual, computeCalculatorTotals(manual), null).some((c) => c.includes("manual cost per mile")));
+}
+
 // ─────────────────────────────────────────────────────────────────────
 
 console.log(

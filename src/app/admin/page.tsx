@@ -1,3 +1,4 @@
+import Link from "next/link";
 import "server-only";
 import { computeCalculatorTotals } from "@/lib/calculatorTotals";
 import { costProfileFromRow } from "@/lib/costProfile";
@@ -376,7 +377,10 @@ ADMIN_EMAILS = ${user.email}`}
                         {formatDate(u.created_at)}
                       </td>
                       <th scope="row" className="py-2.5 pr-4 text-left font-medium break-all">
-                        {u.email}
+                        {/* Everything this driver has entered, read-only. */}
+                        <Link href={`/admin/users/${u.id}`} className="pr-link">
+                          {u.email}
+                        </Link>
                       </th>
                       <td className="py-2.5 pr-4">{name || "—"}</td>
                       <td className="py-2.5 pr-4">
