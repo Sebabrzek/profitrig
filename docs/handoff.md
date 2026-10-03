@@ -20,18 +20,22 @@ live. Every screen, signed in and signed out, is now on the system. What
 follows is Sebastian's call, and the business work is the carrier-pay order
 at the bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (25 Sep 2026)
+## Repository state (3 Oct 2026)
 
-- Production `main` = `origin/main` = `386f071`, live: the marketing
-  homepage and both financial fixes. `git log --oneline -3` is the truth;
-  this file is a summary.
-- **In review: `feature/partial-loads`** — partials under a primary load.
-  Needs migration 017 run by hand, and `PARTIAL_LOADS_EMAILS` set in Vercel,
-  before anyone but an admin sees it. Not merged.
-- **Parked, not forgotten: `design/06-money-and-canvas`** — the ivory
-  canvas, the PWA `start_url`, and the dollar-wave money button (`7a0e420`).
-  Local only, unpushed; Sebastian put it aside on 23 Sep to do partials
-  first. It overlaps this branch only in `loads/page.tsx` and this file.
+- Production `main` = `origin/main` = `8c3b7f4`, live: partial loads on top
+  of the marketing homepage and both financial fixes. Migration 017 is
+  applied. `git log --oneline -3` is the truth; this file is a summary.
+- **In review: `fix/partials-pwa-accuracy`** — partials for every Pro
+  driver, the PWA `start_url` and ivory canvas (without the button), and the
+  per-diem and Admin CPM accuracy pass. Not merged.
+- **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
+  the dollar wave, a banknote border and a scroll, and is not settled on a
+  direction. Do not raise it until he does. `+ Add a Load` keeps production's
+  treatment. The attempts are on `design/06-money-and-canvas` (local only):
+  its canvas and PWA parts have shipped from the branch above; only the
+  button remains there.
+- `PARTIAL_LOADS_EMAILS` in Vercel is unused once the branch above is merged,
+  and can be deleted.
 - Merged branches kept on the remote: `design/03b-surfaces-hierarchy`,
   `design/03c-actions-inputs`, `design/03d-records-lists`,
   `feature/ai-guardrails`, `security/016-chat-writes`, `design/04a-identity`,
@@ -80,9 +84,13 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Chat rows server-written only | `2e4def2` | live (migration 016 applied) |
 | Phase 4A — the approved identity | `3379df7` | live |
 | Phase 5 — signed-out surfaces | `460b863` | live |
-| Phase 4 — marketing homepage | `3379df7`…`eba79e8` | on `design/04-marketing`, approved, **not merged** |
-| Calculation audit (tests only) | `0270ff5` | local only, 195 → 213 checks |
-| Financial correctness fixes | `834c4a3` | local only, approved, 213 → 223 checks |
+| Phase 4 — marketing homepage | `3379df7`…`eba79e8` | live |
+| Calculation audit (tests only) | `0270ff5` | live, 195 → 213 checks |
+| Financial correctness fixes | `834c4a3` | live, 213 → 223 checks |
+| Partial loads (one Owner first) | `8c3b7f4` | live (migration 017 applied), 223 → 262 checks |
+| Partials for every Pro driver | `678ef95` | on `fix/partials-pwa-accuracy`, **not merged** |
+| PWA opens on /calculator; ivory canvas | `f8935e5` | on `fix/partials-pwa-accuracy`, **not merged** |
+| Per diem counts days on the road; Admin CPM shared | `d96de91` | on `fix/partials-pwa-accuracy`, **not merged**, 259 → 275 checks |
 
 ## Locked design decisions
 
@@ -229,11 +237,45 @@ A partial is a second load riding in the same trailer as one already booked
   deliberately kept out of the ledger's Revenue / Cost / Profit columns. A
   primary's own page shows a live Trip panel and the Partials card with
   **+ Add Partial**.
-- **Who sees it:** admins, plus the comma-separated `PARTIAL_LOADS_EMAILS`
-  env var. The server action checks it too. Everyone else sees no change.
+- **Who sees it:** every Pro driver, from 3 Oct. It was tried first on one
+  Owner (an allowlist, since removed); his one partial checked out clean
+  against a read-only query — 600 extra miles that match the geography,
+  nothing entered twice.
 - **Not in this pass:** auto-filling miles from cities (needs a routing
   provider — PC\*Miler is what brokers pay on; an LLM must never be the
   source of a mileage figure), and turning an existing load into a partial.
+
+## Features asked for, not yet planned (3 Oct 2026)
+
+In Sebastian's rough order of interest. Each needs a decision before it can
+be planned.
+
+- **Pay per hour.** Sebastian's own trucks are paid by the hour, and
+  ProfitRig only knows "load pay minus the carrier's %" — it cannot tell his
+  operation whether a week made money. Needs: what counts as an hour (ELD
+  on-duty, clock hours…), whether waiting/detention is paid, anything on top
+  (FSC, minimum per day), and whether a truck can switch between hourly and
+  per-load. Store the pay basis per load, like `carrier_pct`, so a change
+  never rewrites past weeks. Costs stay mile-based; monthly bills may need
+  spreading over hours.
+- **Snap and scan.** Photograph a BOL, rate con, fuel or expense receipt or a
+  carrier settlement; the AI fills a DRAFT the driver confirms — never saves
+  on its own. Keep the original image attached (IRS records, audit trail).
+  Settlements are the big win for leased drivers: one scan, a week of loads,
+  and the carrier % checked. Plus an email-in address. Ship in steps:
+  receipts → rate cons → settlements → email-in.
+- **Invoicing.** Invoice from a load, PDF, email to the broker, paid/unpaid
+  and days outstanding. Mainly for drivers with their own authority (leased
+  drivers are paid by their carrier), and "send to my factor" may matter as
+  much as "send to broker".
+- Both of those need an **email service** (send and receive) — one choice,
+  e.g. Postmark or Resend, serves both.
+- **Auto-fill miles** from origin and destination via a routing provider
+  (PC*Miler is what brokers pay on), with a **city picker** — free-typed
+  "Halls ,tn" will not survive a lookup or an invoice. Never an LLM as the
+  source of a mileage figure.
+- Turning an existing load into a partial.
+- The Loads-vs-Tax revenue difference (D4) still needs Sebastian's call.
 
 ## Still open
 
