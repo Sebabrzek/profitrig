@@ -149,9 +149,13 @@ import {
 import { costProfileFromRow } from "../src/lib/costProfile";
 import {
   adminWeeks,
+  driverNote,
   findLookalikes,
+  gmailHref,
   loadChecks,
+  mailtoHref,
   profileChecks,
+  smsHref,
 } from "../src/lib/adminView";
 
 let failures = 0;
@@ -2313,6 +2317,34 @@ section("Admin shows a driver exactly the numbers they see");
   check("one close to it is not", !profileChecks({ ...profile, mpg: 6.2 }, good, 6.0).some((c) => c.includes("fuel log")));
   const manual = { ...profile, real_cpm_override: good.computedCPM * 1.6 };
   check("a manual cost per mile far from their own inputs is caught", profileChecks(manual, computeCalculatorTotals(manual), null).some((c) => c.includes("manual cost per mile")));
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+section("A note to the driver, sent from Sebastian's own email or phone");
+// ─────────────────────────────────────────────────────────────────────
+{
+  const items = [
+    { where: "Fri, Sep 25 · Been Mac", text: "600 extra miles — confirm that's the detour, not the partial's whole trip" },
+    { where: "Your Calculator", text: "Calculator says 7.5 MPG; their fuel log averages 5.9" },
+  ];
+  const n = driverNote({ firstName: "Dennis", weekLabel: "Sep 21 – 27", items, from: "Sebastian, ProfitRig" });
+  check("it greets the driver and names the week", n.body.startsWith("Hi Dennis —") && n.body.includes("week of Sep 21 – 27"));
+  check("it lists what's worth a look, each with where it is", n.body.includes("• Fri, Sep 25 · Been Mac: 600 extra miles"));
+  check("it is signed by the reviewer", n.body.endsWith("— Sebastian, ProfitRig"));
+  check("the subject names the week", n.subject === "Your ProfitRig numbers — week of Sep 21 – 27");
+  const many = driverNote({ firstName: "", weekLabel: null, items: Array.from({ length: 11 }, (_, i) => ({ text: `item ${i}` })), from: "ProfitRig" });
+  check("a long list is cut at eight, and says how many more", many.body.includes("• item 7") && !many.body.includes("• item 8") && many.body.includes("…and 3 more."));
+  check("no first name still reads naturally", many.body.startsWith("Hi there —"));
+  check("nothing to flag is still a friendly check-in", driverNote({ firstName: "D", weekLabel: null, items: [], from: "S" }).body.includes("wanted to check in"));
+
+  const m = mailtoHref("dennis@example.com", n.subject, n.body);
+  const q = new URLSearchParams(m.slice(m.indexOf("?") + 1));
+  check("the email opens addressed, with the subject and body intact", m.startsWith("mailto:dennis%40example.com?") && q.get("subject") === n.subject && q.get("body") === n.body);
+  check("Gmail gets the same draft", new URL(gmailHref("dennis@example.com", n.subject, n.body)).searchParams.get("body") === n.body);
+  check("a US phone typed any way becomes +1 and digits", smsHref("(555) 123-4567", "x")!.startsWith("sms:+15551234567?"));
+  check("an international number keeps its +", smsHref("+44 7700 900123", "x")!.startsWith("sms:+447700900123?"));
+  check("no usable number means no Text button", smsHref("", "x") === null && smsHref("555-1234", "x") === null && smsHref(null, "x") === null);
 }
 
 // ─────────────────────────────────────────────────────────────────────

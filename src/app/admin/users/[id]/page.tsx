@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
 import { Chip } from "@/components/ui/Chip";
+import { buttonClass } from "@/components/ui/Button";
 import {
   InstrumentPanel,
   PanelNote,
@@ -50,9 +51,13 @@ import {
 } from "@/lib/partials";
 import {
   adminWeeks,
+  driverNote,
   findLookalikes,
+  gmailHref,
   loadChecks,
+  mailtoHref,
   profileChecks,
+  smsHref,
 } from "@/lib/adminView";
 import { computeFuelStats, type FuelLog } from "@/lib/fuel";
 import { roadCategoryMeta, type RoadExpense } from "@/lib/roadExpenses";
@@ -154,6 +159,11 @@ export default async function AdminDriverPage({
     byUser("ai_usage", "status,estimated_cost_usd,created_at"),
     admin.from("feedback").select("id,message,created_at").eq("user_id", id).order("created_at", { ascending: false }),
   ]);
+  const { data: me } = await admin
+    .from("driver_profiles")
+    .select("first_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   type Row = Record<string, unknown>;
   const p = (profileRes.data ?? null) as Row | null;
@@ -223,6 +233,23 @@ export default async function AdminDriverPage({
   const selected =
     weeks.find((w) => w.weekStart === (weekParam ? weekOf(weekParam) : "")) ?? weeks[0] ?? null;
 
+  // A note to the driver about the week in view, for Sebastian to send from
+  // his own email or phone. ProfitRig stores and sends nothing.
+  const calcFlags = costRow ? profileChecks(profile, totals, fuel.averageMpg) : [];
+  const note = driverNote({
+    firstName: String(p?.first_name ?? ""),
+    weekLabel: selected ? formatWeekLabel(new Date(`${selected.weekStart}T12:00:00`)) : null,
+    items: [
+      ...(selected?.loads ?? []).flatMap((l) =>
+        checksFor(l).map((text) => ({ where: `${day(l.load_date, false)} · ${l.broker || (isPartial(l) ? "partial" : "load")}`, text }))
+      ),
+      ...calcFlags.map((text) => ({ where: "Your Calculator", text })),
+    ],
+    from: me?.first_name ? `${me.first_name}, ProfitRig` : "ProfitRig",
+  });
+  const firstName = String(p?.first_name ?? "").trim() || "driver";
+  const sms = smsHref(p?.phone as string | null, note.body);
+
   const usage = ((usageRes.data ?? []) as Row[]);
   const aiCost = usage.reduce((s, u) => s + (Number(u.estimated_cost_usd) || 0), 0);
 
@@ -242,6 +269,36 @@ export default async function AdminDriverPage({
         Exactly what this driver entered, priced the way their own screens
         price it. Nothing here can be changed from Admin.
       </Notice>
+
+      {/* Reach them from your own email or phone, with what is worth a look
+          in the week you are viewing already written out. */}
+      {driver.email && (
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2">
+            <a href={mailtoHref(driver.email, note.subject, note.body)} className={buttonClass({ variant: "dark", size: "sm" })}>
+              Email {firstName}
+            </a>
+            <a
+              href={gmailHref(driver.email, note.subject, note.body)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass({ variant: "secondary", size: "sm" })}
+            >
+              Open in Gmail
+            </a>
+            {sms && (
+              <a href={sms} className={buttonClass({ variant: "secondary", size: "sm" })}>
+                Text {firstName}
+              </a>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Pre-written with what&apos;s worth a look in the week you&apos;re
+            viewing. You edit it before it goes, and it sends from your own
+            email or phone.
+          </p>
+        </div>
+      )}
 
       {/* ── account ─────────────────────────────────────────────────── */}
       <Card className="mb-5">

@@ -163,14 +163,68 @@ export function profileChecks(
   if (p.fuel_price_per_gallon <= 0) out.push("Fuel price not set — fuel is costed at $0");
   else if (p.fuel_price_per_gallon < 2 || p.fuel_price_per_gallon > 7) out.push(`$${p.fuel_price_per_gallon}/gal is an unusual diesel price`);
   if (p.mpg > 0 && fuelLogMpg != null && fuelLogMpg > 0 && Math.abs(p.mpg - fuelLogMpg) / fuelLogMpg > 0.1) {
-    out.push(`Calculator says ${p.mpg} MPG; their fuel log averages ${fuelLogMpg.toFixed(1)}`);
+    out.push(`The Calculator uses ${p.mpg} MPG; the fuel log averages ${fuelLogMpg.toFixed(1)}`);
   }
   if (p.insurance <= 0) out.push("Insurance is $0");
   if (p.real_cpm_override != null && p.real_cpm_override > 0 && t.computedCPM > 0) {
     const diff = (p.real_cpm_override - t.computedCPM) / t.computedCPM;
     if (Math.abs(diff) > 0.25) {
-      out.push(`Their manual cost per mile is ${Math.round(Math.abs(diff) * 100)}% ${diff > 0 ? "above" : "below"} what their own inputs calculate`);
+      out.push(`The manual cost per mile is ${Math.round(Math.abs(diff) * 100)}% ${diff > 0 ? "above" : "below"} what the Calculator inputs work out to`);
     }
   }
   return out;
+}
+
+/**
+ * A note to a driver about what is worth a look, for Sebastian to send from
+ * his OWN email or phone — ProfitRig stores and sends nothing. He edits it
+ * before it goes; this only saves him typing it.
+ */
+export function driverNote({
+  firstName,
+  weekLabel,
+  items,
+  from,
+}: {
+  firstName: string;
+  /** "Sep 21 – 27", or null when there is no week in view. */
+  weekLabel: string | null;
+  items: { where?: string; text: string }[];
+  from: string;
+}): { subject: string; body: string } {
+  const hi = `Hi ${firstName.trim() || "there"} —`;
+  const MAX_ITEMS = 8;
+  const shown = items.slice(0, MAX_ITEMS).map((i) => `• ${i.where ? `${i.where}: ` : ""}${i.text}`);
+  const more = items.length > MAX_ITEMS ? [`…and ${items.length - MAX_ITEMS} more.`] : [];
+  const lead = items.length
+    ? `I was going over your numbers${weekLabel ? ` for the week of ${weekLabel}` : ""} and a few things are worth a look:`
+    : `I was going over your numbers${weekLabel ? ` for the week of ${weekLabel}` : ""} and wanted to check in.`;
+  return {
+    subject: `Your ProfitRig numbers${weekLabel ? ` — week of ${weekLabel}` : ""}`,
+    body: [hi, "", lead, ...(items.length ? ["", ...shown, ...more] : []), "", `— ${from}`].join("\n"),
+  };
+}
+
+/** Opens the reviewer's own mail app. */
+export function mailtoHref(to: string, subject: string, body: string): string {
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+/** Opens a Gmail draft in the browser, for anyone who lives in Gmail. */
+export function gmailHref(to: string, subject: string, body: string): string {
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+/**
+ * Opens Messages. Phone numbers are typed freely on the profile, so keep the
+ * digits and a leading +; a 10-digit US number gets +1. Null when there is
+ * no usable number.
+ */
+export function smsHref(phone: string | null | undefined, body: string): string | null {
+  if (!phone) return null;
+  const plus = phone.trim().startsWith("+");
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  const number = plus ? `+${digits}` : digits.length === 10 ? `+1${digits}` : `+${digits}`;
+  return `sms:${number}?&body=${encodeURIComponent(body)}`;
 }
