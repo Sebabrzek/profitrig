@@ -23,7 +23,18 @@
 
   /* --- Surfaces ---------------------------------------------------------- */
   /* Dark Rig Green = intelligence and results. Light = work and input. */
-  --pr-bg: #f6f7f4;
+
+  /* The light page canvas, warm ivory, read off the hero artwork's own
+     paper. One value under two names so the marketing page and the
+     application cannot drift apart. Off White is NOT replaced: it keeps its
+     own jobs — inner rows, chips, empty states, the disabled and hover
+     mixes below — and white stays the card and form surface. */
+  --pr-paper: #f9f5e9;
+  /* Charcoal eased back toward the paper. Small text directly on the canvas
+     reads 5.33:1 here, where the product's cooler muted grey manages 4.56:1
+     — passing, with nothing spare. */
+  --pr-paper-muted: color-mix(in srgb, var(--pr-text) 70%, var(--pr-paper));
+  --pr-bg: var(--pr-paper);
   --pr-surface: #ffffff;
   --pr-surface-dark: #173c2b;
   --pr-text: #1f2937;
@@ -215,6 +226,18 @@ h6 {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--pr-bg);
+  /* Small text sitting directly on the paper — a page eyebrow, a page or
+     section description — takes the warmer charcoal. White surfaces put it
+     back, immediately below. */
+  --muted: var(--pr-paper-muted);
+}
+/* Inside a white surface we are on the product's own stock, so its muted
+   grey is restored: cards, notices, the action bar, the top bar, the bottom
+   nav, the chat panel. This leans on the `bg-white` utility because that is
+   how every one of those surfaces is painted — if a surface stops using it,
+   this stops finding it. */
+.pr-shell .bg-white {
+  --muted: var(--pr-text-muted);
 }
 .pr-shell[data-width="form"] {
   --pr-content-max: var(--pr-content-form);
@@ -1235,16 +1258,10 @@ input[type="number"] {
    ========================================================================= */
 @layer components {
   :root {
-    /* The marketing canvas. Warm ivory, read off the hero artwork's own
-       paper, and the default behind every light marketing section — not a
-       hero-only background. The product's Off White stays the product's:
-       cards, demo frames and the application itself are unchanged. */
-    --pr-mk-paper: #f9f5e9;
-    /* The product's muted grey is mixed for Off White and lands at 4.56:1 on
-       this warmer stock — passing, with nothing spare. Marketing prose on the
-       paper uses Charcoal eased back toward it instead: 5.3:1, comfortably
-       clear rather than barely over the line. */
-    --pr-mk-paper-muted: color-mix(in srgb, var(--pr-text) 70%, var(--pr-mk-paper));
+    /* The marketing canvas is the shared paper; these names are kept because
+       the marketing rules below read better with them. */
+    --pr-mk-paper: var(--pr-paper);
+    --pr-mk-paper-muted: var(--pr-paper-muted);
   }
 
   /* One sheet. Light sections inherit it; the dark bands paint over it. */

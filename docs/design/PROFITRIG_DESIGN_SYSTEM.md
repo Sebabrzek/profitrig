@@ -10,6 +10,28 @@ Claude's job is implementation. Do not invent design choices where this system a
 
 The user approved the primary horizontal and compact previews. Production wordmark and lockup files now reside in `assets/logos/wordmark/` and `assets/logos/lockup/`. Their custom path geometry is the approved Phase 4A execution of Option 01, not a recovered historical source. The existing charging-bison SVG remains unchanged. Refer to `assets/logos/references/IDENTITY_REFERENCE.md` and the identity proof sheet. This approval supersedes the historical pending-vectorization statements below; it does not approve the earlier rejected Montserrat reconstruction. Phase 4A then implemented the approved identity in the application, reviewed and approved on the same date.
 
+## Canvas and installed app — approved 23 September 2026, shipped 3 October
+
+**Warm ivory `#F9F5E9` is the shared light-page canvas.** It is the token
+`--pr-paper`, read by the marketing page and the signed-in application —
+including login and the visitor calculator, so the calculator is not two
+colours depending on who is looking at it. Off White `#F6F7F4` is *not*
+replaced: it keeps its own jobs (inner rows, chips, empty states, the
+disabled and hover mixes). Small text sitting directly on the canvas uses
+`--pr-paper-muted`, Charcoal eased toward the paper, which measures 5.33:1
+where the product's cooler muted grey manages 4.56:1. Inside a white surface
+the product's muted grey is unchanged.
+
+**White remains the card, form and product surface; Rig Green remains the
+financial and result surface.** Section 8's rule is untouched; only the paper
+behind it is warmer.
+
+**The installed app opens on `/calculator`**, not the public homepage, and the
+manifest's `background_color` matches the canvas it opens onto.
+
+The money-action button treatment is **not** settled and is not part of this
+approval. `+ Add a Load` keeps its existing treatment until it is.
+
 ## Approved typography — mandatory correction
 
 Do not choose, substitute, or reinterpret fonts.
@@ -385,6 +407,9 @@ Never use giant soft SaaS shadows.
 # 8. PRODUCT SURFACE MODEL
 
 This is a major ProfitRig design principle.
+
+> The light page canvas is warm ivory `--pr-paper`; white and Rig Green keep
+> the roles below unchanged. See "Canvas and installed app" above.
 
 ## DARK = INTELLIGENCE / RESULTS
 
