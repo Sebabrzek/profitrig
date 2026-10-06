@@ -57,7 +57,6 @@ import {
   loadChecks,
   mailtoHref,
   profileChecks,
-  smsHref,
 } from "@/lib/adminView";
 import { computeFuelStats, type FuelLog } from "@/lib/fuel";
 import { roadCategoryMeta, type RoadExpense } from "@/lib/roadExpenses";
@@ -234,7 +233,7 @@ export default async function AdminDriverPage({
     weeks.find((w) => w.weekStart === (weekParam ? weekOf(weekParam) : "")) ?? weeks[0] ?? null;
 
   // A note to the driver about the week in view, for Sebastian to send from
-  // his own email or phone. ProfitRig stores and sends nothing.
+  // his own email. ProfitRig stores and sends nothing.
   const calcFlags = costRow ? profileChecks(profile, totals, fuel.averageMpg) : [];
   const note = driverNote({
     firstName: String(p?.first_name ?? ""),
@@ -248,7 +247,6 @@ export default async function AdminDriverPage({
     from: me?.first_name ? `${me.first_name}, ProfitRig` : "ProfitRig",
   });
   const firstName = String(p?.first_name ?? "").trim() || "driver";
-  const sms = smsHref(p?.phone as string | null, note.body);
 
   const usage = ((usageRes.data ?? []) as Row[]);
   const aiCost = usage.reduce((s, u) => s + (Number(u.estimated_cost_usd) || 0), 0);
@@ -270,8 +268,8 @@ export default async function AdminDriverPage({
         price it. Nothing here can be changed from Admin.
       </Notice>
 
-      {/* Reach them from your own email or phone, with what is worth a look
-          in the week you are viewing already written out. */}
+      {/* Reach them from your own email, with what is worth a look in the
+          week you are viewing already written out. */}
       {driver.email && (
         <div className="mb-6">
           <div className="flex flex-wrap gap-2">
@@ -286,16 +284,11 @@ export default async function AdminDriverPage({
             >
               Open in Gmail
             </a>
-            {sms && (
-              <a href={sms} className={buttonClass({ variant: "secondary", size: "sm" })}>
-                Text {firstName}
-              </a>
-            )}
           </div>
           <p className="mt-2 text-xs text-muted">
             Pre-written with what&apos;s worth a look in the week you&apos;re
             viewing. You edit it before it goes, and it sends from your own
-            email or phone.
+            email.
           </p>
         </div>
       )}

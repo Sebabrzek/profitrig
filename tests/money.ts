@@ -155,7 +155,6 @@ import {
   loadChecks,
   mailtoHref,
   profileChecks,
-  smsHref,
 } from "../src/lib/adminView";
 
 let failures = 0;
@@ -2321,7 +2320,7 @@ section("Admin shows a driver exactly the numbers they see");
 
 
 // ─────────────────────────────────────────────────────────────────────
-section("A note to the driver, sent from Sebastian's own email or phone");
+section("A note to the driver, sent from Sebastian's own email");
 // ─────────────────────────────────────────────────────────────────────
 {
   const items = [
@@ -2342,9 +2341,6 @@ section("A note to the driver, sent from Sebastian's own email or phone");
   const q = new URLSearchParams(m.slice(m.indexOf("?") + 1));
   check("the email opens addressed, with the subject and body intact", m.startsWith("mailto:dennis%40example.com?") && q.get("subject") === n.subject && q.get("body") === n.body);
   check("Gmail gets the same draft", new URL(gmailHref("dennis@example.com", n.subject, n.body)).searchParams.get("body") === n.body);
-  check("a US phone typed any way becomes +1 and digits", smsHref("(555) 123-4567", "x")!.startsWith("sms:+15551234567?"));
-  check("an international number keeps its +", smsHref("+44 7700 900123", "x")!.startsWith("sms:+447700900123?"));
-  check("no usable number means no Text button", smsHref("", "x") === null && smsHref("555-1234", "x") === null && smsHref(null, "x") === null);
 }
 
 // ─────────────────────────────────────────────────────────────────────

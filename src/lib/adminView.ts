@@ -177,7 +177,7 @@ export function profileChecks(
 
 /**
  * A note to a driver about what is worth a look, for Sebastian to send from
- * his OWN email or phone — ProfitRig stores and sends nothing. He edits it
+ * his OWN email — ProfitRig stores and sends nothing. He edits it
  * before it goes; this only saves him typing it.
  */
 export function driverNote({
@@ -213,18 +213,4 @@ export function mailtoHref(to: string, subject: string, body: string): string {
 /** Opens a Gmail draft in the browser, for anyone who lives in Gmail. */
 export function gmailHref(to: string, subject: string, body: string): string {
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-/**
- * Opens Messages. Phone numbers are typed freely on the profile, so keep the
- * digits and a leading +; a 10-digit US number gets +1. Null when there is
- * no usable number.
- */
-export function smsHref(phone: string | null | undefined, body: string): string | null {
-  if (!phone) return null;
-  const plus = phone.trim().startsWith("+");
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  const number = plus ? `+${digits}` : digits.length === 10 ? `+1${digits}` : `+${digits}`;
-  return `sms:${number}?&body=${encodeURIComponent(body)}`;
 }
