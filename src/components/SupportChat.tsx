@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { submitFeedbackAction } from "@/app/actions";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +11,7 @@ import {
   ChatIcon,
 } from "@/components/shell/AskProfitRigButton";
 import {
+  AI_BUDGET_NOTICE_AT_PERCENT,
   CHAT_MAX_MESSAGE_CHARS,
   CHAT_REMAINING_NOTICE_AT,
 } from "@/lib/aiGuard";
@@ -36,6 +38,14 @@ function remainingNotice(header: string | null): string | null {
   return `${left} question${left === 1 ? "" : "s"} remaining today.`;
 }
 
+/** "You've used 85% of this month's AI." — from 80% on. */
+function budgetNotice(header: string | null): string | null {
+  if (header === null || header.trim() === "") return null;
+  const used = Number(header);
+  if (!Number.isFinite(used) || used < AI_BUDGET_NOTICE_AT_PERCENT) return null;
+  return `You've used ${Math.min(100, Math.round(used))}% of this month's AI.`;
+}
+
 export function SupportChat() {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
@@ -48,6 +58,8 @@ export function SupportChat() {
     "idle" | "sending" | "sent" | "error"
   >("idle");
   const [notice, setNotice] = useState<string | null>(null);
+  /** The allowance ran out and a bigger one is for sale to this driver. */
+  const [showPlans, setShowPlans] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const answerRef = useRef<AbortController | null>(null);
@@ -119,6 +131,7 @@ export function SupportChat() {
     setInput("");
     setBusy(true);
     setNotice(null);
+    setShowPlans(false);
 
     const outgoing: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages([...outgoing, { role: "assistant", content: "" }]);
@@ -134,13 +147,17 @@ export function SupportChat() {
         body: JSON.stringify({ message: text }),
         signal: controller.signal,
       });
-      setNotice(remainingNotice(res.headers.get("X-Ask-Remaining-Day")));
+      setNotice(
+        remainingNotice(res.headers.get("X-Ask-Remaining-Day")) ??
+          budgetNotice(res.headers.get("X-Ai-Used-Percent"))
+      );
 
       if (!res.ok) {
         let msg = "Something went wrong. Try again in a minute.";
         try {
           const data = await res.json();
           if (typeof data?.error === "string") msg = data.error;
+          if (data?.upgrade === true) setShowPlans(true);
         } catch {
           // non-JSON error body — keep default message
         }
@@ -292,6 +309,17 @@ export function SupportChat() {
                   className="pt-1 text-center text-[11px] font-semibold text-[var(--pr-rig-green)]"
                 >
                   {notice}
+                </p>
+              )}
+              {showPlans && (
+                <p className="pt-1 text-center text-sm">
+                  <Link
+                    href="/upgrade"
+                    onClick={() => setOpen(false)}
+                    className="pr-link font-semibold"
+                  >
+                    See plans
+                  </Link>
                 </p>
               )}
               <p className="text-[11px] text-muted text-center pt-1">

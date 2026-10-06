@@ -5,16 +5,18 @@ import { Notice } from "@/components/ui/Notice";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription } from "@/lib/subscription";
 import { isPro } from "@/lib/subscription";
-import { UpgradeCard } from "./UpgradeCard";
+import { proPlusOnSale } from "@/lib/stripe/server";
+import { aiTier, type AiTier } from "@/lib/aiGuard";
+import { ProPlusOffer, UpgradeCard } from "./UpgradeCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function UpgradePage({
   searchParams,
 }: {
-  searchParams: Promise<{ canceled?: string }>;
+  searchParams: Promise<{ canceled?: string; switched?: string }>;
 }) {
-  const { canceled } = await searchParams;
+  const { canceled, switched } = await searchParams;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -23,6 +25,8 @@ export default async function UpgradePage({
 
   const sub = await fetchSubscription(supabase, user.id);
   const alreadyPro = isPro(sub);
+  const tier = aiTier(sub, alreadyPro);
+  const onSale = proPlusOnSale();
 
   return (
     <AppShell
@@ -35,6 +39,11 @@ export default async function UpgradePage({
     >
         {canceled && !alreadyPro && (
           <Notice className="mb-4">Checkout canceled — no charges made.</Notice>
+        )}
+        {switched && (
+          <Notice className="mb-4">
+            Switch confirmed. Your plan updates here within a minute.
+          </Notice>
         )}
 
         <PageHeader
@@ -54,11 +63,17 @@ export default async function UpgradePage({
         />
 
         {alreadyPro ? (
-          <ProActive sub={sub} />
+          <>
+            <ProActive sub={sub} tier={tier} />
+            {onSale && tier !== "pro_plus" && <ProPlusOffer />}
+          </>
         ) : (
           <>
             <FeatureList />
-            <UpgradeCard hasExistingCustomer={Boolean(sub?.stripe_customer_id)} />
+            <UpgradeCard
+              hasExistingCustomer={Boolean(sub?.stripe_customer_id)}
+              proPlusOnSale={onSale}
+            />
           </>
         )}
     </AppShell>
@@ -72,6 +87,7 @@ function FeatureList() {
     "Weekly summary card with totals and averages",
     "Export to Sheets / Excel — weekly, monthly, all-time",
     "Past weeks always accessible — never lose a record",
+    "A much bigger monthly AI allowance for Ask ProfitRig",
     "Cancel anytime. 7-day free trial.",
   ];
   return (
@@ -89,7 +105,7 @@ function FeatureList() {
 import { ProActiveControls } from "./UpgradeCard";
 import type { SubscriptionRow } from "@/lib/subscription";
 
-function ProActive({ sub }: { sub: SubscriptionRow | null }) {
+function ProActive({ sub, tier }: { sub: SubscriptionRow | null; tier: AiTier }) {
   const ends = sub?.current_period_end
     ? new Date(sub.current_period_end).toLocaleDateString("en-US", {
         month: "long",
@@ -102,7 +118,7 @@ function ProActive({ sub }: { sub: SubscriptionRow | null }) {
     <Card as="div" className="mb-4">
       <CardHeader
         className="mb-0"
-        eyebrow="You're on ProfitRig Pro"
+        eyebrow={`You're on ProfitRig ${tier === "pro_plus" ? "Pro Plus" : "Pro"}`}
         title={isTrial ? "Free trial active" : "Subscription active"}
       />
       {ends && (

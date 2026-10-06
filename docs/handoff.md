@@ -1,6 +1,6 @@
 # ProfitRig — handoff
 
-Updated 21 Sep 2026. **Read this first in any new session.**
+Updated 6 Oct 2026. **Read this first in any new session.**
 
 ## Start of a new session: do not code
 
@@ -20,15 +20,18 @@ live. Every screen, signed in and signed out, is now on the system. What
 follows is Sebastian's call, and the business work is the carrier-pay order
 at the bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (3 Oct 2026)
+## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `db835a5` (6 Oct), live: partials for
-  every Pro driver, the PWA opening on /calculator, the ivory canvas, per
-  diem by days on the road, Admin's shared CPM formula, and the read-only
-  Admin page per driver with an Email draft. Migration 017 is applied.
-  `git log --oneline -3` is the truth; this file is a summary.
-- **In review: `feature/in-app-alerts` (Phase B)** — needs migration 018 run
-  by hand before merge. Not merged.
+- Production `main` = `origin/main` = `6896f8e` (6 Oct), live: partials for
+  every Pro driver, in-app alerts (Phase B), the PWA opening on /calculator,
+  the ivory canvas, per diem by days on the road, Admin's shared CPM
+  formula, and the read-only Admin page per driver with an Email draft.
+  Migrations 017 and 018 are applied. `git log --oneline -3` is the truth;
+  this file is a summary.
+- **In review: `feature/ai-budget` (D0, the monthly AI allowance)** — needs
+  migration 019 run by hand before merge (the code falls back to the old
+  question counts until it has). Pro Plus stays hidden until
+  `STRIPE_PRICE_PRO_PLUS` is set in Vercel. Not merged.
 - **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
   the dollar wave, a banknote border and a scroll, and is not settled on a
   direction. Do not raise it until he does. `+ Add a Load` keeps production's
@@ -160,11 +163,15 @@ Phase 5 added four, on questions the design system deliberately leaves open:
 The browser sends one question and nothing else; the server decides
 everything (`src/lib/aiGuard.ts` holds the rules, and they are tested).
 
-- Limits per driver, enforced in Postgres by `ai_reserve_request()`, rolling:
-  Pro 5/minute, 30/day, 300/month. Free 5/5/25. It fails closed.
-- Every request is recorded in `ai_usage` with tokens, status and cost.
-  Measured: about 4,400 input tokens a question, so a Pro driver at the cap
-  costs roughly $2 a month.
+- **A monthly AI allowance in dollars** (D0, migration 019), enforced in
+  Postgres by `ai_reserve_budget()`: it locks on the driver, keeps the
+  per-minute and per-day caps, adds up this calendar month's spend (UTC, so
+  it never resets later than the 1st for a US driver) and starts a request
+  only if what it may cost fits whole. It fails closed. Until 019 has run,
+  the code falls back to the old `ai_reserve_request()` question counts.
+- Every request is recorded in `ai_usage` with tokens, status, cost and
+  feature (`chat`, later `scan`). Measured: about 4,400 input tokens a
+  question — roughly half a cent on Haiku.
 - Chat rows are written **only** by the server with the service-role key.
   A driver can read their own transcript and nothing else (migration 016).
 - Only server-written (`trusted`) rows are ever replayed to the model, so a
@@ -268,6 +275,35 @@ not by text — so they are caught where they can be fixed.
   a count on the Loads tab in the navigation, push or email alerts (needs
   the email provider decision).
 
+## The monthly AI allowance (D0) — what was decided, 6 Oct 2026
+
+Sebastian wants thick margins to run ads: AI must never eat a plan's profit,
+and scanning (D1) will cost far more per use than a chat question.
+
+- **One allowance, in dollars, per calendar month, for all AI** — Ask
+  ProfitRig and scanning together. Numbers live in `lib/aiGuard.ts`
+  (`AI_MONTHLY_BUDGET_USD`): Free $0.25 (a few questions, a taste of
+  scanning), **Pro $4** ($9.99/mo), Pro yearly $3.30 ($99/yr is $8.25/mo),
+  **Pro Plus $8** ($19.99/mo). About 40% of what a plan earns, at most.
+- **A trial gets $1, not the plan's allowance.** Checkout asks no card for
+  the 7-day trial, so every throwaway sign-up would otherwise be $4 of AI.
+  Chosen while building; Sebastian can change it in one line.
+- Drivers see a **percentage**, never dollars: Profile → "AI this month"
+  (meter, resets date, upgrade link), a heads-up in the chat from 80%, and
+  at 100% AI pauses until the 1st with **See plans** when a bigger
+  allowance is for sale to them. A request starts only if it fits whole.
+- **Admin sees dollars:** "AI mo." per driver (spend / allowance, plan on
+  hover), an "AI this month" total, and the driver page's Account section.
+- **Pro Plus** — $19.99/mo, monthly only, everything in Pro with twice the
+  AI. The plan picker shows it only once `STRIPE_PRICE_PRO_PLUS` is set, so
+  Sebastian decides when it goes on sale (chat alone will not get near $4;
+  it earns its keep once scanning ships). Existing Pro subscribers switch on
+  Stripe's own confirmation page (`subscription_update_confirm`), which
+  shows the proration before anything changes; checkout refuses anyone
+  already on a plan, so nobody can end up with two subscriptions.
+- **Max** — a later, expensive plan with every feature automated. Not
+  designed yet.
+
 ## Features asked for, not yet planned (3 Oct 2026)
 
 In Sebastian's rough order of interest. Each needs a decision before it can
@@ -315,8 +351,9 @@ be planned.
   `--brand-soft`, `text-muted`, `border-border`) are still used by about
   thirty files, including the shared components. Retiring them is its own
   task and needs approval; it is not a side effect of anything else.
-- The Admin view of `ai_usage` is not built. Sebastian's own test chat and
-  its 12 usage rows are deliberately still in the database.
+- Admin shows AI spend per driver this month (D0); a per-request view of
+  `ai_usage` is not built. Sebastian's own test chat and its usage rows are
+  deliberately still in the database.
 - Supabase "Confirm email" is still unverified. Do not enable it before
   sign-up has a "check your email" step and a callback route — today it has
   neither, so turning it on would break sign-up.
@@ -326,10 +363,11 @@ be planned.
 - Next.js 16 (App Router, Turbopack) — **read `node_modules/next/dist/docs/`
   before using Next APIs.** React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 194 checks in `tests/money.ts` (money math, CSV, calculator,
-  nav, formatters, and the Ask ProfitRig guardrails).
+- `npm test` = 347 checks in `tests/money.ts` (money math, CSV, calculator,
+  nav, formatters, partials, alerts, the Ask ProfitRig guardrails and the
+  monthly AI allowance).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
-  Latest is **016**, applied 21 Sep 2026.
+  Latest applied is **018** (6 Oct 2026); **019** is written, in review.
 - Local preview: `.claude/launch.json` → "profitrig", port 3000. Signed-in
   pages redirect to /login, so local checks only reach signed-out screens; a
   temporary page under `src/app/login-harness/` gets through the middleware

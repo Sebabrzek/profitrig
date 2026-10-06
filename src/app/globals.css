@@ -807,6 +807,23 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
     opacity: 0.6;
     cursor: progress;
   }
+
+  /* --- Meter ---------------------------------------------------------------
+     How much of an allowance is used (Profile: AI this month). A plain bar,
+     Rig Green: using an allowance is neither profit nor loss. */
+  .pr-meter {
+    height: 8px;
+    overflow: hidden;
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius-pill);
+    background: var(--pr-surface-muted);
+  }
+  .pr-meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--pr-rig-green);
+  }
 }
 
 /* ===========================================================================

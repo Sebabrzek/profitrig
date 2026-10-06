@@ -12,6 +12,14 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail, adminEmails } from "@/lib/admin";
+import { isPro, type SubscriptionRow } from "@/lib/subscription";
+import { fetchMonthSpend } from "@/lib/aiBudget";
+import {
+  AI_MONTHLY_BUDGET_USD,
+  AI_TIER_LABEL,
+  aiTier,
+  formatAiDollars,
+} from "@/lib/aiGuard";
 import { signOutAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -151,6 +159,8 @@ ADMIN_EMAILS = ${user.email}`}
     snapshotsCountRes,
     loadCountRes,
     chatRes,
+    subsRes,
+    monthSpend,
   ] = await Promise.all([
     admin.from("driver_profiles").select("*"),
     admin
@@ -176,6 +186,10 @@ ADMIN_EMAILS = ${user.email}`}
       .select("id,user_id,role,content,created_at")
       .order("created_at", { ascending: false })
       .limit(120),
+    // Plans, for each driver's AI allowance.
+    admin.from("subscriptions").select("*"),
+    // What each driver's AI has cost this month. Null if unreadable.
+    fetchMonthSpend(admin, new Date()),
   ]);
 
   const profiles: DriverProfileRow[] = profilesRes.data ?? [];
@@ -183,6 +197,16 @@ ADMIN_EMAILS = ${user.email}`}
   const chatRows: ChatRow[] = (chatRes.data as ChatRow[] | null) ?? [];
   const chatQuestions = chatRows.filter((c) => c.role === "user");
   const profileByUser = new Map(profiles.map((p) => [p.user_id, p]));
+  const subByUser = new Map(
+    ((subsRes.data ?? []) as SubscriptionRow[]).map((s) => [s.user_id, s])
+  );
+  const tierOf = (uid: string) => {
+    const sub = subByUser.get(uid) ?? null;
+    return aiTier(sub, isPro(sub));
+  };
+  const aiMonthTotal = monthSpend
+    ? [...monthSpend.values()].reduce((a, b) => a + b, 0)
+    : null;
 
   // Per-user CPM: each saved profile priced by computeCalculatorTotals —
   // the Calculator's own function, not a copy of it — so Admin can never
@@ -300,7 +324,7 @@ ADMIN_EMAILS = ${user.email}`}
           />
         </section>
 
-        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <section className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
           <StatTile
             figure={false}
             label="Cost profiles saved"
@@ -326,12 +350,18 @@ ADMIN_EMAILS = ${user.email}`}
               0
             ))}
           />
+          <StatTile
+            figure={false}
+            label="AI this month"
+            value={aiMonthTotal == null ? "—" : formatAiDollars(aiMonthTotal)}
+            context={monthSpend ? `${monthSpend.size} drivers used it` : undefined}
+          />
         </section>
 
         <Card>
           <CardHeader
             title="User activity — every signup"
-            description="CPM = computed cost/mile from the user's saved cost profile (override applied if they set one). Target = CPM + their desired profit/mile."
+            description="CPM = computed cost/mile from the user's saved cost profile (override applied if they set one). Target = CPM + their desired profit/mile. AI mo. = what their AI has cost this month, of their plan's allowance."
           />
           {/* Scrolls sideways on a phone; focusable so a keyboard can too. */}
           <div
@@ -355,6 +385,7 @@ ADMIN_EMAILS = ${user.email}`}
                   <th scope="col" className="pr-record-label py-2 pr-4 text-right">Target rate</th>
                   <th scope="col" className="pr-record-label py-2 pr-4 text-right">Mo. miles</th>
                   <th scope="col" className="pr-record-label py-2 pr-4 text-right"># Loads</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4 text-right">AI mo.</th>
                   <th scope="col" className="pr-record-label py-2 pr-4">Last save</th>
                   <th scope="col" className="pr-record-label py-2 pr-4">Opt-in</th>
                   <th scope="col" className="pr-record-label py-2">Conf.</th>
@@ -412,6 +443,14 @@ ADMIN_EMAILS = ${user.email}`}
                       <td className="py-2.5 pr-4 text-right whitespace-nowrap tabular-nums">
                         {loads > 0 ? loads : "—"}
                       </td>
+                      <td
+                        className="py-2.5 pr-4 text-right whitespace-nowrap tabular-nums"
+                        title={AI_TIER_LABEL[tierOf(u.id)]}
+                      >
+                        {monthSpend?.get(u.id)
+                          ? `${formatAiDollars(monthSpend.get(u.id) ?? 0)} / ${formatAiDollars(AI_MONTHLY_BUDGET_USD[tierOf(u.id)])}`
+                          : "—"}
+                      </td>
                       <td className="py-2.5 pr-4 whitespace-nowrap text-muted text-xs">
                         {cpm?.updatedAt ? formatDate(cpm.updatedAt) : "—"}
                       </td>
@@ -443,7 +482,7 @@ ADMIN_EMAILS = ${user.email}`}
                 })}
                 {sortedUsers.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="py-6 text-center text-muted">
+                    <td colSpan={13} className="py-6 text-center text-muted">
                       No signups yet.
                     </td>
                   </tr>

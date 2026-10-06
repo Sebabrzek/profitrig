@@ -728,10 +728,11 @@ import { headers } from "next/headers";
 import {
   getStripe,
   STRIPE_PRICE_MONTHLY,
+  STRIPE_PRICE_PRO_PLUS,
   STRIPE_PRICE_YEARLY,
 } from "@/lib/stripe/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { fetchSubscription } from "@/lib/subscription";
+import { fetchSubscription, isPro } from "@/lib/subscription";
 
 async function siteOrigin(): Promise<string> {
   const h = await headers();
@@ -872,14 +873,18 @@ export async function deleteFuelLogAction(
 }
 
 export async function createCheckoutAction(input: {
-  plan: "monthly" | "yearly";
+  plan: "monthly" | "yearly" | "pro_plus";
   promoCode?: string | null;
 }): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const stripe = getStripe();
   if (!stripe) return { ok: false, error: "Stripe is not configured yet." };
 
   const priceId =
-    input.plan === "yearly" ? STRIPE_PRICE_YEARLY : STRIPE_PRICE_MONTHLY;
+    input.plan === "pro_plus"
+      ? STRIPE_PRICE_PRO_PLUS
+      : input.plan === "yearly"
+        ? STRIPE_PRICE_YEARLY
+        : STRIPE_PRICE_MONTHLY;
   if (!priceId) {
     return {
       ok: false,
@@ -892,6 +897,16 @@ export async function createCheckoutAction(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
+
+  // A second checkout would start a second subscription, billed alongside
+  // the first. Someone already on a plan changes it instead.
+  const existing = await fetchSubscription(supabase, user.id);
+  if (isPro(existing)) {
+    return {
+      ok: false,
+      error: "You already have a plan. Change it from Manage subscription.",
+    };
+  }
 
   // Resolve a discount (if a promo code was entered) or fall back to letting
   // Stripe's own checkout UI take a code.
@@ -920,8 +935,7 @@ export async function createCheckoutAction(input: {
   const admin = createSupabaseAdminClient();
   let stripeCustomerId: string | undefined;
   if (admin) {
-    const sub = await fetchSubscription(supabase, user.id);
-    stripeCustomerId = sub?.stripe_customer_id ?? undefined;
+    stripeCustomerId = existing?.stripe_customer_id ?? undefined;
   }
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
@@ -964,6 +978,69 @@ export async function createCheckoutAction(input: {
     return { ok: false, error: "Stripe returned no checkout URL." };
   }
   return { ok: true, url: session.url };
+}
+
+/**
+ * Pro → Pro Plus for someone already paying. Opens Stripe's own page, which
+ * shows exactly what changes and what it costs today, and switches only when
+ * the driver confirms there. Nothing is charged from here.
+ */
+export async function switchToProPlusAction(): Promise<
+  { ok: true; url: string } | { ok: false; error: string }
+> {
+  const stripe = getStripe();
+  if (!stripe) return { ok: false, error: "Stripe is not configured yet." };
+  if (!STRIPE_PRICE_PRO_PLUS) {
+    return { ok: false, error: "Pro Plus isn't available yet." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const sub = await fetchSubscription(supabase, user.id);
+  if (!isPro(sub) || !sub?.stripe_customer_id || !sub.stripe_subscription_id) {
+    return { ok: false, error: "There's no active plan to switch." };
+  }
+  if (sub.plan === "pro_plus") {
+    return { ok: false, error: "You're already on Pro Plus." };
+  }
+
+  const origin = await siteOrigin();
+  try {
+    const live = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+    const item = live.items.data[0];
+    if (!item || live.items.data.length !== 1) {
+      return {
+        ok: false,
+        error: "This plan can't be switched here. Tap Talk to a human and we'll do it for you.",
+      };
+    }
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: sub.stripe_customer_id,
+      return_url: `${origin}/upgrade`,
+      flow_data: {
+        type: "subscription_update_confirm",
+        subscription_update_confirm: {
+          subscription: live.id,
+          items: [{ id: item.id, price: STRIPE_PRICE_PRO_PLUS, quantity: 1 }],
+        },
+        after_completion: {
+          type: "redirect",
+          redirect: { return_url: `${origin}/upgrade?switched=1` },
+        },
+      },
+    });
+    return { ok: true, url: portal.url };
+  } catch (err) {
+    console.error("switch to pro plus failed", err);
+    return {
+      ok: false,
+      error: "Couldn't open the switch. Try Manage subscription, or tap Talk to a human.",
+    };
+  }
 }
 
 export async function createPortalAction(): Promise<

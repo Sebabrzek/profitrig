@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
+import { proPlusOnSale } from "@/lib/stripe/server";
 import { CHAT_SYSTEM_PROMPT } from "@/lib/supportChat";
 import {
   CHAT_CONTEXT_MESSAGES,
@@ -10,15 +11,22 @@ import {
   CHAT_MAX_MESSAGE_CHARS,
   CHAT_MAX_TOKENS,
   CHAT_MODEL,
+  CHAT_RESERVE_USD,
+  AI_MONTHLY_BUDGET_USD,
   OFF_TOPIC_REPLY,
+  aiBudgetPeriod,
+  aiTier,
+  aiUpgradeFor,
   buildConversation,
+  chatLimitMessage,
+  chatLimitsForTier,
   estimateCostUsd,
   estimateOutputTokens,
   limitsForPlan,
   orderStoredMessages,
+  planForTier,
   screenUserMessage,
   validateUserMessage,
-  type Plan,
 } from "@/lib/aiGuard";
 
 export const runtime = "nodejs";
@@ -31,7 +39,8 @@ export const runtime = "nodejs";
  * before — is worked out here:
  *
  *   1. signed in, message is 1–1,500 characters
- *   2. the limit check in Postgres reserves this request (fails closed)
+ *   2. the check in Postgres reserves this request against the driver's
+ *      per-minute and per-day caps and monthly AI allowance (fails closed)
  *   3. obvious misuse is refused without paying for an AI call
  *   4. the recent conversation is read back from ProfitRig's own records
  *   5. the answer streams, and stops if the driver closes the chat
@@ -45,28 +54,14 @@ function fail(error: string, status: number) {
   return NextResponse.json({ error }, { status });
 }
 
-/** What a driver is told when they run out, by plan and window. */
-function limitMessage(reason: "minute" | "day" | "month", plan: Plan): string {
-  if (reason === "minute") {
-    return "That's a lot of questions at once. Give it a minute, then ask again.";
-  }
-  if (reason === "day") {
-    return plan === "free"
-      ? "You've reached today's Ask ProfitRig limit. Free accounts get 5 questions per day. Pro includes up to 30."
-      : "You've reached today's Ask ProfitRig limit of 30 questions. More free up through the day.";
-  }
-  return plan === "free"
-    ? "You've reached this month's Ask ProfitRig limit. Free accounts get 25 questions a month. Pro includes up to 300."
-    : "You've reached this month's Ask ProfitRig limit of 300 questions.";
-}
-
 type Reservation = {
   allowed: boolean;
-  reason?: "minute" | "day" | "month";
+  reason?: "minute" | "day" | "month" | "budget";
   retry_at?: string | null;
   usage_id?: string;
   remaining_day?: number;
-  remaining_month?: number;
+  /** This month's spend before this request (migration 019 onwards). */
+  spent_usd?: number;
 };
 
 export async function POST(request: Request) {
@@ -111,41 +106,81 @@ export async function POST(request: Request) {
   const message = checked.message;
 
   const sub = await fetchSubscription(supabase, user.id);
-  const plan: Plan = isPro(sub) ? "pro" : "free";
-  const limits = limitsForPlan(plan);
+  const tier = aiTier(sub, isPro(sub));
+  const plan = planForTier(tier);
+  const limits = chatLimitsForTier(tier);
+  const budgetUsd = AI_MONTHLY_BUDGET_USD[tier];
+  const period = aiBudgetPeriod(new Date());
+  const onSale = proPlusOnSale();
 
   // One call decides and records: it locks on this driver, counts their
-  // rolling minute / 24 hours / 30 days, and only then reserves the request.
-  // Two requests at the same instant are handled one after the other.
-  const { data, error: reserveError } = await admin.rpc("ai_reserve_request", {
+  // rolling minute and 24 hours, adds up this month's AI spend, and only
+  // then reserves the request — holding enough to finish it. Two requests
+  // at the same instant are handled one after the other.
+  let { data, error: reserveError } = await admin.rpc("ai_reserve_budget", {
     p_user_id: user.id,
     p_plan: plan,
     p_model: CHAT_MODEL,
+    p_feature: "chat",
     p_per_minute: limits.perMinute,
     p_per_day: limits.perDay,
-    p_per_month: limits.perMonth,
+    p_budget_usd: budgetUsd,
+    p_reserve_usd: CHAT_RESERVE_USD,
+    p_period_start: period.start.toISOString(),
   });
+  // Until migration 019 runs, the old question counts still guard the chat.
+  if (reserveError?.code === "PGRST202") {
+    const legacy = limitsForPlan(plan);
+    ({ data, error: reserveError } = await admin.rpc("ai_reserve_request", {
+      p_user_id: user.id,
+      p_plan: plan,
+      p_model: CHAT_MODEL,
+      p_per_minute: legacy.perMinute,
+      p_per_day: legacy.perDay,
+      p_per_month: legacy.perMonth,
+    }));
+  }
   const reservation = data as Reservation | null;
   if (reserveError || !reservation) {
     console.error("ask-profitrig: usage check failed", reserveError);
     return fail(UNAVAILABLE, 503);
   }
   if (!reservation.allowed || !reservation.usage_id) {
+    const reason = reservation.reason ?? "day";
     return NextResponse.json(
       {
-        error: limitMessage(reservation.reason ?? "day", plan),
-        reason: reservation.reason ?? "day",
-        retryAt: reservation.retry_at ?? null,
+        error: chatLimitMessage(reason, tier, period.resetsAt, onSale),
+        reason,
+        retryAt:
+          reason === "budget"
+            ? period.resetsAt.toISOString()
+            : reservation.retry_at ?? null,
+        // Only when a bigger allowance is actually for sale to them.
+        upgrade:
+          reason === "budget" && aiUpgradeFor(tier, onSale) !== null,
       },
       { status: 429 }
     );
   }
   const usageId = reservation.usage_id;
+  // How much of the month this question takes them to, counting what it
+  // holds. A percentage only: drivers never see dollars.
+  const usedPercent =
+    reservation.spent_usd == null || budgetUsd <= 0
+      ? ""
+      : String(
+          Math.min(
+            100,
+            Math.floor(
+              ((Number(reservation.spent_usd) + CHAT_RESERVE_USD) / budgetUsd) * 100
+            )
+          )
+        );
   const headers = {
     "Content-Type": "text/plain; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Ask-Remaining-Day": String(reservation.remaining_day ?? ""),
-    "X-Ask-Remaining-Month": String(reservation.remaining_month ?? ""),
+    "X-Ai-Used-Percent": usedPercent,
   };
 
   async function saveMessage(role: "user" | "assistant", content: string) {

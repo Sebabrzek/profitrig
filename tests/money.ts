@@ -114,16 +114,33 @@ import { RecordDeleteButton } from "../src/components/ui/Records";
 import { AskProfitRigButton } from "../src/components/shell/AskProfitRigButton";
 import { readFileSync } from "node:fs";
 import {
+  AI_BUDGET_NOTICE_AT_PERCENT,
+  AI_MONTHLY_BUDGET_USD,
   AI_PRICING,
   CHAT_MAX_MESSAGE_CHARS,
+  CHAT_MAX_TOKENS,
+  CHAT_MODEL,
+  CHAT_RESERVE_USD,
   OFF_TOPIC_REPLY,
+  aiBudgetPeriod,
+  aiBudgetStatus,
+  aiTier,
+  aiUpgradeFor,
   buildConversation,
+  chatLimitMessage,
+  chatLimitsForTier,
   estimateCostUsd,
+  formatAiDollars,
+  formatResetDate,
   limitsForPlan,
   orderStoredMessages,
+  planForTier,
   screenUserMessage,
+  spentUsd,
   validateUserMessage,
+  type AiTier,
 } from "../src/lib/aiGuard";
+import { AiAllowanceCard } from "../src/app/profile/AiAllowanceCard";
 import {
   fuelEntryPresentation,
   loadRecordFigures,
@@ -1489,6 +1506,203 @@ check(
     AI_PRICING["claude-haiku-4-5"].inputPerMTok === 1 &&
     AI_PRICING["claude-haiku-4-5"].outputPerMTok === 5
 );
+
+check(
+  "Opus 5.5 is priced for scanning at $4 in and $20 out per million tokens",
+  estimateCostUsd("claude-opus-5-5", { input_tokens: 1000, output_tokens: 1000 }) === 0.024 &&
+    AI_PRICING["claude-opus-5-5"].cacheReadPerMTok === 0.4
+);
+
+// ─────────────────────────────────────────────────────────────────────
+section("The monthly AI allowance");
+// ─────────────────────────────────────────────────────────────────────
+
+check(
+  "each plan gets the agreed monthly AI allowance",
+  JSON.stringify(AI_MONTHLY_BUDGET_USD) ===
+    JSON.stringify({ free: 0.25, trial: 1, pro_monthly: 4, pro_yearly: 3.3, pro_plus: 8 })
+);
+{
+  // To the whole percent: $4 is 40.04% of $9.99.
+  const share = (budget: number, monthly: number) => Math.round((budget / monthly) * 100);
+  check(
+    "AI costs at most about 40% of what a plan earns",
+    share(AI_MONTHLY_BUDGET_USD.pro_monthly, 9.99) <= 40 &&
+      share(AI_MONTHLY_BUDGET_USD.pro_yearly, 99 / 12) <= 40 &&
+      share(AI_MONTHLY_BUDGET_USD.pro_plus, 19.99) <= 40
+  );
+}
+check(
+  "a trial, with no card on file, gets a starter allowance below the plan's",
+  AI_MONTHLY_BUDGET_USD.trial < AI_MONTHLY_BUDGET_USD.pro_yearly &&
+    AI_MONTHLY_BUDGET_USD.trial > AI_MONTHLY_BUDGET_USD.free
+);
+{
+  const sub = (status: string, plan: string | null) => ({ status, plan });
+  check(
+    "a subscription's plan decides its allowance",
+    aiTier(null, false) === "free" &&
+      aiTier(sub("canceled", "monthly"), false) === "free" &&
+      aiTier(sub("trialing", "pro_plus"), true) === "trial" &&
+      aiTier(sub("active", "monthly"), true) === "pro_monthly" &&
+      aiTier(sub("active", "month"), true) === "pro_monthly" &&
+      aiTier(sub("active", null), true) === "pro_monthly" &&
+      aiTier(sub("active", "yearly"), true) === "pro_yearly" &&
+      aiTier(sub("active", "year"), true) === "pro_yearly" &&
+      aiTier(sub("active", "pro_plus"), true) === "pro_plus"
+  );
+}
+check(
+  "Pro Plus opens every screen Pro does",
+  planForTier("pro_plus") === "pro" && planForTier("trial") === "pro" && planForTier("free") === "free"
+);
+check(
+  "the chat's day caps: Free 5, Pro 30, Pro Plus 60, and 5 a minute for everyone",
+  chatLimitsForTier("free").perDay === 5 &&
+    chatLimitsForTier("pro_monthly").perDay === 30 &&
+    chatLimitsForTier("pro_yearly").perDay === 30 &&
+    chatLimitsForTier("pro_plus").perDay === 60 &&
+    (["free", "trial", "pro_monthly", "pro_yearly", "pro_plus"] as AiTier[]).every(
+      (t) => chatLimitsForTier(t).perMinute === 5
+    )
+);
+{
+  // The most a question can cost: the whole system prompt module (an upper
+  // bound on the prompt), a full replayed conversation and a maximum
+  // question, at a pessimistic 3 characters a token, plus a maximum answer.
+  const promptChars = readFileSync("src/lib/supportChat.ts", "utf8").length;
+  const worstInput = Math.ceil((promptChars + 3 * CHAT_MAX_MESSAGE_CHARS + 3 * 1200 + CHAT_MAX_MESSAGE_CHARS) / 3);
+  const worst = estimateCostUsd(CHAT_MODEL, { input_tokens: worstInput, output_tokens: CHAT_MAX_TOKENS });
+  check(
+    "a question holds more than it can possibly cost, so it never stops halfway",
+    worst < CHAT_RESERVE_USD,
+    `worst case $${worst}`
+  );
+}
+{
+  const oct = aiBudgetPeriod(new Date("2026-10-06T15:00:00Z"));
+  const dec = aiBudgetPeriod(new Date("2026-12-31T23:59:59Z"));
+  check(
+    "the allowance runs by calendar month and resets on the 1st",
+    oct.start.toISOString() === "2026-10-01T00:00:00.000Z" &&
+      oct.resetsAt.toISOString() === "2026-11-01T00:00:00.000Z" &&
+      formatResetDate(oct.resetsAt) === "Nov 1" &&
+      dec.resetsAt.toISOString() === "2027-01-01T00:00:00.000Z" &&
+      formatResetDate(dec.resetsAt) === "Jan 1"
+  );
+  // 7pm on Oct 31 in California is already November in UTC: the reset is
+  // early for a West Coast driver, never late.
+  check(
+    "it never resets later than the 1st anywhere in the US",
+    aiBudgetPeriod(new Date("2026-11-01T02:00:00Z")).start.toISOString() === "2026-11-01T00:00:00.000Z"
+  );
+}
+check(
+  "spend counts what finished requests cost and what running ones hold",
+  spentUsd([
+    { estimated_cost_usd: 0.004, reserved_cost_usd: 0.015 },
+    { estimated_cost_usd: null, reserved_cost_usd: 0.015 },
+    { estimated_cost_usd: "0.0021" },
+    { estimated_cost_usd: 0 },
+    {},
+    { estimated_cost_usd: "nonsense" },
+  ]) === 0.0211
+);
+{
+  const now = new Date("2026-10-06T15:00:00Z");
+  const fresh = aiBudgetStatus("pro_monthly", 0, now);
+  const at80 = aiBudgetStatus("pro_monthly", 3.2, now);
+  const nearly = aiBudgetStatus("pro_monthly", 3.98, now);
+  const out = aiBudgetStatus("pro_monthly", 3.99, now);
+  check(
+    "the meter: a percentage, a heads-up from 80%, and 100% only when the next question will not fit",
+    fresh.usedPercent === 0 && !fresh.nearlyOut && !fresh.out &&
+      at80.usedPercent === AI_BUDGET_NOTICE_AT_PERCENT && at80.nearlyOut && !at80.out &&
+      nearly.usedPercent === 99 && !nearly.out &&
+      out.usedPercent === 100 && out.out &&
+      formatResetDate(out.resetsAt) === "Nov 1"
+  );
+  check("Free's allowance runs out at 25 cents", aiBudgetStatus("free", 0.25, now).out && !aiBudgetStatus("free", 0.1, now).out);
+}
+check(
+  "more AI is offered only where it exists: Free → Pro, Pro → Pro Plus once it is on sale",
+  aiUpgradeFor("free", false) === "pro" &&
+    aiUpgradeFor("trial", true) === null &&
+    aiUpgradeFor("pro_monthly", true) === "pro_plus" &&
+    aiUpgradeFor("pro_yearly", true) === "pro_plus" &&
+    aiUpgradeFor("pro_monthly", false) === null &&
+    aiUpgradeFor("pro_plus", true) === null
+);
+{
+  const nov1 = new Date("2026-11-01T00:00:00Z");
+  const msgs = (["free", "trial", "pro_monthly", "pro_yearly", "pro_plus"] as AiTier[]).flatMap((t) => [
+    chatLimitMessage("budget", t, nov1, true),
+    chatLimitMessage("budget", t, nov1, false),
+    chatLimitMessage("day", t, nov1, true),
+  ]);
+  check(
+    "when the allowance runs out, the driver is told when it comes back and where more is",
+    chatLimitMessage("budget", "free", nov1, false).includes("Nov 1") &&
+      /go Pro/.test(chatLimitMessage("budget", "free", nov1, false)) &&
+      chatLimitMessage("budget", "pro_monthly", nov1, true).includes("Pro Plus") &&
+      !chatLimitMessage("budget", "pro_monthly", nov1, false).includes("Pro Plus") &&
+      !chatLimitMessage("budget", "pro_plus", nov1, true).includes("Pro Plus") &&
+      /trial/.test(chatLimitMessage("budget", "trial", nov1, true))
+  );
+  check("a driver is never shown dollars of AI", msgs.every((m) => !m.includes("$")));
+  check(
+    "the day limit names the driver's own cap",
+    chatLimitMessage("day", "free", nov1, false).includes("5 questions") &&
+      chatLimitMessage("day", "pro_plus", nov1, false).includes("60 questions")
+  );
+}
+check(
+  "Admin's AI dollars read to the cent",
+  formatAiDollars(0) === "$0.00" &&
+    formatAiDollars(0.004) === "<$0.01" &&
+    formatAiDollars(0.42) === "$0.42" &&
+    formatAiDollars(4) === "$4.00"
+);
+{
+  const html = (spent: number, tier: AiTier = "pro_monthly", onSale = true) =>
+    renderToStaticMarkup(
+      React.createElement(AiAllowanceCard, {
+        status: aiBudgetStatus(tier, spent, new Date("2026-10-06T15:00:00Z")),
+        proPlusOnSale: onSale,
+      })
+    );
+  const mid = html(1.4);
+  const full = html(3.99);
+  check(
+    "Profile shows the share used, as a meter, with the reset date — and no dollars",
+    mid.includes('role="meter"') && mid.includes('aria-valuenow="35"') && mid.includes("35%") &&
+      mid.includes("resets Nov 1") && !mid.includes("$")
+  );
+  check(
+    "at 100% it says AI is paused until the 1st, and offers Pro Plus when on sale",
+    full.includes("paused until Nov 1") && full.includes("Pro Plus") && !html(3.99, "pro_monthly", false).includes("Pro Plus")
+  );
+  check("Free is offered Pro", html(0.1, "free").includes("Go Pro for more AI"));
+}
+{
+  const route = readFileSync("src/app/api/chat/route.ts", "utf8");
+  const webhook = readFileSync("src/app/api/stripe/webhook/route.ts", "utf8");
+  const actions = readFileSync("src/app/actions.ts", "utf8");
+  const migration = readFileSync("supabase-migration-019.sql", "utf8");
+  check(
+    "the chat reserves against the allowance, and falls back to the old counts until migration 019 runs",
+    route.includes('"ai_reserve_budget"') && route.includes('p_feature: "chat"') &&
+      route.includes("p_reserve_usd: CHAT_RESERVE_USD") && route.includes('"PGRST202"') &&
+      route.includes('"ai_reserve_request"')
+  );
+  check("Stripe's Pro Plus price is recorded as pro_plus", /proPlusId && priceId === proPlusId\) return "pro_plus"/.test(webhook));
+  check("someone already on a plan cannot start a second subscription", actions.includes("if (isPro(existing))"));
+  check(
+    "only the server can run the allowance check",
+    /revoke all on function public\.ai_reserve_budget[^;]*from public, anon, authenticated/.test(migration) &&
+      /grant execute on function public\.ai_reserve_budget[^;]*to service_role/.test(migration)
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────
 section("One cost formula, several implementations: they must not drift");

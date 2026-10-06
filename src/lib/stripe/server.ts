@@ -15,4 +15,10 @@ export function getStripe(): Stripe | null {
 
 export const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY;
 export const STRIPE_PRICE_YEARLY = process.env.STRIPE_PRICE_YEARLY;
+/** Pro Plus, $19.99 a month. Until it is set, Pro Plus is not offered. */
+export const STRIPE_PRICE_PRO_PLUS = process.env.STRIPE_PRICE_PRO_PLUS;
+
+export function proPlusOnSale(): boolean {
+  return Boolean(STRIPE_PRICE_PRO_PLUS);
+}
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;

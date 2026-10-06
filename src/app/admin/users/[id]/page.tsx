@@ -55,6 +55,9 @@ import { computeFuelStats, type FuelLog } from "@/lib/fuel";
 import { roadCategoryMeta, type RoadExpense } from "@/lib/roadExpenses";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
 import { CheckList, DataTable, KeyValues } from "./Sections";
+import type { SubscriptionRow } from "@/lib/subscription";
+import { fetchAiBudget } from "@/lib/aiBudget";
+import { AI_TIER_LABEL, formatAiDollars, formatResetDate } from "@/lib/aiGuard";
 
 /**
  * One driver, everything they have entered, READ-ONLY — so Sebastian can sit
@@ -151,11 +154,10 @@ export default async function AdminDriverPage({
     byUser("ai_usage", "status,estimated_cost_usd,created_at"),
     admin.from("feedback").select("id,message,created_at").eq("user_id", id).order("created_at", { ascending: false }),
   ]);
-  const { data: me } = await admin
-    .from("driver_profiles")
-    .select("first_name")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: me }, aiBudget] = await Promise.all([
+    admin.from("driver_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
+    fetchAiBudget(admin, id, (subRes.data ?? null) as SubscriptionRow | null, new Date()),
+  ]);
 
   type Row = Record<string, unknown>;
   const p = (profileRes.data ?? null) as Row | null;
@@ -316,6 +318,12 @@ export default async function AdminDriverPage({
               sub
                 ? `${String(sub.status)}${sub.current_period_end ? ` until ${day(String(sub.current_period_end))}` : ""}${sub.cancel_at_period_end ? " (cancelling)" : ""}`
                 : "Free",
+            ],
+            [
+              "AI this month",
+              aiBudget
+                ? `${formatAiDollars(aiBudget.spentUsd)} of ${formatAiDollars(aiBudget.budgetUsd)} (${AI_TIER_LABEL[aiBudget.tier]}) · ${aiBudget.usedPercent}% · resets ${formatResetDate(aiBudget.resetsAt)}`
+                : "—",
             ],
             ["Signed up", day(driver.created_at)],
             ["Last sign-in", day(driver.last_sign_in_at)],

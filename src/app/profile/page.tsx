@@ -4,6 +4,11 @@ import { EmptyState, PageHeader, SectionHeading } from "@/components/ui/Surfaces
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fetchAiBudget } from "@/lib/aiBudget";
+import type { AiBudgetStatus } from "@/lib/aiGuard";
+import { proPlusOnSale } from "@/lib/stripe/server";
+import { AiAllowanceCard } from "./AiAllowanceCard";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm, type PastLoadsWithoutSplit } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
@@ -20,9 +25,15 @@ export default async function ProfilePage() {
   let userIsPro = false;
   let pastLoads: PastLoadsWithoutSplit = { count: 0, from: null, to: null };
   let snapshots: Snapshot[] = [];
+  let aiStatus: AiBudgetStatus | null = null;
   if (user) {
     email = user.email ?? "";
-    userIsPro = isPro(await fetchSubscription(supabase, user.id));
+    const sub = await fetchSubscription(supabase, user.id);
+    userIsPro = isPro(sub);
+    // Drivers cannot read ai_usage themselves; the server reads their own
+    // rows for them. No meter if that is not possible.
+    const admin = createSupabaseAdminClient();
+    aiStatus = admin ? await fetchAiBudget(admin, user.id, sub, new Date()) : null;
     const { data } = await supabase
       .from("driver_profiles")
       .select("*")
@@ -98,6 +109,11 @@ export default async function ProfilePage() {
           description="Quick info about you and your operation. All optional. Helps us send tips that actually match what you haul."
         />
         <ProfileForm initial={initial} email={email} pastLoads={pastLoads} />
+        {aiStatus && (
+          <div className="mt-4">
+            <AiAllowanceCard status={aiStatus} proPlusOnSale={proPlusOnSale()} />
+          </div>
+        )}
         <div className="mt-4">
           <FeedbackCard />
         </div>

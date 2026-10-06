@@ -5,8 +5,9 @@
  *
  * Pure functions only — no database, no network, no secrets — so every rule
  * is tested (npm test) and can be read in one place. The limits themselves
- * are enforced in Postgres (ai_reserve_request, migration 015); these are
- * the numbers handed to it.
+ * are enforced in Postgres (ai_reserve_budget, migration 019 — or the older
+ * ai_reserve_request, migration 015, until 019 has run); these are the
+ * numbers handed to it.
  */
 
 /** The model every Ask ProfitRig answer comes from. */
@@ -47,11 +48,219 @@ const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: { perMinute: 5, perDay: 5, perMonth: 25 },
 };
 
+/**
+ * The question counts from before the monthly allowance. Used only if
+ * migration 019 has not run, when the server falls back to the old check.
+ */
 export function limitsForPlan(plan: Plan): PlanLimits {
   return PLAN_LIMITS[plan];
 }
 
-/** What Anthropic charges, per million tokens. Checked 19 Sep 2026. */
+// ─────────────────────────────────────────────────────────────────────
+// The monthly AI allowance
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Which AI allowance a driver has. Pro and Pro Plus open the same screens;
+ * they differ only in how much AI a month includes.
+ */
+export type AiTier = "free" | "trial" | "pro_monthly" | "pro_yearly" | "pro_plus";
+
+/**
+ * What one driver's AI may cost ProfitRig in a month, in dollars: Ask
+ * ProfitRig and scanning together. At most about 40% of what the plan
+ * earns — $9.99 → $4, $99 a year ($8.25 a month) → $3.30, $19.99 → $8.
+ * Agreed with Sebastian, 6 Oct 2026.
+ *
+ * A trial needs no card, so it gets a starter allowance rather than the
+ * plan's: otherwise every throwaway sign-up is $4 of AI for nothing.
+ */
+export const AI_MONTHLY_BUDGET_USD: Record<AiTier, number> = {
+  free: 0.25,
+  trial: 1,
+  pro_monthly: 4,
+  pro_yearly: 3.3,
+  pro_plus: 8,
+};
+
+/**
+ * Ask ProfitRig's per-minute and per-day caps. They stop a runaway; the
+ * dollar allowance is the real limit.
+ */
+const CHAT_RATE_LIMITS: Record<AiTier, { perMinute: number; perDay: number }> = {
+  free: { perMinute: 5, perDay: 5 },
+  trial: { perMinute: 5, perDay: 30 },
+  pro_monthly: { perMinute: 5, perDay: 30 },
+  pro_yearly: { perMinute: 5, perDay: 30 },
+  pro_plus: { perMinute: 5, perDay: 60 },
+};
+
+export function chatLimitsForTier(tier: AiTier): { perMinute: number; perDay: number } {
+  return CHAT_RATE_LIMITS[tier];
+}
+
+/**
+ * What a question is allowed to cost while it runs. Above the most one can
+ * cost — the whole system prompt, a full replayed conversation, a maximum
+ * question and a maximum answer come to about a cent on Haiku — so a
+ * question that starts always has room to finish.
+ */
+export const CHAT_RESERVE_USD = 0.015;
+
+/** From this share of the allowance on, the driver is told. */
+export const AI_BUDGET_NOTICE_AT_PERCENT = 80;
+
+export const AI_TIER_LABEL: Record<AiTier, string> = {
+  free: "Free",
+  trial: "Pro trial",
+  pro_monthly: "Pro",
+  pro_yearly: "Pro (yearly)",
+  pro_plus: "Pro Plus",
+};
+
+/**
+ * The allowance a subscription carries. `pro` is the caller's isPro() —
+ * whether the subscription is live at all.
+ */
+export function aiTier(
+  sub: { status: string; plan: string | null } | null | undefined,
+  pro: boolean
+): AiTier {
+  if (!pro || !sub) return "free";
+  if (sub.status === "trialing") return "trial";
+  if (sub.plan === "pro_plus") return "pro_plus";
+  if (sub.plan === "yearly" || sub.plan === "year") return "pro_yearly";
+  return "pro_monthly";
+}
+
+/** Pro Plus is Pro for every screen and every rule except the allowance. */
+export function planForTier(tier: AiTier): Plan {
+  return tier === "free" ? "free" : "pro";
+}
+
+/**
+ * The allowance runs by calendar month from midnight UTC on the 1st. That is
+ * on or before midnight on the 1st everywhere in the US, so it never resets
+ * later than a driver was told — and it does not depend on the time zone
+ * their browser reports, which they could change.
+ */
+export function aiBudgetPeriod(now: Date): { start: Date; resetsAt: Date } {
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  return {
+    start: new Date(Date.UTC(y, m, 1)),
+    resetsAt: new Date(Date.UTC(y, m + 1, 1)),
+  };
+}
+
+/** "Nov 1" */
+export function formatResetDate(resetsAt: Date): string {
+  return resetsAt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** "$0.42", "<$0.01" — AI spend for Admin, to the cent. Drivers never see it. */
+export function formatAiDollars(usd: number): string {
+  if (!Number.isFinite(usd) || usd <= 0) return "$0.00";
+  if (usd < 0.01) return "<$0.01";
+  return `$${usd.toFixed(2)}`;
+}
+
+/** A usage row's cost: what it cost if finished, what it holds if running. */
+export function spentUsd(
+  rows: { estimated_cost_usd?: unknown; reserved_cost_usd?: unknown }[]
+): number {
+  let total = 0;
+  for (const r of rows) {
+    const v = r.estimated_cost_usd ?? r.reserved_cost_usd ?? 0;
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) total += n;
+  }
+  return Math.round(total * 1_000_000) / 1_000_000;
+}
+
+export type AiBudgetStatus = {
+  tier: AiTier;
+  budgetUsd: number;
+  spentUsd: number;
+  /** 0–100. 100 only when the next question would not fit. */
+  usedPercent: number;
+  nearlyOut: boolean;
+  out: boolean;
+  resetsAt: Date;
+};
+
+/**
+ * Where a driver stands this month. Drivers see a percentage, never dollars;
+ * Admin sees both.
+ */
+export function aiBudgetStatus(tier: AiTier, spent: number, now: Date): AiBudgetStatus {
+  const budgetUsd = AI_MONTHLY_BUDGET_USD[tier];
+  const out = spent + CHAT_RESERVE_USD > budgetUsd;
+  const raw = budgetUsd > 0 ? (spent / budgetUsd) * 100 : 100;
+  const usedPercent = out ? 100 : Math.max(0, Math.min(99, Math.floor(raw)));
+  return {
+    tier,
+    budgetUsd,
+    spentUsd: spent,
+    usedPercent,
+    nearlyOut: usedPercent >= AI_BUDGET_NOTICE_AT_PERCENT,
+    out,
+    resetsAt: aiBudgetPeriod(now).resetsAt,
+  };
+}
+
+/**
+ * Where "more AI" lives for this driver, if anywhere. Pro Plus is only
+ * offered once its Stripe price is set; a trial's starter allowance is not
+ * raised by changing plans, so a trial is offered nothing.
+ */
+export function aiUpgradeFor(tier: AiTier, proPlusOnSale: boolean): "pro" | "pro_plus" | null {
+  if (tier === "free") return "pro";
+  if ((tier === "pro_monthly" || tier === "pro_yearly") && proPlusOnSale) return "pro_plus";
+  return null;
+}
+
+/** What a driver is told when Ask ProfitRig says no, by reason and plan. */
+export function chatLimitMessage(
+  reason: "minute" | "day" | "month" | "budget",
+  tier: AiTier,
+  resetsAt: Date,
+  proPlusOnSale: boolean
+): string {
+  if (reason === "minute") {
+    return "That's a lot of questions at once. Give it a minute, then ask again.";
+  }
+  if (reason === "day") {
+    const perDay = chatLimitsForTier(tier).perDay;
+    return tier === "free"
+      ? `You've reached today's Ask ProfitRig limit. Free accounts get ${perDay} questions a day; Pro includes up to ${chatLimitsForTier("pro_monthly").perDay}.`
+      : `You've reached today's Ask ProfitRig limit of ${perDay} questions. More free up through the day.`;
+  }
+  if (reason === "month") {
+    return "You've reached this month's Ask ProfitRig limit.";
+  }
+  const when = formatResetDate(resetsAt);
+  if (tier === "free") {
+    return `You've used this month's free AI allowance. It resets ${when} — or go Pro for a much bigger one.`;
+  }
+  if (tier === "trial") {
+    return `You've used the AI included with your free trial. Your full monthly allowance starts when your plan does.`;
+  }
+  if (aiUpgradeFor(tier, proPlusOnSale) === "pro_plus") {
+    return `You've used this month's AI allowance. It resets ${when}. Need more? Pro Plus includes twice as much.`;
+  }
+  return `You've used this month's AI allowance. It resets ${when}.`;
+}
+
+/**
+ * What Anthropic charges, per million tokens. Haiku checked 19 Sep 2026;
+ * Opus 5.5 (for scanning) checked 6 Oct 2026. Cache writes are 1.25× input,
+ * cache reads 0.1×.
+ */
 export const AI_PRICING: Record<
   string,
   { inputPerMTok: number; outputPerMTok: number; cacheWritePerMTok: number; cacheReadPerMTok: number }
@@ -61,6 +270,12 @@ export const AI_PRICING: Record<
     outputPerMTok: 5,
     cacheWritePerMTok: 1.25,
     cacheReadPerMTok: 0.1,
+  },
+  "claude-opus-5-5": {
+    inputPerMTok: 4,
+    outputPerMTok: 20,
+    cacheWritePerMTok: 5,
+    cacheReadPerMTok: 0.4,
   },
 };
 

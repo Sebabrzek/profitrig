@@ -6,13 +6,20 @@ import {
 } from "@/lib/stripe/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+/**
+ * 'monthly' | 'yearly' | 'pro_plus' — which plan a subscription is on. The
+ * AI allowance is read from this (aiTier in lib/aiGuard), so a price that is
+ * not one of ours falls back to its billing interval and gets Pro's.
+ */
 function getPlanFromSubscription(sub: Stripe.Subscription): string | null {
   const monthlyId = process.env.STRIPE_PRICE_MONTHLY;
   const yearlyId = process.env.STRIPE_PRICE_YEARLY;
+  const proPlusId = process.env.STRIPE_PRICE_PRO_PLUS;
   const priceId = sub.items.data[0]?.price.id;
   if (!priceId) return null;
   if (priceId === monthlyId) return "monthly";
   if (priceId === yearlyId) return "yearly";
+  if (proPlusId && priceId === proPlusId) return "pro_plus";
   return sub.items.data[0]?.price.recurring?.interval ?? null;
 }
 

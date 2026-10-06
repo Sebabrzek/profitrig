@@ -1,21 +1,32 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card } from "@/components/ui/Surfaces";
 import { Notice } from "@/components/ui/Notice";
 import { Button } from "@/components/ui/Button";
 import { Field, TextInput } from "@/components/ui/Field";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { createCheckoutAction, createPortalAction } from "../actions";
+import { Card, CardHeader } from "@/components/ui/Surfaces";
+import {
+  createCheckoutAction,
+  createPortalAction,
+  switchToProPlusAction,
+} from "../actions";
 
-type Plan = "monthly" | "yearly";
+type Period = "monthly" | "yearly";
+type Level = "pro" | "pro_plus";
 
 export function UpgradeCard({
   hasExistingCustomer: _hasExistingCustomer,
+  proPlusOnSale,
 }: {
   hasExistingCustomer: boolean;
+  /** Pro Plus is offered only once its Stripe price is set. */
+  proPlusOnSale: boolean;
 }) {
-  const [plan, setPlan] = useState<Plan>("monthly");
+  const [level, setLevel] = useState<Level>("pro");
+  const [period, setPeriod] = useState<Period>("monthly");
+  // Pro Plus is monthly only.
+  const plan = proPlusOnSale && level === "pro_plus" ? "pro_plus" : period;
   const [code, setCode] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +47,11 @@ export function UpgradeCard({
   }
 
   const priceLabel =
-    plan === "yearly" ? "$99 / year" : "$9.99 / month";
+    plan === "pro_plus"
+      ? "$19.99 / month"
+      : plan === "yearly"
+        ? "$99 / year"
+        : "$9.99 / month";
   const sublabel =
     plan === "yearly"
       ? "Save ~17% vs paying monthly"
@@ -44,25 +59,46 @@ export function UpgradeCard({
 
   return (
     <Card as="div" className="mb-4">
-      <div className="mb-5">
-        <SegmentedControl
-          label="Billing period"
-          block
-          value={plan}
-          onChange={setPlan}
-          options={[
-            { value: "monthly", label: "Monthly" },
-            {
-              value: "yearly",
-              label: (
-                <>
-                  Yearly <span className="ml-1 font-medium">(save 17%)</span>
-                </>
-              ),
-            },
-          ]}
-        />
-      </div>
+      {proPlusOnSale && (
+        <div className="mb-3">
+          <SegmentedControl
+            label="Plan"
+            block
+            value={level}
+            onChange={setLevel}
+            options={[
+              { value: "pro", label: "Pro" },
+              { value: "pro_plus", label: "Pro Plus" },
+            ]}
+          />
+        </div>
+      )}
+      {plan === "pro_plus" ? (
+        <p className="mb-5 text-sm leading-snug text-muted">
+          Everything in Pro, with twice the monthly AI allowance. Billed
+          monthly.
+        </p>
+      ) : (
+        <div className="mb-5">
+          <SegmentedControl
+            label="Billing period"
+            block
+            value={period}
+            onChange={setPeriod}
+            options={[
+              { value: "monthly", label: "Monthly" },
+              {
+                value: "yearly",
+                label: (
+                  <>
+                    Yearly <span className="ml-1 font-medium">(save 17%)</span>
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
+      )}
 
       <div className="text-center mb-4">
         <p className="text-4xl font-black">{priceLabel}</p>
@@ -127,5 +163,44 @@ export function ProActiveControls() {
         </Notice>
       )}
     </div>
+  );
+}
+
+/**
+ * For someone already on Pro: more AI, on Stripe's own confirmation page,
+ * which shows what changes and what it costs before anything does.
+ */
+export function ProPlusOffer() {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function go() {
+    setError(null);
+    startTransition(async () => {
+      const r = await switchToProPlusAction();
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      window.location.href = r.url;
+    });
+  }
+
+  return (
+    <Card as="div" className="mb-4">
+      <CardHeader
+        eyebrow="Pro Plus · $19.99 / month"
+        title="Want more AI?"
+        description="Everything in Pro, with twice the monthly AI allowance. Stripe shows exactly what changes, and what it costs today, before you confirm."
+      />
+      <Button variant="secondary" onClick={go} pending={pending}>
+        {pending ? "Opening…" : "Switch to Pro Plus"}
+      </Button>
+      {error && (
+        <Notice tone="error" className="mt-3">
+          {error}
+        </Notice>
+      )}
+    </Card>
   );
 }
