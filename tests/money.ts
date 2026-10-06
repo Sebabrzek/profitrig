@@ -150,10 +150,14 @@ import {
   cleanScanReading,
   draftFromReading,
   isScanMimeType,
+  mergeScanAnswers,
+  needsPageTwo,
   scanCostUsd,
   scanLimitsForTier,
   scanReserveUsd,
 } from "../src/lib/scan";
+import { pdfPage } from "../src/lib/pdfPages";
+import { PDFDocument } from "pdf-lib";
 import { ScanDraftNotice } from "../src/app/loads/ScanDraftNotice";
 import {
   fuelEntryPresentation,
@@ -1718,6 +1722,9 @@ check(
   );
 }
 
+/** Checks that must wait on something (reading a PDF); awaited before the summary. */
+const asyncChecks: Promise<void>[] = [];
+
 // ─────────────────────────────────────────────────────────────────────
 section("Scanning: a document becomes a draft the driver checks, never a saved load");
 // ─────────────────────────────────────────────────────────────────────
@@ -1907,7 +1914,81 @@ section("Scanning: a document becomes a draft the driver checks, never a saved l
     notice({ id: "s2", state: "saved", documentLabel: "rate con", checks: [], loadId: "L9" }).includes('href="/loads/L9"')
   );
 
+  // PDFs: page 1, then page 2 only when page 1 is missing what matters.
+  check("a rate con with everything on page 1 stops at page 1", !needsPageTwo(rateCon));
+  check(
+    "missing miles alone never pays for page 2 — many rate cons don't print them",
+    !needsPageTwo({ ...rateCon, miles: null })
+  );
+  check(
+    "page 2 is read when page 1 lacks the pay, a place or the date, or is a cover sheet",
+    needsPageTwo({ ...rateCon, linehaulPay: null, totalPay: null }) &&
+      needsPageTwo({ ...rateCon, origin: null }) &&
+      needsPageTwo({ ...rateCon, destination: null }) &&
+      needsPageTwo({ ...rateCon, pickupDate: null }) &&
+      needsPageTwo({ ...rateCon, documentType: "other" }) &&
+      !needsPageTwo({ ...rateCon, linehaulPay: null })
+  );
+  const p1 = {
+    document_type: "rate_confirmation", ticket_count: 1, pickup_date: "2026-10-06", customer: "Freight Tec",
+    load_number: "1105373", origin: "Oglesby, IL", destination: "Madison, WI", miles: null,
+    linehaul_pay: null, fuel_surcharge: null, other_pay: [], total_pay: null, rate_as_printed: null,
+    commodity: "Mesh", weight: null, unclear: ["multi-stop"],
+  };
+  const p2 = {
+    document_type: "other", ticket_count: 1, pickup_date: "2026-10-09", customer: "Someone Else",
+    load_number: null, origin: null, destination: "Chicago, IL", miles: 420,
+    linehaul_pay: 2500, fuel_surcharge: 300, other_pay: [{ label: "Stop-off", amount: 50 }], total_pay: 2850,
+    rate_as_printed: null, commodity: null, weight: "48,000 lb", unclear: ["multi-stop", "faint print"],
+  };
+  const both = mergeScanAnswers(p1, p2);
+  check(
+    "page 2 only fills page 1's gaps: page 1's date, broker and places stand",
+    both.pickup_date === "2026-10-06" && both.customer === "Freight Tec" && both.destination === "Madison, WI" &&
+      both.miles === 420 && both.weight === "48,000 lb" && both.document_type === "rate_confirmation" && both.pages_read === 2
+  );
+  check(
+    "pay comes whole from one page — here page 2's, since page 1 had none",
+    both.linehaul_pay === 2500 && both.fuel_surcharge === 300 && both.total_pay === 2850 &&
+      JSON.stringify(both.other_pay) === '[{"label":"Stop-off","amount":50}]' &&
+      JSON.stringify(both.unclear) === '["multi-stop","faint print"]'
+  );
+  const keepPay = mergeScanAnswers({ ...p1, linehaul_pay: 2800, total_pay: 2800 }, p2);
+  check(
+    "page 1's pay is never mixed with page 2's",
+    keepPay.linehaul_pay === 2800 && keepPay.total_pay === 2800 && keepPay.fuel_surcharge === null &&
+      JSON.stringify(keepPay.other_pay) === "[]"
+  );
+  check(
+    "a merged answer reads back like any other",
+    draftFromReading(cleanScanReading(both, today), base).load.linehaul_pay === 2500
+  );
+
+  asyncChecks.push(
+    (async () => {
+      const doc = await PDFDocument.create();
+      for (let i = 0; i < 3; i++) doc.addPage([612, 792 + i]);
+      const bytes = await doc.save();
+      const second = await pdfPage(bytes, 1);
+      const back = second ? await PDFDocument.load(Buffer.from(second.data, "base64")) : null;
+      check(
+        "a PDF page is cut out on its own: page 2 of 3 becomes a one-page PDF",
+        second?.pageCount === 3 && back?.getPageCount() === 1 && back?.getPage(0).getHeight() === 793
+      );
+      check(
+        "a page that isn't there, or a file that isn't a PDF, gives nothing to cut",
+        (await pdfPage(bytes, 3)) === null && (await pdfPage(new TextEncoder().encode("not a pdf"), 0)) === null
+      );
+    })()
+  );
+
   const route = readFileSync("src/app/api/scan/route.ts", "utf8");
+  check(
+    "the AI never sees past page 2 of a PDF, and page 2 only when page 1 needs it",
+    route.includes("pdfPage(bytes, 0)") && route.includes("pdfPage(bytes, 1)") &&
+      !/pdfPage\(bytes, [2-9]/.test(route) &&
+      route.includes("needsPageTwo(cleanScanReading(one.answer, today))")
+  );
   check(
     "the scan route measures the document before reserving, reserves before reading, and never saves a load",
     route.indexOf("countTokens(") > 0 &&
@@ -2846,9 +2927,17 @@ section("Alerts reach the driver, and \"this is right\" silences only what it sa
 
 // ─────────────────────────────────────────────────────────────────────
 
-console.log(
-  failures === 0
-    ? `\n\x1b[32m${checks} checks passed.\x1b[0m\n`
-    : `\n\x1b[31m${failures} of ${checks} checks FAILED.\x1b[0m\n`
+Promise.all(asyncChecks).then(
+  () => {
+    console.log(
+      failures === 0
+        ? `\n\x1b[32m${checks} checks passed.\x1b[0m\n`
+        : `\n\x1b[31m${failures} of ${checks} checks FAILED.\x1b[0m\n`
+    );
+    process.exit(failures === 0 ? 0 : 1);
+  },
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  }
 );
-process.exit(failures === 0 ? 0 : 1);

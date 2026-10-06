@@ -161,7 +161,7 @@ Fields:
 - rate_as_printed: when pay is given as a rate rather than a total ("$2.65/mi", "$9.50 per ton", "$131/hr"), that rate exactly as printed.
 - commodity: what is hauled, as printed.
 - weight: weight or quantity with its unit, as printed ("42,000 lb", "18.42 tons").
-- unclear: short plain phrases for anything hard to read or ambiguous that the driver should check. Do not list fields that are simply not printed, or how many tickets there are: ProfitRig already says so.`;
+- unclear: short plain phrases for anything hard to read or ambiguous that the driver should check. Do not list fields that are simply not printed, or how many tickets there are: ProfitRig already says so. Do not mention other pages of the document: ProfitRig reads the next page itself when it needs to.`;
 
 const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: "null" }] });
 
@@ -411,6 +411,72 @@ export function draftFromReading(reading: ScanReading, base: Load): ScanDraft {
     },
     checks,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PDFs: page 1 first, page 2 only if page 1 is missing what matters
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether a PDF's page 1 left out something page 2 might have: the pay, the
+ * pickup or delivery place, or the date — or page 1 is not the load at all
+ * (a cover sheet). Missing miles do NOT count: many rate cons never print
+ * them, and reading page 2 would usually pay to find nothing.
+ */
+export function needsPageTwo(page1: ScanReading): boolean {
+  return (
+    page1.documentType === "other" ||
+    (page1.linehaulPay == null && page1.totalPay == null) ||
+    page1.origin == null ||
+    page1.destination == null ||
+    page1.pickupDate == null
+  );
+}
+
+const PAY_FIELDS = ["linehaul_pay", "fuel_surcharge", "other_pay", "total_pay", "rate_as_printed"] as const;
+const FILL_FIELDS = [
+  "pickup_date",
+  "customer",
+  "load_number",
+  "origin",
+  "destination",
+  "miles",
+  "commodity",
+  "weight",
+] as const;
+
+const blank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
+
+/**
+ * Pages 1 and 2 read separately, as one answer. Page 1 wins wherever it has
+ * a value; page 2 only fills the gaps. Pay is taken whole from ONE page —
+ * all of page 2's pay lines when page 1 had no pay, otherwise none of them —
+ * so a line haul from one page can never be added to a total from another.
+ * Stored as the scan's `extracted`, so it reads back like any other answer.
+ */
+export function mergeScanAnswers(page1: unknown, page2: unknown): Record<string, unknown> {
+  const a = (page1 && typeof page1 === "object" ? page1 : {}) as Record<string, unknown>;
+  const b = (page2 && typeof page2 === "object" ? page2 : {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...a };
+  if (a.document_type === "other" && b.document_type && b.document_type !== "other") {
+    merged.document_type = b.document_type;
+  }
+  for (const k of FILL_FIELDS) if (blank(a[k]) && !blank(b[k])) merged[k] = b[k];
+  const aHasPay = !blank(a.linehaul_pay) || !blank(a.total_pay);
+  const bHasPay = !blank(b.linehaul_pay) || !blank(b.total_pay);
+  if (!aHasPay && bHasPay) for (const k of PAY_FIELDS) merged[k] = b[k];
+  const unclear = [
+    ...(Array.isArray(a.unclear) ? a.unclear : []),
+    ...(Array.isArray(b.unclear) ? b.unclear : []),
+  ].filter((u, i, all) => typeof u === "string" && all.indexOf(u) === i);
+  merged.unclear = unclear;
+  merged.pages_read = 2;
+  return merged;
+}
+
+/** What the AI is told alongside page 2, so it reads it on its own terms. */
+export function pageTwoPrompt(today: string): string {
+  return `Today's date is ${today}. This is page 2 of a document whose first page was already read. Read this page on its own.`;
 }
 
 /** A blank Load for tests and callers that have no page defaults. */

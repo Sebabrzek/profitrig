@@ -316,9 +316,18 @@ and scanning (D1) will cost far more per use than a chat question.
   only, not partials (a partial records extra miles, which no document
   prints). Free has no Loads, so no scanning — a driver tries it on the trial.
 - **Opus 5.5 at low effort**, structured JSON output, server-side
-  `fallbacks: "default"`. Measured on test documents (a made-up rate con, a
-  made-up pair of scale tickets): about 2¢ and 3–7 seconds a scan, every
-  field right — so Pro's $4 is roughly 200 scans a month.
+  `fallbacks: "default"`. Measured: about 2¢ and 3–7 seconds a photo, every
+  field right on a made-up rate con, made-up scale tickets and Sebastian's
+  real Freight Tec rate con — so Pro's $4 is roughly 150–200 scans a month.
+- **PDFs are read page 1 first, page 2 only if needed, never further**
+  (Sebastian's call). A real 7-page Freight Tec rate con cost 10¢ read whole
+  — pages 2–7 are terms, scrambled text and e-signature receipts — and 2.5¢
+  read as page 1 alone. Page 2 is read only when page 1 lacks the pay, a
+  place or the date, or is a cover sheet (missing miles alone don't count);
+  page 2 fills only page 1's gaps, and pay is taken whole from one page. A
+  rate con with its pay on page 2 cost 3.7¢. Pages are cut with `pdf-lib`;
+  a PDF that can't be cut (locked, damaged) is read whole, capped by the
+  token limit. The whole PDF is still what is stored.
 - **The AI copies what is printed and nothing else** (`lib/scan.ts`): never
   estimates, calculates or looks up a value; mileage only as printed. Any
   adding up is done in code: accessorial lines summed, a total that disagrees
@@ -398,7 +407,7 @@ be planned.
 - Next.js 16 (App Router, Turbopack) — **read `node_modules/next/dist/docs/`
   before using Next APIs.** React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 370 checks in `tests/money.ts` (money math, CSV, calculator,
+- `npm test` = 380 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
   monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.

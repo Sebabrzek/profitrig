@@ -21,11 +21,16 @@ import {
   SCAN_MODEL,
   SCAN_OUTPUT_SCHEMA,
   SCAN_SYSTEM_PROMPT,
+  cleanScanReading,
   isScanMimeType,
+  mergeScanAnswers,
+  needsPageTwo,
+  pageTwoPrompt,
   scanCostUsd,
   scanLimitsForTier,
   scanReserveUsd,
 } from "@/lib/scan";
+import { pdfPage } from "@/lib/pdfPages";
 import { todayIsoIn, TZ_COOKIE } from "@/lib/loads";
 
 export const runtime = "nodejs";
@@ -38,13 +43,17 @@ export const maxDuration = 120;
  * The browser sends one file. Everything else is decided here:
  *
  *   1. signed in, on a plan with Loads, the file is an image or PDF ≤ 4 MB
- *   2. its size in tokens is measured (free), and anything huge is refused
- *   3. the check in Postgres reserves what this scan may cost against the
- *      driver's monthly AI allowance (fails closed)
- *   4. the file is stored, privately, under the driver's own folder
- *   5. Opus 5.5 reads it into a fixed JSON shape
- *   6. what it read, tokens and cost are recorded; the browser gets the
- *      scan's id and opens a draft load from it
+ *   2. a PDF is cut into its first two pages: the AI reads page 1, and
+ *      page 2 only if page 1 is missing the pay, a place or the date —
+ *      never further (a rate con's later pages are terms and signatures)
+ *   3. its size in tokens is measured (free), and anything huge is refused
+ *   4. the check in Postgres reserves what this scan may cost — both pages,
+ *      if there are two — against the driver's monthly AI allowance
+ *      (fails closed)
+ *   5. the whole file is stored, privately, under the driver's own folder
+ *   6. Opus 5.5 reads it into a fixed JSON shape
+ *   7. what it read, tokens and cost are recorded as ONE scan; the browser
+ *      gets the scan's id and opens a draft load from it
  *
  * Nothing becomes a load here. The driver checks the draft and saves it.
  */
@@ -112,55 +121,81 @@ export async function POST(request: Request) {
   }
 
   const mime = file.type;
-  const data = Buffer.from(await file.arrayBuffer()).toString("base64");
-  const documentBlock: Anthropic.Beta.BetaContentBlockParam =
-    mime === "application/pdf"
-      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data } }
-      : {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: mime as "image/jpeg" | "image/png" | "image/webp",
-            data,
-          },
-        };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const data = Buffer.from(bytes).toString("base64");
   // Today on the driver's calendar, so a date without a year lands right.
   const today = todayIsoIn((await cookies()).get(TZ_COOKIE)?.value);
-  const messages: Anthropic.Beta.BetaMessageParam[] = [
-    {
-      role: "user",
-      content: [
-        documentBlock,
-        { type: "text", text: `Today's date is ${today}. Read this document.` },
-      ],
-    },
+
+  // What the AI is shown: a photo as it is; a PDF one page at a time.
+  type Part = { block: Anthropic.Beta.BetaContentBlockParam; prompt: string };
+  const pdf = (b64: string): Anthropic.Beta.BetaContentBlockParam => ({
+    type: "document",
+    source: { type: "base64", media_type: "application/pdf", data: b64 },
+  });
+  const firstPrompt = `Today's date is ${today}. Read this document.`;
+  let first: Part;
+  let second: Part | null = null;
+  if (mime === "application/pdf") {
+    const page1 = await pdfPage(bytes, 0);
+    const page2 = page1 && page1.pageCount >= 2 ? await pdfPage(bytes, 1) : null;
+    // A PDF that cannot be taken apart (damaged, or locked) is read whole;
+    // the token limit below still caps what that can cost.
+    first = { block: pdf(page1 ? page1.data : data), prompt: firstPrompt };
+    if (page2) second = { block: pdf(page2.data), prompt: pageTwoPrompt(today) };
+  } else {
+    first = {
+      block: {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: mime as "image/jpeg" | "image/png" | "image/webp",
+          data,
+        },
+      },
+      prompt: firstPrompt,
+    };
+  }
+  const messagesFor = (part: Part): Anthropic.Beta.BetaMessageParam[] => [
+    { role: "user", content: [part.block, { type: "text", text: part.prompt }] },
   ];
 
   const anthropic = new Anthropic({ apiKey });
 
   // Measured before anything is spent: counting tokens is free.
-  let inputTokens: number;
+  const count = async (part: Part) =>
+    (
+      await anthropic.messages.countTokens({
+        model: SCAN_MODEL,
+        system: SCAN_SYSTEM_PROMPT,
+        messages: messagesFor(part) as Anthropic.MessageParam[],
+      })
+    ).input_tokens;
+  let firstTokens: number;
+  let secondTokens = 0;
   try {
-    const counted = await anthropic.messages.countTokens({
-      model: SCAN_MODEL,
-      system: SCAN_SYSTEM_PROMPT,
-      messages: messages as Anthropic.MessageParam[],
-    });
-    inputTokens = counted.input_tokens;
+    [firstTokens, secondTokens] = await Promise.all([
+      count(first),
+      second ? count(second) : Promise.resolve(0),
+    ]);
   } catch (err) {
     console.error("scan: token count failed", err);
     return fail("That file couldn't be opened. Try a clearer photo, or a different PDF.", 422);
   }
-  if (inputTokens > SCAN_MAX_INPUT_TOKENS) {
+  if (firstTokens > SCAN_MAX_INPUT_TOKENS) {
     return fail(
       "That document is too long to scan. Send just the page with the load on it.",
       413
     );
   }
+  if (secondTokens > SCAN_MAX_INPUT_TOKENS) second = null;
 
   const period = aiBudgetPeriod(new Date());
   const onSale = proPlusOnSale();
-  const reserveUsd = scanReserveUsd(inputTokens);
+  // Held for both pages when there are two, since page 2 may be needed.
+  const reserveUsd =
+    Math.ceil(
+      (scanReserveUsd(firstTokens) + (second ? scanReserveUsd(secondTokens) : 0)) * 10_000
+    ) / 10_000;
   const { data: reserved, error: reserveError } = await admin.rpc("ai_reserve_budget", {
     p_user_id: user.id,
     p_plan: planForTier(tier),
@@ -230,7 +265,8 @@ export async function POST(request: Request) {
     return fail(UNAVAILABLE, 503);
   }
 
-  try {
+  // One read of one part: its answer (null if unusable), cost and tokens.
+  async function read(part: Part) {
     const response = await anthropic.beta.messages.create({
       model: SCAN_MODEL,
       max_tokens: SCAN_MAX_TOKENS,
@@ -238,20 +274,20 @@ export async function POST(request: Request) {
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: SCAN_SYSTEM_PROMPT,
-      messages,
+      messages: messagesFor(part),
       output_config: {
         effort: SCAN_EFFORT,
         format: { type: "json_schema", schema: SCAN_OUTPUT_SCHEMA as unknown as Record<string, unknown> },
       },
     });
-
+    const u = response.usage;
     const cost = scanCostUsd(
       {
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
-        cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
-        cache_read_input_tokens: response.usage.cache_read_input_tokens,
-        iterations: (response.usage.iterations ?? []).map((i) => ({
+        input_tokens: u.input_tokens,
+        output_tokens: u.output_tokens,
+        cache_creation_input_tokens: u.cache_creation_input_tokens,
+        cache_read_input_tokens: u.cache_read_input_tokens,
+        iterations: (u.iterations ?? []).map((i) => ({
           type: i.type,
           model: "model" in i ? String(i.model) : null,
           input_tokens: i.input_tokens,
@@ -262,27 +298,58 @@ export async function POST(request: Request) {
       },
       response.model
     );
-
-    let extracted: unknown = null;
+    let answer: unknown = null;
     if (response.stop_reason === "end_turn") {
       const textBlock = response.content.find((b) => b.type === "text");
       try {
-        extracted = textBlock && textBlock.type === "text" ? JSON.parse(textBlock.text) : null;
+        answer = textBlock && textBlock.type === "text" ? JSON.parse(textBlock.text) : null;
       } catch {
-        extracted = null;
+        answer = null;
       }
     }
+    return {
+      answer: answer !== null && typeof answer === "object" ? answer : null,
+      cost,
+      model: response.model,
+      stopReason: response.stop_reason,
+      input: u.input_tokens,
+      output: u.output_tokens,
+      cacheWrite: u.cache_creation_input_tokens ?? 0,
+      cacheRead: u.cache_read_input_tokens ?? 0,
+    };
+  }
+
+  try {
+    const one = await read(first);
+    const total = { ...one };
+    let extracted: unknown = one.answer;
+    // Page 2 only when page 1 is missing what matters — then stop.
+    if (one.answer && second && needsPageTwo(cleanScanReading(one.answer, today))) {
+      try {
+        const two = await read(second);
+        total.cost = Math.round((total.cost + two.cost) * 1_000_000) / 1_000_000;
+        total.input += two.input;
+        total.output += two.output;
+        total.cacheWrite += two.cacheWrite;
+        total.cacheRead += two.cacheRead;
+        if (two.answer) extracted = mergeScanAnswers(one.answer, two.answer);
+      } catch (err) {
+        // Page 1's answer stands; the form lists what is still missing.
+        console.error("scan: page 2 read failed", err);
+      }
+    }
+
     const readOk = extracted !== null && typeof extracted === "object";
 
     await recordUsage({
       status: readOk ? "succeeded" : "error",
-      error_code: readOk ? null : String(response.stop_reason ?? "unparsed").slice(0, 60),
-      model: response.model,
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
-      cache_creation_input_tokens: response.usage.cache_creation_input_tokens ?? null,
-      cache_read_input_tokens: response.usage.cache_read_input_tokens ?? null,
-      estimated_cost_usd: cost,
+      error_code: readOk ? null : String(one.stopReason ?? "unparsed").slice(0, 60),
+      model: one.model,
+      input_tokens: total.input,
+      output_tokens: total.output,
+      cache_creation_input_tokens: total.cacheWrite,
+      cache_read_input_tokens: total.cacheRead,
+      estimated_cost_usd: total.cost,
     });
     await admin
       .from("scans")
