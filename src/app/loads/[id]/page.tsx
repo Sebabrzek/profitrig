@@ -116,7 +116,7 @@ export default async function EditLoadPage({
   if (initial.parent_load_id) {
     const { data: primary } = await supabase
       .from("loads")
-      .select("id,load_date,broker,origin,destination")
+      .select("id,load_date,broker,origin,destination,loaded_miles,deadhead_miles")
       .eq("id", initial.parent_load_id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -130,6 +130,9 @@ export default async function EditLoadPage({
           })
         : "the load it rides with",
       dateLabel: dateLabelOf(primary?.load_date ?? initial.load_date),
+      miles: primary
+        ? (Number(primary.loaded_miles) || 0) + (Number(primary.deadhead_miles) || 0)
+        : undefined,
     };
   }
 

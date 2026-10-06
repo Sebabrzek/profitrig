@@ -10,7 +10,14 @@ import {
   buildMtdContext,
   computeLoadEconomics,
   loadMonthKey,
+  todayIso,
 } from "@/lib/loads";
+import {
+  LOOKALIKE_CHECK,
+  keepDismissals,
+  loadChecks,
+  openChecks,
+} from "@/lib/checks";
 import {
   MAX_PARTIALS,
   partialExtraMiles,
@@ -166,6 +173,8 @@ export type PartialOf = {
   label: string;
   /** "Thu, Sep 18" */
   dateLabel: string;
+  /** The primary's total miles, to judge whether "extra miles" look like a whole trip. */
+  miles?: number;
 };
 
 export function LoadForm({
@@ -242,6 +251,30 @@ export function LoadForm({
   const setField = <K extends keyof Load>(k: K) => (v: Load[K]) =>
     setLoad((s) => ({ ...s, [k]: v }));
 
+  // Alerts as the driver types, in the same words the Loads page and Admin
+  // use (lib/checks). Marking one "this is right" is saved with the load.
+  const fuelEstimate = useMemo(
+    () => computeLoadEconomics({ ...load, fuel_actual: null }, costProfile, undefined).fuelCost,
+    [load, costProfile]
+  );
+  const liveChecks = loadChecks(load, e, {
+    fuelEstimate,
+    primaryMiles: partialOf?.miles,
+    today: todayIso(),
+  });
+  const { open: openLive, confirmed: confirmedLive } = openChecks(
+    liveChecks,
+    load.dismissed_checks
+  );
+  const markRight = (wording: string, yes: boolean) =>
+    setLoad((s) => {
+      const now = s.dismissed_checks ?? [];
+      return {
+        ...s,
+        dismissed_checks: yes ? [...now, wording] : now.filter((d) => d !== wording),
+      };
+    });
+
   function save() {
     setError(null);
     if (
@@ -252,7 +285,12 @@ export function LoadForm({
       return;
     }
     startTransition(async () => {
-      const r = await saveLoadAction(load);
+      // Keep only marks that still match an alert — a changed figure drops
+      // its mark. The duplicate alert needs the other loads, so it is kept.
+      const r = await saveLoadAction({
+        ...load,
+        dismissed_checks: keepDismissals(load.dismissed_checks, [...liveChecks, LOOKALIKE_CHECK]),
+      });
       if (!r.ok) {
         setError(r.error);
         return;
@@ -642,6 +680,34 @@ export function LoadForm({
           />
         </div>
       </Section>
+
+      {(openLive.length > 0 || confirmedLive.length > 0) && (
+        <Notice
+          title={openLive.length > 0 ? "Worth a look before you save" : undefined}
+          className="mb-4"
+        >
+          <ul className="flex flex-col gap-1.5">
+            {openLive.map((c) => (
+              <li key={c} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span>{c}</span>
+                <button type="button" className="pr-link pr-hit shrink-0 text-sm" onClick={() => markRight(c, true)}>
+                  This is right
+                </button>
+              </li>
+            ))}
+            {confirmedLive.map((c) => (
+              <li key={c} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-muted">
+                <span>
+                  <span aria-hidden="true">✓ </span>Marked right: {c}
+                </span>
+                <button type="button" className="pr-link pr-hit shrink-0 text-sm" onClick={() => markRight(c, false)}>
+                  Undo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
 
       {error && (
         <Notice tone="error" className="mb-4">

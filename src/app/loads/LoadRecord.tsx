@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LossTag } from "@/components/ui/Records";
+import { Chip } from "@/components/ui/Chip";
 import {
   loadRecordFigures,
   partialRecordFigures,
@@ -44,6 +45,7 @@ export function LoadRecord({
   origin,
   destination,
   economics,
+  flagged = false,
 }: {
   /** Unique per record; builds the ids that name the link. */
   id: string;
@@ -53,6 +55,8 @@ export function LoadRecord({
   origin: string;
   destination: string;
   economics: LoadRecordEconomics;
+  /** An alert on this load is still open (lib/checks). */
+  flagged?: boolean;
 }) {
   const f = loadRecordFigures(economics);
   const k = `load-${id}`;
@@ -71,7 +75,7 @@ export function LoadRecord({
       <Link
         href={href}
         className="pr-record pr-record-link pr-load"
-        aria-labelledby={`${k}-title ${k}-date${hasRoute ? ` ${k}-route` : ""} ${k}-profit`}
+        aria-labelledby={`${k}-title ${k}-date${hasRoute ? ` ${k}-route` : ""} ${k}-profit${flagged ? ` ${k}-flag` : ""}`}
         aria-describedby={`${k}-miles ${k}-revenue ${k}-cost`}
       >
         <div className="pr-load-id">
@@ -81,6 +85,11 @@ export function LoadRecord({
           <p id={`${k}-title`} className="pr-load-title">
             {broker || "Untitled load"}
           </p>
+          {flagged && (
+            <p id={`${k}-flag`} className="pr-load-flag">
+              <Chip tone="loss">Worth a look</Chip>
+            </p>
+          )}
           {hasRoute && (
             <p id={`${k}-route`} className="pr-load-route">
               {origin || "—"}{" "}
@@ -157,6 +166,7 @@ export function PartialRecord({
   origin,
   destination,
   economics,
+  flagged = false,
 }: {
   id: string;
   href: string;
@@ -164,6 +174,8 @@ export function PartialRecord({
   origin: string;
   destination: string;
   economics: LoadRecordEconomics;
+  /** An alert on this partial is still open (lib/checks). */
+  flagged?: boolean;
 }) {
   const f = partialRecordFigures(economics);
   const k = `partial-${id}`;
@@ -173,7 +185,7 @@ export function PartialRecord({
       <Link
         href={href}
         className="pr-record pr-record-link pr-load-partial-link"
-        aria-labelledby={`${k}-kind ${k}-title${hasRoute ? ` ${k}-route` : ""} ${k}-adds`}
+        aria-labelledby={`${k}-kind ${k}-title${hasRoute ? ` ${k}-route` : ""} ${k}-adds${flagged ? ` ${k}-flag` : ""}`}
         aria-describedby={`${k}-detail`}
       >
         <div className="pr-load-partial-id">
@@ -183,6 +195,11 @@ export function PartialRecord({
           <p id={`${k}-title`} className="pr-load-title">
             {broker || "Untitled partial"}
           </p>
+          {flagged && (
+            <p id={`${k}-flag`} className="pr-load-flag">
+              <Chip tone="loss">Worth a look</Chip>
+            </p>
+          )}
           {hasRoute && (
             <p id={`${k}-route`} className="pr-load-route">
               {origin || "—"} <span aria-hidden="true">→</span>

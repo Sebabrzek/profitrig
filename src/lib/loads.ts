@@ -30,6 +30,11 @@ export type Load = {
    * Optional so the many places that build a Load by hand need not name it.
    */
   parent_load_id?: string | null;
+  /**
+   * The exact wording of each alert the driver has marked "this is right" on
+   * this load (lib/checks, migration 018). Optional: absent before 018 runs.
+   */
+  dismissed_checks?: string[];
 };
 
 /**
@@ -74,6 +79,9 @@ export function loadFromRow(r: Record<string, unknown>): Load {
       typeof r.parent_load_id === "string" && r.parent_load_id
         ? r.parent_load_id
         : null,
+    dismissed_checks: Array.isArray(r.dismissed_checks)
+      ? r.dismissed_checks.filter((d): d is string => typeof d === "string")
+      : [],
   };
 }
 

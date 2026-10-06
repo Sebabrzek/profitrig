@@ -49,15 +49,8 @@ import {
   tripLabel,
   tripTotals,
 } from "@/lib/partials";
-import {
-  adminWeeks,
-  driverNote,
-  findLookalikes,
-  gmailHref,
-  loadChecks,
-  mailtoHref,
-  profileChecks,
-} from "@/lib/adminView";
+import { adminWeeks, driverNote, gmailHref, mailtoHref } from "@/lib/adminView";
+import { findLookalikes, loadChecks, openChecks, profileChecks } from "@/lib/checks";
 import { computeFuelStats, type FuelLog } from "@/lib/fuel";
 import { roadCategoryMeta, type RoadExpense } from "@/lib/roadExpenses";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
@@ -197,13 +190,19 @@ export default async function AdminDriverPage({
   const lookalikes = findLookalikes(loads);
   const today = isoDate(now);
   const weekOf = (iso: string) => isoDate(startOfWeek(new Date(`${iso}T12:00:00`), settings.weekStart));
-  const checksFor = (l: Load) =>
-    loadChecks(l, econ(l), {
-      fuelEstimate: computeLoadEconomics({ ...l, fuel_actual: null }, profile, undefined).fuelCost,
-      primaryMiles: l.parent_load_id ? ownMiles(byId.get(l.parent_load_id) ?? l) : undefined,
-      lookalike: lookalikes.has(String(l.id)),
-      today,
-    });
+  // Open alerts, and the ones the driver has marked "this is right" — the
+  // latter shown as confirmed, never counted as problems.
+  const alertsFor = (l: Load) =>
+    openChecks(
+      loadChecks(l, econ(l), {
+        fuelEstimate: computeLoadEconomics({ ...l, fuel_actual: null }, profile, undefined).fuelCost,
+        primaryMiles: l.parent_load_id ? ownMiles(byId.get(l.parent_load_id) ?? l) : undefined,
+        lookalike: lookalikes.has(String(l.id)),
+        today,
+      }),
+      l.dismissed_checks
+    );
+  const checksFor = (l: Load) => alertsFor(l).open;
 
   // ── fuel ────────────────────────────────────────────────────────────────
   const rig = (rigRes.data ?? null) as Row | null;
@@ -559,6 +558,9 @@ export default async function AdminDriverPage({
                       {l.notes && <p className="max-w-[28ch] whitespace-pre-wrap">{l.notes}</p>}
                       {checks.map((c) => (
                         <p key={c} className="max-w-[32ch] text-[var(--pr-loss-deep)]">● {c}</p>
+                      ))}
+                      {alertsFor(l).confirmed.map((c) => (
+                        <p key={c} className="max-w-[32ch] text-muted">✓ Driver says right: {c}</p>
                       ))}
                       {raw?.updated_at != null && (
                         <p className="text-xs text-muted">saved {day(String(raw.updated_at))}</p>

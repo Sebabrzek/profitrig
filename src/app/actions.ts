@@ -458,6 +458,7 @@ export async function deleteSnapshotAction(
 
 import type { Load } from "@/lib/loads";
 import { MAX_PARTIALS, asPartial } from "@/lib/partials";
+import { keepDismissals } from "@/lib/checks";
 import { isRoadCategory } from "@/lib/roadExpenses";
 
 function nullableNum(v: number | null): number | null {
@@ -478,13 +479,15 @@ export async function saveLoadAction(
   // keeps whatever primary the saved row already has, so a crafted request
   // cannot quietly turn a partial back into a full-mileage load.
   let parentId: string | null = input.parent_load_id || null;
+  let existing: Record<string, unknown> | null = null;
   if (input.id) {
-    const { data: existing } = await supabase
+    const { data } = await supabase
       .from("loads")
       .select("*")
       .eq("id", input.id)
       .eq("user_id", user.id)
       .maybeSingle();
+    existing = data;
     if (existing && typeof existing.parent_load_id === "string") {
       parentId = existing.parent_load_id;
     }
@@ -557,6 +560,12 @@ export async function saveLoadAction(
     // Sent only for a partial, so an ordinary save never names the column
     // and keeps working before migration 017 runs.
     ...(parentId ? { parent_load_id: parentId } : {}),
+    // The alerts the driver has marked "this is right". The form sends only
+    // marks that still match an alert; this caps their size. Sent only once
+    // migration 018 has added the column, which an edit can see.
+    ...(existing && "dismissed_checks" in existing
+      ? { dismissed_checks: keepDismissals(load.dismissed_checks, null) }
+      : {}),
     updated_at: new Date().toISOString(),
   };
 
@@ -572,15 +581,66 @@ export async function saveLoadAction(
     return { ok: true, id: load.id };
   }
 
-  const { data, error } = await supabase
-    .from("loads")
-    .insert(row)
-    .select("id")
-    .single();
-  if (error) return { ok: false, error: error.message };
+  // A brand-new load can carry marks made while it was being entered. Try
+  // with them; if migration 018 has not added the column yet, save the load
+  // without them rather than lose it.
+  const marks = keepDismissals(load.dismissed_checks, null);
+  const insert = (r: typeof row & { dismissed_checks?: string[] }) =>
+    supabase.from("loads").insert(r).select("id").single();
+  let { data, error } = await insert(marks.length ? { ...row, dismissed_checks: marks } : row);
+  if (error && marks.length && /dismissed_checks/.test(error.message)) {
+    ({ data, error } = await insert(row));
+  }
+  if (error || !data) return { ok: false, error: error?.message ?? "Couldn't save the load." };
   revalidatePath("/loads");
   if (parentId) revalidatePath(`/loads/${parentId}`);
   return { ok: true, id: data.id };
+}
+
+/**
+ * Mark one alert on a load "this is right" — or take the mark back. The mark
+ * is the alert's exact wording (lib/checks), so if the load's figures later
+ * change, the alert returns on its own.
+ */
+export async function setLoadCheckAction(
+  loadId: string,
+  wording: string,
+  confirmed: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+  if (typeof wording !== "string" || !wording || wording.length > 300) {
+    return { ok: false, error: "That alert couldn't be saved." };
+  }
+
+  const { data: row } = await supabase
+    .from("loads")
+    .select("*")
+    .eq("id", loadId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "That load no longer exists." };
+  if (!("dismissed_checks" in row)) {
+    return { ok: false, error: "Marking alerts isn't switched on yet. The alert stays for now." };
+  }
+
+  const current = Array.isArray(row.dismissed_checks) ? row.dismissed_checks : [];
+  const next = confirmed
+    ? keepDismissals([...current, wording], null)
+    : keepDismissals(current.filter((d: unknown) => d !== wording), null);
+
+  const { error } = await supabase
+    .from("loads")
+    .update({ dismissed_checks: next })
+    .eq("id", loadId)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/loads");
+  revalidatePath(`/loads/${loadId}`);
+  return { ok: true };
 }
 
 export async function deleteLoadAction(

@@ -22,12 +22,13 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (3 Oct 2026)
 
-- Production `main` = `origin/main` = `8c3b7f4`, live: partial loads on top
-  of the marketing homepage and both financial fixes. Migration 017 is
-  applied. `git log --oneline -3` is the truth; this file is a summary.
-- **In review: `fix/partials-pwa-accuracy`** — partials for every Pro
-  driver, the PWA `start_url` and ivory canvas (without the button), and the
-  per-diem and Admin CPM accuracy pass. Not merged.
+- Production `main` = `origin/main` = `db835a5` (6 Oct), live: partials for
+  every Pro driver, the PWA opening on /calculator, the ivory canvas, per
+  diem by days on the road, Admin's shared CPM formula, and the read-only
+  Admin page per driver with an Email draft. Migration 017 is applied.
+  `git log --oneline -3` is the truth; this file is a summary.
+- **In review: `feature/in-app-alerts` (Phase B)** — needs migration 018 run
+  by hand before merge. Not merged.
 - **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
   the dollar wave, a banknote border and a scroll, and is not settled on a
   direction. Do not raise it until he does. `+ Add a Load` keeps production's
@@ -88,10 +89,11 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Calculation audit (tests only) | `0270ff5` | live, 195 → 213 checks |
 | Financial correctness fixes | `834c4a3` | live, 213 → 223 checks |
 | Partial loads (one Owner first) | `8c3b7f4` | live (migration 017 applied), 223 → 262 checks |
-| Partials for every Pro driver | `678ef95` | on `fix/partials-pwa-accuracy`, **not merged** |
-| PWA opens on /calculator; ivory canvas | `f8935e5` | on `fix/partials-pwa-accuracy`, **not merged** |
-| Per diem counts days on the road; Admin CPM shared | `d96de91` | on `fix/partials-pwa-accuracy`, **not merged**, 259 → 275 checks |
-| Admin: one page per driver, read-only, everything they entered | — | on `fix/partials-pwa-accuracy`, **not merged**, 275 → 298 checks |
+| Partials for every Pro driver | `678ef95` | live |
+| PWA opens on /calculator; ivory canvas | `f8935e5` | live |
+| Per diem counts days on the road; Admin CPM shared | `d96de91` | live, 259 → 275 checks |
+| Admin: one page per driver, read-only, everything they entered | `7fb8005`, `d96310f`, `db835a5` | live (email only — no texting) |
+| Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
 
@@ -245,6 +247,26 @@ A partial is a second load riding in the same trailer as one already booked
 - **Not in this pass:** auto-filling miles from cities (needs a routing
   provider — PC\*Miler is what brokers pay on; an LLM must never be the
   source of a mileage figure), and turning an existing load into a partial.
+
+## In-app alerts (Phase B) — what was decided, 6 Oct 2026
+
+Sebastian wanted drivers to hear about likely mistakes in the app itself —
+not by text — so they are caught where they can be fixed.
+
+- **One set of checks, one wording, everywhere** (`lib/checks`): the load
+  form as the driver types ("Worth a look before you save"), the Loads page
+  ("N loads worth a look this week", with Open load and This is right), a
+  "Worth a look" tag on the load in the list, and Admin. Checks are plain
+  code — never AI deciding what is wrong with someone's books.
+- **"This is right"** stores the alert's EXACT wording on the load
+  (`loads.dismissed_checks`, migration 018, max 20). The wording carries the
+  figure, so changing the miles or pay reopens the alert; a stale mark can
+  never hide a new problem. Saving from the form keeps only marks that still
+  match (the duplicate-load mark is kept, since the form cannot re-check it).
+- Admin shows marked alerts as "Driver says right", not as problems.
+- Not yet: alerts on the Calculator inputs for drivers (Admin only for now),
+  a count on the Loads tab in the navigation, push or email alerts (needs
+  the email provider decision).
 
 ## Features asked for, not yet planned (3 Oct 2026)
 

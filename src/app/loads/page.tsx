@@ -59,6 +59,8 @@ import {
   isPartial,
   tripTotals,
 } from "@/lib/partials";
+import { findLookalikes, loadChecks, openChecks } from "@/lib/checks";
+import { MarkRightButton } from "./AlertButton";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -261,6 +263,40 @@ export default async function LoadsPage({
   );
   const isConfigured = profileIsConfigured(profile);
 
+  // Alerts: loads worth a second look, in the same words Admin shows
+  // (lib/checks). The duplicate check reads the whole month, so a load saved
+  // twice across a week boundary is still caught. An alert the driver has
+  // marked "this is right" stays quiet until its figure changes.
+  const monthRows: Load[] = (monthLoadsRes.data ?? []).map((r) => loadFromRow(r));
+  const lookalikes = findLookalikes(monthRows);
+  const weekById = new Map(loads.map((l) => [String(l.id), l]));
+  const dayLabel = (iso: string) =>
+    new Date(iso + "T12:00:00").toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  const alerts = loads
+    .map((l) => {
+      const own = Number(l.loaded_miles || 0) + Number(l.deadhead_miles || 0);
+      const stats = monthStats.get(loadMonthKey(l.load_date));
+      const e = computeLoadEconomics(
+        l,
+        profile,
+        buildMtdContext(l.load_date, Math.max(0, (stats?.miles ?? 0) - own), stats?.firstDay ?? 1, now)
+      );
+      const parent = l.parent_load_id ? weekById.get(l.parent_load_id) : undefined;
+      const checks = loadChecks(l, e, {
+        fuelEstimate: computeLoadEconomics({ ...l, fuel_actual: null }, profile, undefined).fuelCost,
+        primaryMiles: parent ? Number(parent.loaded_miles || 0) + Number(parent.deadhead_miles || 0) : undefined,
+        lookalike: lookalikes.has(String(l.id)),
+        today,
+      });
+      return { load: l, ...openChecks(checks, l.dismissed_checks) };
+    })
+    .filter((a) => a.open.length > 0);
+  const flaggedIds = new Set(alerts.map((a) => String(a.load.id)));
+
   // One note per month this week's loads fall in (two when a week crosses
   // months), explaining the fixed-cost share and whether it can still move.
   const allocationNotes = [
@@ -343,6 +379,36 @@ export default async function LoadsPage({
             </Link>
           </Notice>
         ) : null}
+
+        {/* What is worth a second look this week, and the way to say "this
+            is right". */}
+        {alerts.length > 0 && (
+          <Notice
+            title={`${alerts.length === 1 ? "1 load" : `${alerts.length} loads`} worth a look this week`}
+            className="mb-4"
+          >
+            <ul className="flex flex-col gap-3">
+              {alerts.map(({ load, open }) => (
+                <li key={load.id}>
+                  <p className="font-semibold">
+                    {dayLabel(load.load_date)} · {load.broker || (isPartial(load) ? "Partial" : "Load")}
+                  </p>
+                  {open.map((c) => (
+                    <div key={c} className="mt-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <span>{c}</span>
+                      <span className="flex shrink-0 items-baseline gap-4">
+                        <Link href={`/loads/${load.id}`} className="pr-link pr-hit text-sm">
+                          Open load
+                        </Link>
+                        <MarkRightButton loadId={String(load.id)} wording={c} />
+                      </span>
+                    </div>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        )}
 
         {/* The weekly scoreboard: the result and why it is what it is. */}
         <AnswerLayout>
@@ -534,6 +600,7 @@ export default async function LoadsPage({
                   origin={p.origin}
                   destination={p.destination}
                   economics={economicsOf(p)}
+                  flagged={flaggedIds.has(String(p.id))}
                 />
               );
               return (
@@ -549,6 +616,7 @@ export default async function LoadsPage({
                       origin={load.origin}
                       destination={load.destination}
                       economics={economicsOf(load)}
+                      flagged={flaggedIds.has(String(load.id))}
                     />
                   )}
                   {trip.partials.map(partialRecord)}

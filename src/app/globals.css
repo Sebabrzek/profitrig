@@ -1113,6 +1113,11 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
         grid-row: 3;
         grid-column: 1 / -1;
       }
+      .pr-load-id > .pr-load-flag {
+        grid-row: 4;
+        grid-column: 1 / -1;
+        justify-self: start;
+      }
       .pr-load-cell {
         display: block;
         margin: 0;
@@ -1218,6 +1223,17 @@ body:has(.pr-shell[data-nav="app"] .pr-action-bar) .pr-chat-launcher {
   }
   .pr-load-trip-profit {
     margin-left: auto;
+  }
+}
+
+@layer components {
+  /* --- An alert on a load ---------------------------------------------------
+     "Worth a look" under the broker. On a card it simply follows the title;
+     in the ledger it takes a row of its own across the Load column (placed
+     inside the ledger block above), so it never widens the date and pushes
+     the route sideways. */
+  .pr-load-flag {
+    margin-top: 2px;
   }
 }
 

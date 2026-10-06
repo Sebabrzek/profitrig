@@ -147,15 +147,16 @@ import {
   suggestNightsFromLoads,
 } from "../src/lib/tax/perDiem";
 import { costProfileFromRow } from "../src/lib/costProfile";
+import { adminWeeks, driverNote, gmailHref, mailtoHref } from "../src/lib/adminView";
 import {
-  adminWeeks,
-  driverNote,
+  LOOKALIKE_CHECK,
+  MAX_DISMISSED_CHECKS,
   findLookalikes,
-  gmailHref,
+  keepDismissals,
   loadChecks,
-  mailtoHref,
+  openChecks,
   profileChecks,
-} from "../src/lib/adminView";
+} from "../src/lib/checks";
 
 let failures = 0;
 let checks = 0;
@@ -2341,6 +2342,63 @@ section("A note to the driver, sent from Sebastian's own email");
   const q = new URLSearchParams(m.slice(m.indexOf("?") + 1));
   check("the email opens addressed, with the subject and body intact", m.startsWith("mailto:dennis%40example.com?") && q.get("subject") === n.subject && q.get("body") === n.body);
   check("Gmail gets the same draft", new URL(gmailHref("dennis@example.com", n.subject, n.body)).searchParams.get("body") === n.body);
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+section("Alerts reach the driver, and \"this is right\" silences only what it saw");
+// The driver sees the same checks Admin sees. Marking one right stores its
+// EXACT wording, so changing the figure reopens it — a stale mark can never
+// hide a new problem.
+// ─────────────────────────────────────────────────────────────────────
+{
+  const econ = (l: Load) => computeLoadEconomics(l, profile, undefined);
+  const ctx = { fuelEstimate: 300, today: "2026-10-06" };
+  const short = load({ id: "s", loaded_miles: 300, deadhead_miles: 0, linehaul_pay: 2820 });
+  const alerts = loadChecks(short, econ(short), ctx);
+  check("a $9.40-a-mile load raises its alert", alerts.length === 1 && alerts[0].includes("$9.40/mi"), alerts.join("; "));
+
+  const marked = openChecks(alerts, alerts);
+  check("marked right, it is confirmed, not open", marked.open.length === 0 && marked.confirmed.length === 1);
+  const edited = load({ ...short, loaded_miles: 30 }); // a fat-fingered edit later
+  const after = openChecks(loadChecks(edited, econ(edited), ctx), alerts);
+  check("change the miles and the alert comes back — the old mark no longer matches",
+    after.open.length === 1 && after.open[0].includes("$94.00/mi") && after.confirmed.length === 0, after.open.join("; "));
+  check("a load with no marks has every alert open", openChecks(alerts, undefined).open.length === 1);
+
+  const firing = ["A", "B"];
+  check("on save, a mark whose alert no longer fires is dropped", JSON.stringify(keepDismissals(["A", "Z"], firing)) === '["A"]');
+  check("junk from a crafted request is dropped", JSON.stringify(keepDismissals(["A", 7, "", "x".repeat(301), null], null)) === '["A"]');
+  check("marks are not repeated", JSON.stringify(keepDismissals(["A", "A", "B"], null)) === '["A","B"]');
+  check("and never more than the column allows",
+    keepDismissals(Array.from({ length: 30 }, (_, i) => `m${i}`), null).length === MAX_DISMISSED_CHECKS && MAX_DISMISSED_CHECKS === 20);
+  check("the form keeps a duplicate-load mark it cannot re-check itself",
+    keepDismissals([LOOKALIKE_CHECK], ["something else", LOOKALIKE_CHECK]).length === 1);
+  check("the duplicate alert's wording is the one the checks use",
+    loadChecks(short, econ(short), { ...ctx, lookalike: true }).includes(LOOKALIKE_CHECK));
+  const fuelOff = load({ loaded_miles: 600, linehaul_pay: 1700, fuel_actual: 40 });
+  check("alert wording reads right to the driver and to Admin alike (no 'their')",
+    loadChecks(fuelOff, econ(fuelOff), ctx).some((c) => c.includes("the Calculator's MPG")) &&
+      !loadChecks(fuelOff, econ(fuelOff), ctx).some((c) => /\btheir\b/i.test(c)));
+
+  check("marks are read from a load row", JSON.stringify(loadFromRow({ load_date: "2026-10-01", dismissed_checks: ["A", 3, "B"] }).dismissed_checks) === '["A","B"]');
+  check("a row from before migration 018 has none", JSON.stringify(loadFromRow({ load_date: "2026-10-01" }).dismissed_checks) === "[]");
+
+  // A flagged load says so in the list, and its accessible name includes it.
+  const flaggedHtml = renderToStaticMarkup(
+    React.createElement(LoadRecord, {
+      id: "F1", href: "/loads/F1", dateLabel: "Thu, Oct 1", broker: "TQL", origin: "Dallas, TX", destination: "Waco, TX",
+      economics: econ(short), flagged: true,
+    })
+  );
+  check("a flagged load shows Worth a look in the list", flaggedHtml.includes("Worth a look") && flaggedHtml.includes('id="load-F1-flag"') && flaggedHtml.includes("load-F1-flag\""));
+  const plainHtml = renderToStaticMarkup(
+    React.createElement(LoadRecord, {
+      id: "F2", href: "/loads/F2", dateLabel: "Thu, Oct 1", broker: "TQL", origin: "Dallas, TX", destination: "Waco, TX",
+      economics: econ(short),
+    })
+  );
+  check("an unflagged load's markup is exactly as before", !plainHtml.includes("Worth a look") && !plainHtml.includes("-flag"));
 }
 
 // ─────────────────────────────────────────────────────────────────────

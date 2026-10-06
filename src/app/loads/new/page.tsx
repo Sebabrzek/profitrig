@@ -185,6 +185,8 @@ export default async function NewLoadPage({
           month: "short",
           day: "numeric",
         }),
+        miles:
+          (Number(primary.loaded_miles) || 0) + (Number(primary.deadhead_miles) || 0),
       }
     : undefined;
 
