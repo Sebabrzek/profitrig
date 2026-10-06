@@ -135,6 +135,7 @@ export default async function AdminDriverPage({
     chatRes,
     usageRes,
     feedbackRes,
+    scansRes,
   ] = await Promise.all([
     fetchDriverSettings(admin, id),
     driverToday(),
@@ -153,6 +154,8 @@ export default async function AdminDriverPage({
     byUser("support_chats", "id,role,content,created_at").order("created_at", { ascending: false }).limit(60),
     byUser("ai_usage", "status,estimated_cost_usd,created_at"),
     admin.from("feedback").select("id,message,created_at").eq("user_id", id).order("created_at", { ascending: false }),
+    // Empty before migration 020.
+    byUser("scans", "id,created_at,status,document_type,extracted,load_id").order("created_at", { ascending: false }).limit(50),
   ]);
   const [{ data: me }, aiBudget] = await Promise.all([
     admin.from("driver_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
@@ -718,6 +721,56 @@ export default async function AdminDriverPage({
               what: String(r.description),
               cost: formatMoney(Number(r.cost) || 0),
             }))}
+          />
+        </Card>
+      </section>
+
+      {/* ── scans ───────────────────────────────────────────────────── */}
+      <section id="scans" className="mb-8 scroll-mt-24">
+        <SectionHeading
+          title="Scans"
+          description="Documents they scanned, newest first, and what ProfitRig read from each — to check the scanner against the original."
+        />
+        <Card>
+          <DataTable
+            caption="Scanned documents"
+            empty="Nothing scanned."
+            columns={[
+              { key: "date", label: "Scanned" },
+              { key: "what", label: "Read as" },
+              { key: "read", label: "What it read" },
+              { key: "load", label: "Load" },
+              { key: "file", label: "Original" },
+            ]}
+            rows={((scansRes.data ?? []) as Row[]).map((r) => {
+              const x = (r.extracted ?? {}) as Row;
+              const read = [x.customer, x.origin && x.destination ? `${x.origin} → ${x.destination}` : null, x.total_pay ?? x.linehaul_pay ? `$${x.total_pay ?? x.linehaul_pay}` : null, x.miles ? `${x.miles} mi` : null]
+                .filter(Boolean)
+                .join(" · ");
+              return {
+                _key: String(r.id),
+                date: day(r.created_at as string),
+                what: r.status === "read" ? String(r.document_type ?? "—").replace(/_/g, " ") : String(r.status),
+                read: read || "—",
+                load: r.load_id && byId.get(String(r.load_id)) ? (
+                  <a
+                    href={`?week=${weekOf(byId.get(String(r.load_id))!.load_date)}#entry-${r.load_id}`}
+                    className="pr-link"
+                  >
+                    Saved
+                  </a>
+                ) : r.load_id ? (
+                  "Saved"
+                ) : (
+                  "Not saved"
+                ),
+                file: (
+                  <a href={`/api/scan/${r.id}/file`} target="_blank" rel="noopener noreferrer" className="pr-link">
+                    View
+                  </a>
+                ),
+              };
+            })}
           />
         </Card>
       </section>

@@ -22,16 +22,19 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `6896f8e` (6 Oct), live: partials for
-  every Pro driver, in-app alerts (Phase B), the PWA opening on /calculator,
-  the ivory canvas, per diem by days on the road, Admin's shared CPM
-  formula, and the read-only Admin page per driver with an Email draft.
-  Migrations 017 and 018 are applied. `git log --oneline -3` is the truth;
-  this file is a summary.
-- **In review: `feature/ai-budget` (D0, the monthly AI allowance)** — needs
-  migration 019 run by hand before merge (the code falls back to the old
-  question counts until it has). Pro Plus stays hidden until
-  `STRIPE_PRICE_PRO_PLUS` is set in Vercel. Not merged.
+- Production `main` = `origin/main` = `9051f0d` (6 Oct), live: the monthly
+  AI allowance (D0), in-app alerts (Phase B), partials for every Pro driver,
+  the PWA opening on /calculator, the ivory canvas, per diem by days on the
+  road, Admin's shared CPM formula, and the read-only Admin page per driver
+  with an Email draft. Migrations 017, 018 and 019 are applied.
+  `git log --oneline -3` is the truth; this file is a summary.
+- **Pro Plus is created in Stripe** ($19.99/mo, its own product) and the
+  Customer portal lets plans switch, prorated and charged immediately,
+  downgrades at period end. It stays off the upgrade page until
+  `STRIPE_PRICE_PRO_PLUS` is set in Vercel — Sebastian's call, suggested for
+  when scanning ships.
+- **In review: `feature/scanner` (D1)** — needs migration 020 run by hand
+  before merge. Not merged.
 - **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
   the dollar wave, a banknote border and a scroll, and is not settled on a
   direction. Do not raise it until he does. `+ Add a Load` keeps production's
@@ -96,6 +99,8 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | PWA opens on /calculator; ivory canvas | `f8935e5` | live |
 | Per diem counts days on the road; Admin CPM shared | `d96de91` | live, 259 → 275 checks |
 | Admin: one page per driver, read-only, everything they entered | `7fb8005`, `d96310f`, `db835a5` | live (email only — no texting) |
+| Phase B — in-app alerts, "This is right" | `6896f8e` | live (migration 018 applied) |
+| D0 — monthly AI allowance in dollars; Pro Plus plumbing | `9051f0d` | live (migration 019 applied), 322 → 347 checks |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -304,6 +309,35 @@ and scanning (D1) will cost far more per use than a chat question.
 - **Max** — a later, expensive plan with every feature automated. Not
   designed yet.
 
+## Scanning (D1) — what was decided, 6 Oct 2026
+
+- **A photo or PDF of a rate con or load ticket fills in a DRAFT load.** The
+  driver checks it and taps Save; nothing is ever saved by the AI. New loads
+  only, not partials (a partial records extra miles, which no document
+  prints). Free has no Loads, so no scanning — a driver tries it on the trial.
+- **Opus 5.5 at low effort**, structured JSON output, server-side
+  `fallbacks: "default"`. Measured on test documents (a made-up rate con, a
+  made-up pair of scale tickets): about 2¢ and 3–7 seconds a scan, every
+  field right — so Pro's $4 is roughly 200 scans a month.
+- **The AI copies what is printed and nothing else** (`lib/scan.ts`): never
+  estimates, calculates or looks up a value; mileage only as printed. Any
+  adding up is done in code: accessorial lines summed, a total that disagrees
+  with its parts called out rather than picked, a total-only rate con entered
+  as line haul with nothing added on top. Malformed or absurd values become
+  empty fields. A ticket's tons × rate is NOT turned into pay.
+- **Cost:** the file's tokens are counted first (free); the allowance check
+  then holds that plus the format overhead and the full output ceiling at
+  the dearest fallback model's prices, so a started scan always fits.
+  Per day: trial 20, Pro 40, Pro Plus 80.
+- **Originals are kept**, private (Storage bucket `scans`, no policies; the
+  server hands the owner or admin a one-minute link), linked to the load
+  when it is saved. Deleting a load keeps its scan.
+- **Several tickets in one photo:** only the first is read, and the driver is
+  told to scan each one. Turning one photo into several loads waits for
+  Julio's real photos.
+- **Still needed before real drivers:** Julio's ticket photos and 2–3 real
+  rate cons, to check the reading on messy originals.
+
 ## Features asked for, not yet planned (3 Oct 2026)
 
 In Sebastian's rough order of interest. Each needs a decision before it can
@@ -321,8 +355,9 @@ be planned.
   carrier settlement; the AI fills a DRAFT the driver confirms — never saves
   on its own. Keep the original image attached (IRS records, audit trail).
   Settlements are the big win for leased drivers: one scan, a week of loads,
-  and the carrier % checked. Plus an email-in address. Ship in steps:
-  receipts → rate cons → settlements → email-in.
+  and the carrier % checked. Plus an email-in address. Rate cons and load
+  tickets went first (D1, above); still to come: receipts, settlements,
+  email-in (Postmark).
 - **Invoicing.** Invoice from a load, PDF, email to the broker, paid/unpaid
   and days outstanding. Mainly for drivers with their own authority (leased
   drivers are paid by their carrier), and "send to my factor" may matter as
@@ -363,11 +398,12 @@ be planned.
 - Next.js 16 (App Router, Turbopack) — **read `node_modules/next/dist/docs/`
   before using Next APIs.** React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 347 checks in `tests/money.ts` (money math, CSV, calculator,
-  nav, formatters, partials, alerts, the Ask ProfitRig guardrails and the
-  monthly AI allowance).
+- `npm test` = 370 checks in `tests/money.ts` (money math, CSV, calculator,
+  nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
+  monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
-  Latest applied is **018** (6 Oct 2026); **019** is written, in review.
+  Latest applied is **019** (6 Oct 2026); **020** is written, in review.
+  They are checked offline in PGlite before Sebastian runs them.
 - Local preview: `.claude/launch.json` → "profitrig", port 3000. Signed-in
   pages redirect to /login, so local checks only reach signed-out screens; a
   temporary page under `src/app/login-harness/` gets through the middleware

@@ -258,8 +258,8 @@ export function chatLimitMessage(
 
 /**
  * What Anthropic charges, per million tokens. Haiku checked 19 Sep 2026;
- * Opus 5.5 (for scanning) checked 6 Oct 2026. Cache writes are 1.25× input,
- * cache reads 0.1×.
+ * Opus 5.5 (scanning) and the Opus models a refused scan can fall back to,
+ * 6 Oct 2026. Cache writes are 1.25× input.
  */
 export const AI_PRICING: Record<
   string,
@@ -275,7 +275,19 @@ export const AI_PRICING: Record<
     inputPerMTok: 4,
     outputPerMTok: 20,
     cacheWritePerMTok: 5,
-    cacheReadPerMTok: 0.4,
+    cacheReadPerMTok: 0.2,
+  },
+  "claude-opus-5": {
+    inputPerMTok: 5,
+    outputPerMTok: 25,
+    cacheWritePerMTok: 6.25,
+    cacheReadPerMTok: 0.5,
+  },
+  "claude-opus-4-8": {
+    inputPerMTok: 5,
+    outputPerMTok: 25,
+    cacheWritePerMTok: 6.25,
+    cacheReadPerMTok: 0.5,
   },
 };
 

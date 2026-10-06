@@ -36,9 +36,12 @@ export async function updateSession(request: NextRequest) {
   // a Supabase session.
   // /api/chat runs its own auth check and answers with JSON — it must not be
   // redirected to the HTML login page, or an expired session would stream
-  // login-page markup back into the chat widget as an "answer".
+  // login-page markup back into the chat widget as an "answer". /api/scan
+  // likewise: the Scan button reads its JSON.
   const isPublicApi =
-    pathname.startsWith("/api/stripe") || pathname.startsWith("/api/chat");
+    pathname.startsWith("/api/stripe") ||
+    pathname.startsWith("/api/chat") ||
+    pathname.startsWith("/api/scan");
   // Two public pages: the marketing home, and the calculator itself.
   // Visitors can play with the math; saving prompts an account. /loads,
   // /fuel, /tax, /profile, /admin remain auth-gated below.

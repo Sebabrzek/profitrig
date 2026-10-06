@@ -17,6 +17,11 @@ import { driverToday } from "@/lib/driverClock";
 import { fetchDriverSettings } from "@/lib/driverSettings";
 import { LoadForm, type PartialOf } from "../LoadForm";
 import { MAX_PARTIALS, tripLabel } from "@/lib/partials";
+import { ScanCard } from "../ScanCard";
+import { ScanDraftNotice, type ScanState } from "../ScanDraftNotice";
+import { SCAN_DOCUMENT_LABEL, cleanScanReading, draftFromReading } from "@/lib/scan";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -43,7 +48,7 @@ const EMPTY_PROFILE: CostProfile = {
 export default async function NewLoadPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; partial_of?: string }>;
+  searchParams: Promise<{ date?: string; partial_of?: string; scan?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createSupabaseServerClient();
@@ -86,11 +91,45 @@ export default async function NewLoadPage({
     primary = data;
   }
 
+  // A load scanned from a rate con or ticket: the form opens filled in with
+  // what was read, for the driver to check. Their own scans only (RLS).
+  const blank: Load = {
+    ...EMPTY_LOAD,
+    load_date: params.date || today,
+    // A leased driver's split, filled in so they don't retype it per load.
+    carrier_pct: settings.carrierPct,
+  };
+  let scan: ScanState | null = null;
+  let scanned: Load | null = null;
+  if (!primary && params.scan && UUID.test(params.scan)) {
+    const { data } = await supabase
+      .from("scans")
+      .select("id,status,document_type,extracted,load_id")
+      .eq("id", params.scan)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) {
+      const reading =
+        data.status === "read" ? cleanScanReading(data.extracted, today) : null;
+      const draft = reading && !data.load_id ? draftFromReading(reading, blank) : null;
+      scanned = draft && reading?.documentType !== "other" ? draft.load : null;
+      scan = {
+        id: String(data.id),
+        state: data.load_id ? "saved" : reading ? "read" : "failed",
+        documentLabel: reading ? SCAN_DOCUMENT_LABEL[reading.documentType] : "document",
+        checks: draft?.checks ?? [],
+        loadId: data.load_id ? String(data.load_id) : null,
+      };
+    }
+  }
+
   const newLoadDate = primary
     ? new Date(String(primary.load_date) + "T12:00:00")
-    : params.date
-      ? new Date(params.date + "T12:00:00")
-      : now;
+    : scanned
+      ? new Date(scanned.load_date + "T12:00:00")
+      : params.date
+        ? new Date(params.date + "T12:00:00")
+        : now;
   const monthFrom = startOfMonth(newLoadDate);
   const monthTo = endOfMonth(newLoadDate);
 
@@ -163,12 +202,7 @@ export default async function NewLoadPage({
             ? settings.carrierPct
             : Number(primary.carrier_pct),
       }
-    : {
-        ...EMPTY_LOAD,
-        load_date: params.date || today,
-        // A leased driver's split, filled in so they don't retype it per load.
-        carrier_pct: settings.carrierPct,
-      };
+    : scanned ?? blank;
 
   const partialOf: PartialOf | undefined = primary
     ? {
@@ -210,7 +244,11 @@ export default async function NewLoadPage({
             </Link>
           }
         />
+        {!partialOf && (scan ? <ScanDraftNotice scan={scan} /> : <ScanCard />)}
         <LoadForm
+          // A new scan opens a fresh form, filled in from that document.
+          key={scan?.id ?? "new"}
+          scanId={scan?.state === "read" && scanned ? scan.id : undefined}
           initial={initial}
           costProfile={profile}
           otherMonthMiles={otherMonthMiles}

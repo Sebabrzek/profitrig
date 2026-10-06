@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/ui/Surfaces";
+import { SCAN_DOCUMENT_LABEL, type ScanDocumentType } from "@/lib/scan";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -53,7 +54,7 @@ export default async function EditLoadPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
-  const [loadRes, costRes, settings] = await Promise.all([
+  const [loadRes, costRes, settings, scansRes] = await Promise.all([
     supabase
       .from("loads")
       .select("*")
@@ -66,9 +67,17 @@ export default async function EditLoadPage({
       .eq("user_id", user.id)
       .maybeSingle(),
     fetchDriverSettings(supabase, user.id),
+    // The documents this load was scanned from. Empty before migration 020.
+    supabase
+      .from("scans")
+      .select("id,document_type,created_at")
+      .eq("load_id", id)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true }),
   ]);
 
   if (!loadRes.data) notFound();
+  const scans = (scansRes.data ?? []) as { id: string; document_type: string | null }[];
   const r = loadRes.data;
 
   // Other loads logged in this load's same calendar month, excluding this
@@ -198,6 +207,24 @@ export default async function EditLoadPage({
             </Link>
           }
         />
+        {scans.length > 0 && (
+          <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {scans.map((sc, i) => (
+              <a
+                key={sc.id}
+                href={`/api/scan/${sc.id}/file`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pr-link font-semibold"
+              >
+                View the original{" "}
+                {SCAN_DOCUMENT_LABEL[(sc.document_type ?? "other") as ScanDocumentType] ??
+                  "document"}
+                {scans.length > 1 ? ` ${i + 1}` : ""}
+              </a>
+            ))}
+          </p>
+        )}
         <LoadForm
           initial={initial}
           costProfile={profile}

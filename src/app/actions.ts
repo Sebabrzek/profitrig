@@ -467,7 +467,9 @@ function nullableNum(v: number | null): number | null {
 }
 
 export async function saveLoadAction(
-  input: Load
+  input: Load,
+  /** The scan a new load was filled in from (lib/scan). */
+  scanId?: string
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -592,6 +594,21 @@ export async function saveLoadAction(
     ({ data, error } = await insert(row));
   }
   if (error || !data) return { ok: false, error: error?.message ?? "Couldn't save the load." };
+  // The original document stays with the load it became. Only the driver's
+  // own scan, and only one not already used; drivers cannot write scans, so
+  // the server does. A failure here never loses the load.
+  if (scanId && !parentId && /^[0-9a-f-]{36}$/i.test(scanId)) {
+    const admin = createSupabaseAdminClient();
+    const { error: linkError } = admin
+      ? await admin
+          .from("scans")
+          .update({ load_id: data.id })
+          .eq("id", scanId)
+          .eq("user_id", user.id)
+          .is("load_id", null)
+      : { error: new Error("no service role key") };
+    if (linkError) console.error("save load: could not link scan", linkError);
+  }
   revalidatePath("/loads");
   if (parentId) revalidatePath(`/loads/${parentId}`);
   return { ok: true, id: data.id };

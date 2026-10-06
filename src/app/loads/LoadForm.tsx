@@ -186,8 +186,14 @@ export function LoadForm({
   leased = false,
   partialOf,
   trip,
+  scanId,
 }: {
   initial: Load;
+  /**
+   * The scan this new load was filled in from. Saving links the two, so the
+   * original document stays with the load.
+   */
+  scanId?: string;
   costProfile: CostProfile;
   loadId?: string;
   /**
@@ -287,10 +293,13 @@ export function LoadForm({
     startTransition(async () => {
       // Keep only marks that still match an alert — a changed figure drops
       // its mark. The duplicate alert needs the other loads, so it is kept.
-      const r = await saveLoadAction({
-        ...load,
-        dismissed_checks: keepDismissals(load.dismissed_checks, [...liveChecks, LOOKALIKE_CHECK]),
-      });
+      const r = await saveLoadAction(
+        {
+          ...load,
+          dismissed_checks: keepDismissals(load.dismissed_checks, [...liveChecks, LOOKALIKE_CHECK]),
+        },
+        scanId
+      );
       if (!r.ok) {
         setError(r.error);
         return;
