@@ -2,6 +2,9 @@ import Link from "next/link";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/ui/Surfaces";
 import { SCAN_DOCUMENT_LABEL, type ScanDocumentType } from "@/lib/scan";
+import { canInvoice, invoiceStanding } from "@/lib/invoices";
+import { invoiceMoney } from "@/lib/invoicePdf";
+import { driverToday } from "@/lib/driverClock";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -54,7 +57,7 @@ export default async function EditLoadPage({
   const sub = await fetchSubscription(supabase, user.id);
   if (!isPro(sub)) redirect("/upgrade");
 
-  const [loadRes, costRes, settings, scansRes] = await Promise.all([
+  const [loadRes, costRes, settings, scansRes, invoicesRes, { iso: today }] = await Promise.all([
     supabase
       .from("loads")
       .select("*")
@@ -74,10 +77,22 @@ export default async function EditLoadPage({
       .eq("load_id", id)
       .eq("user_id", user.id)
       .order("created_at", { ascending: true }),
+    // Its invoice, if it has one. Empty before migration 022.
+    supabase
+      .from("invoices")
+      .select("id,number,status,total,invoice_date,due_date")
+      .eq("load_id", id)
+      .eq("user_id", user.id)
+      .neq("status", "void")
+      .order("created_at", { ascending: false })
+      .limit(1),
+    driverToday(),
   ]);
 
   if (!loadRes.data) notFound();
   const scans = (scansRes.data ?? []) as { id: string; document_type: string | null }[];
+  const invoice = invoicesRes.error ? null : (invoicesRes.data ?? [])[0] ?? null;
+  const showInvoicing = !invoicesRes.error && canInvoice(settings.authorityType);
   const r = loadRes.data;
 
   // Other loads logged in this load's same calendar month, excluding this
@@ -207,6 +222,33 @@ export default async function EditLoadPage({
             </Link>
           }
         />
+        {showInvoicing && (
+          <p className="mb-3 text-sm">
+            {invoice ? (
+              <>
+                <Link href={`/loads/invoices/${invoice.id}`} className="pr-link font-semibold">
+                  Invoice #{invoice.number}
+                </Link>{" "}
+                · {invoiceMoney(Number(invoice.total))} ·{" "}
+                {(() => {
+                  const st = invoiceStanding(
+                    { status: invoice.status, invoice_date: String(invoice.invoice_date), due_date: String(invoice.due_date) },
+                    today
+                  );
+                  return st.label === "Paid"
+                    ? "Paid"
+                    : st.label === "Overdue"
+                      ? `Overdue ${st.daysLate} day${st.daysLate === 1 ? "" : "s"}`
+                      : `Open, ${st.daysOut} day${st.daysOut === 1 ? "" : "s"} out`;
+                })()}
+              </>
+            ) : (
+              <Link href={`/loads/invoices/new?load=${id}`} className="pr-link font-semibold">
+                Create invoice
+              </Link>
+            )}
+          </p>
+        )}
         {scans.length > 0 && (
           <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {scans.map((sc, i) => (

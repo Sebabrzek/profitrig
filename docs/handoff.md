@@ -22,21 +22,21 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `c3f36e7` (6 Oct), live: Next.js
-  16.3.8 (all 12 advisories cleared), scanning (D1), the monthly AI
-  allowance (D0), in-app alerts (Phase B), partials for
+- Production `main` = `origin/main` = `2a1063b` (7 Oct), live: email-in
+  (D3, Postmark set up and tested end to end), Next.js 16.3.8, scanning
+  (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
   every Pro driver, the PWA opening on /calculator, the ivory canvas, per
   diem by days on the road, Admin's shared CPM formula, and the read-only
-  Admin page per driver with an Email draft. Migrations 017–020 are
+  Admin page per driver with an Email draft. Migrations 017–021 are
   applied. `git log --oneline -3` is the truth; this file is a summary.
 - **Pro Plus is created in Stripe** ($19.99/mo, its own product) and the
   Customer portal lets plans switch, prorated and charged immediately,
   downgrades at period end. It stays off the upgrade page until
   `STRIPE_PRICE_PRO_PLUS` is set in Vercel — Sebastian's call, suggested for
   when scanning ships.
-- **In review: `feature/email-in` (D3)** — needs migration 021, then the
-  set-up below (GoDaddy MX, Postmark inbound, `POSTMARK_INBOUND_SECRET`).
-  Not merged.
+- **In review: `feature/invoices` (invoicing step 1)** — needs migration 022
+  run by hand before merge. Not merged. Step 2 (email from ProfitRig) is
+  not built.
 - **Postmark** is approved (free tier, 100 emails a month), server
   "ProfitRig", profitrig.com verified (DKIM + Return-Path at GoDaddy). Move
   to a paid plan before invoices or email-in see real volume.
@@ -108,6 +108,7 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | D0 — monthly AI allowance in dollars; Pro Plus plumbing | `9051f0d` | live (migration 019 applied), 322 → 347 checks |
 | D1 — scan a rate con or load ticket into a draft load; PDFs page 1, then page 2 | `e2821cb`, `0a59cae` | live (migration 020 applied), 347 → 380 checks |
 | Security — Next.js 16.2.6 → 16.3.8 | `c3f36e7` | live; not exposed to the headline middleware bypass (needs one `i18n` locale) |
+| D3 — email-in; scanner notes about money only | `24d49fd`, `2a1063b` | live (migration 021 applied), 380 → 399 checks; Postmark inbound live |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -394,6 +395,37 @@ and scanning (D1) will cost far more per use than a chat question.
   → Settings: inbound domain `in.profitrig.com`, webhook
   `https://postmark:<secret>@www.profitrig.com/api/email-in`.
 
+## Invoicing — what was decided, 7 Oct 2026
+
+- **Who**: drivers whose Profile isn't "leased" (own authority, or both) —
+  a leased driver's carrier bills the broker. Pro only.
+- **Company only** on the invoice, never the driver's name (Sebastian's
+  call). Business details are set once on Profile → Invoice details:
+  company, MC, address, phone, billing email, terms ("Net N", the driver
+  picks N, 0–180, default 30), next invoice number (default 1001, editable
+  to continue their own numbering), and an optional factoring company,
+  which becomes "Please remit payment to".
+- **An invoice is made from a load** ("Create invoice" on the load page) and
+  starts as the load's pay — line haul, fuel, other — plus the broker's
+  load number from the rate con when the load was scanned, and the billing
+  email last used for that broker. It is its own document: editing it never
+  changes the load, and when its total differs from the load's pay the
+  form and the invoice page say so, in dollars.
+- **Issued invoices keep a snapshot** of the business details, so changing
+  the address later never rewrites them. Due date and total are computed by
+  the database. Invoices are cancelled, never deleted; numbers never reused.
+- **The PDF** (`lib/invoicePdf`, pdf-lib, standard fonts) is one plain page,
+  followed by the rate con the load was scanned from and any BOL/POD photos
+  attached — the packet a billing desk wants. A locked or unreadable file
+  is skipped, not fatal. WebP photos can't go in a PDF (uploads are turned
+  into JPEG in the browser, so this only affects an emailed-in WebP).
+- **Tracking**: /loads/invoices — owed, overdue (red), paid in the last 30
+  days; each invoice open / N days out / overdue / paid / cancelled. Mark
+  paid with a date.
+- **Step 2, not built**: email the invoice from ProfitRig via Postmark (from
+  "Company via ProfitRig", replies to the driver, copy to the driver),
+  bounces shown. Needs Postmark's paid plan and a server token in Vercel.
+
 ## Features asked for, not yet planned (3 Oct 2026)
 
 In Sebastian's rough order of interest. Each needs a decision before it can
@@ -458,11 +490,11 @@ be planned.
   `npm audit` still lists build and lint tooling (eslint, postcss, babel,
   browserslist); none of it runs where visitors can reach it. React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 399 checks in `tests/money.ts` (money math, CSV, calculator,
+- `npm test` = 421 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
   monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
-  Latest applied is **020** (6 Oct 2026); **021** is written, in review.
+  Latest applied is **021** (7 Oct 2026); **022** is written, in review.
   They are checked offline in PGlite before Sebastian runs them.
 - Local preview: `.claude/launch.json` → "profitrig", port 3000. Signed-in
   pages redirect to /login, so local checks only reach signed-out screens; a

@@ -170,7 +170,25 @@ import {
   sniffType,
   type EmailOutcome,
 } from "../src/lib/emailIn";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import {
+  EMPTY_INVOICE_SETTINGS,
+  addDays,
+  canInvoice,
+  checkInvoice,
+  checkInvoiceSettings,
+  daysBetween,
+  differenceFromLoad,
+  draftInvoice,
+  fromBlock,
+  invoiceStanding,
+  invoiceTotal,
+  loadGross,
+  nextInvoiceNumber,
+  remitBlock,
+  summarizeInvoices,
+} from "../src/lib/invoices";
+import { invoiceDay, invoiceLines, invoiceMoney, renderInvoicePdf, wrap, type InvoiceDoc } from "../src/lib/invoicePdf";
 import { ScanDraftNotice } from "../src/app/loads/ScanDraftNotice";
 import {
   fuelEntryPresentation,
@@ -2182,6 +2200,223 @@ section("Email-in: a rate con emailed to a driver's own address becomes a draft"
     "drivers can read their address and email log but not write them",
     /revoke insert, update, delete on public\.email_in_addresses from anon, authenticated/.test(m021) &&
       /revoke insert, update, delete on public\.email_in_messages from anon, authenticated/.test(m021)
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+section("Invoicing: a load billed to the broker, without ever changing the load");
+// ─────────────────────────────────────────────────────────────────────
+
+{
+  check(
+    "only a leased driver is left out — their carrier does the billing",
+    !canInvoice("leased") && canInvoice("own_mc") && canInvoice("both") && canInvoice("") && canInvoice(null)
+  );
+
+  const ok = checkInvoiceSettings({
+    company_name: "  Lewis Freight LLC ",
+    mc_number: "MC# 1041722",
+    state: "wi",
+    zip: "54701",
+    email: "Billing@LewisFreight.com",
+    net_days: "30",
+    next_number: "2050",
+  });
+  check(
+    "business details are tidied: MC digits only, state in capitals, email lower case",
+    ok.ok && ok.settings.company_name === "Lewis Freight LLC" && ok.settings.mc_number === "1041722" &&
+      ok.settings.state === "WI" && ok.settings.email === "billing@lewisfreight.com" && ok.settings.next_number === 2050
+  );
+  check(
+    "and refused when they can't be right",
+    !checkInvoiceSettings({ company_name: "" }).ok &&
+      !checkInvoiceSettings({ company_name: "X", mc_number: "ABC" }).ok &&
+      !checkInvoiceSettings({ company_name: "X", zip: "5470" }).ok &&
+      !checkInvoiceSettings({ company_name: "X", net_days: 365 }).ok &&
+      !checkInvoiceSettings({ company_name: "X", next_number: 0 }).ok &&
+      !checkInvoiceSettings({ company_name: "X", email: "billing@" }).ok &&
+      !checkInvoiceSettings({ company_name: "X", factor_name: "RTS Financial" }).ok
+  );
+  const settings = { ...EMPTY_INVOICE_SETTINGS, company_name: "Lewis Freight LLC", mc_number: "1041722", address_line: "12 Main St", city: "Eau Claire", state: "WI", zip: "54701" };
+  check(
+    "the invoice is from the company, and is paid to the factoring company when there is one",
+    fromBlock(settings).company === "Lewis Freight LLC" &&
+      fromBlock(settings).address === "12 Main St\nEau Claire, WI 54701" &&
+      remitBlock(settings) === "Lewis Freight LLC\n12 Main St\nEau Claire, WI 54701" &&
+      remitBlock({ ...settings, factor_name: "RTS Financial", factor_address: "PO Box 840267\nDallas, TX 75284" }) ===
+        "RTS Financial\nPO Box 840267\nDallas, TX 75284"
+  );
+  check(
+    "invoice numbers start at 1001, follow the highest used, and honour a chosen next number",
+    nextInvoiceNumber(1001, null) === 1001 &&
+      nextInvoiceNumber(1001, 1004) === 1005 &&
+      nextInvoiceNumber(2050, 1004) === 2050 &&
+      nextInvoiceNumber(1001, 2050) === 2051
+  );
+  check(
+    "due dates count calendar days across months and years",
+    addDays("2026-10-07", 30) === "2026-11-06" &&
+      addDays("2026-12-15", 30) === "2027-01-14" &&
+      addDays("2026-10-07", 0) === "2026-10-07" &&
+      daysBetween("2026-10-07", "2026-11-06") === 30
+  );
+
+  const load = {
+    broker: "C.H. Robinson ",
+    origin: "Buffalo, IA",
+    destination: "Burnsville, MN",
+    load_date: "2026-10-05",
+    linehaul_pay: 1334.8,
+    fuel_surcharge: 275.2,
+    accessorials: 0,
+  };
+  const draft = draftInvoice(load, { net_days: 30 }, {
+    today: "2026-10-07",
+    scanExtracted: { document_type: "rate_confirmation", load_number: "569967944" },
+    lastBillToEmail: "loaddocs@chrobinson.com",
+  });
+  check(
+    "a new invoice is the load as it stands, with the broker's load number from the rate con",
+    draft.bill_to_name === "C.H. Robinson" && draft.bill_to_email === "loaddocs@chrobinson.com" &&
+      draft.broker_load_number === "569967944" && draft.pickup_date === "2026-10-05" &&
+      draft.linehaul === 1334.8 && draft.fuel_surcharge === 275.2 && invoiceTotal(draft) === 1610 &&
+      loadGross(load) === 1610 && draft.invoice_date === "2026-10-07" && draft.net_days === 30
+  );
+  check(
+    "a load that wasn't scanned just leaves the load number to fill in",
+    draftInvoice(load, { net_days: 15 }, { today: "2026-10-07" }).broker_load_number === ""
+  );
+  check(
+    "an invoice is checked before it is saved",
+    checkInvoice({ ...draft }).ok &&
+      !checkInvoice({ ...draft, bill_to_name: " " }).ok &&
+      !checkInvoice({ ...draft, linehaul: -5 }).ok &&
+      !checkInvoice({ ...draft, linehaul: 0, fuel_surcharge: 0, accessorials: 0 }).ok &&
+      !checkInvoice({ ...draft, linehaul: 5_000_000 }).ok &&
+      !checkInvoice({ ...draft, bill_to_email: "chr.com" }).ok &&
+      !checkInvoice({ ...draft, invoice_date: "2026-02-30" }).ok
+  );
+  const typed = checkInvoice({ ...draft, linehaul: "$1,334.80", fuel_surcharge: "275.2", accessorials: "" });
+  check(
+    "amounts typed with dollar signs and commas are read to the cent",
+    typed.ok && typed.invoice.linehaul === 1334.8 && typed.invoice.accessorials === 0 && invoiceTotal(typed.invoice) === 1610
+  );
+  check(
+    "an edit on the invoice is called out against the load's pay, in dollars",
+    differenceFromLoad(1660, 1610) === 50 && differenceFromLoad(1610, 1610) === 0 && differenceFromLoad(1500.1, 1610) === -109.9
+  );
+
+  const today = "2026-11-10";
+  const open = { status: "open" as const, invoice_date: "2026-10-07", due_date: "2026-11-06", paid_at: null, total: 1610 };
+  check(
+    "where an invoice stands: days out, overdue after its due date, paid, cancelled",
+    invoiceStanding({ ...open, due_date: "2026-11-10" }, today).label === "Open" &&
+      invoiceStanding(open, today).label === "Overdue" &&
+      invoiceStanding(open, today).daysLate === 4 &&
+      invoiceStanding(open, today).daysOut === 34 &&
+      invoiceStanding({ ...open, status: "paid" }, today).label === "Paid" &&
+      invoiceStanding({ ...open, status: "void" }, today).label === "Cancelled"
+  );
+  const sum = summarizeInvoices(
+    [
+      open,
+      { ...open, due_date: "2026-12-01", total: 900 },
+      { ...open, status: "paid", paid_at: "2026-11-01", total: 2800 },
+      { ...open, status: "paid", paid_at: "2026-08-01", total: 5000 },
+      { ...open, status: "void", total: 777 },
+    ],
+    today
+  );
+  check(
+    "the list adds up what is owed and late, and what came in in the last 30 days — cancelled counts for nothing",
+    sum.owed === 2510 && sum.openCount === 2 && sum.overdue === 1610 && sum.overdueCount === 1 && sum.paidLast30 === 2800
+  );
+
+  check(
+    "an invoice shows money to the cent and plain dates",
+    invoiceMoney(1610) === "$1,610.00" && invoiceMoney(1334.8) === "$1,334.80" && invoiceDay("2026-10-07") === "Oct 7, 2026"
+  );
+  check(
+    "charges: line haul always, fuel and other charges only when there are some",
+    invoiceLines({ linehaul: 1610, fuelSurcharge: 0, accessorials: 0, origin: "Buffalo, IA", destination: "Burnsville, MN" })
+      .map((l) => l.label)
+      .join("|") === "Line haul — Buffalo, IA to Burnsville, MN" &&
+      invoiceLines({ linehaul: 1334.8, fuelSurcharge: 275.2, accessorials: 50, origin: "", destination: "" }).length === 3
+  );
+
+  const doc: InvoiceDoc = {
+    number: 1001,
+    invoiceDate: "2026-10-07",
+    dueDate: "2026-11-06",
+    netDays: 30,
+    from: { company: "Łódź → Trucking “LLC” 🚚", mc: "1041722", address: "12 Main St\nEau Claire, WI 54701", phone: "", email: "" },
+    billTo: { name: "C.H. Robinson", address: "", email: "loaddocs@chrobinson.com" },
+    brokerLoadNumber: "569967944",
+    pickupDate: "2026-10-05",
+    origin: "Buffalo, IA",
+    destination: "Burnsville, MN",
+    linehaul: 1334.8,
+    fuelSurcharge: 275.2,
+    accessorials: 0,
+    remitTo: "RTS Financial\nPO Box 840267\nDallas, TX 75284",
+    notes: "",
+    status: "open",
+  };
+  asyncChecks.push(
+    (async () => {
+      const alone = await renderInvoicePdf(doc);
+      const back = await PDFDocument.load(alone.bytes);
+      check(
+        "the invoice is one page, and characters a PDF font can't draw don't break it",
+        back.getPageCount() === 1 && back.getTitle() === "Invoice 1001 — Łódź → Trucking “LLC” 🚚" && alone.skipped === 0
+      );
+      // Addresses keep their line breaks: a "?" where a new line belongs is
+      // what the first draft printed.
+      const font = await (await PDFDocument.create()).embedFont(StandardFonts.Helvetica);
+      check(
+        "an address prints on its own lines, never joined by a '?'",
+        JSON.stringify(wrap(font, "RTS Financial\nPO Box 840267\nDallas, TX 75284", 10, 400)) ===
+          '["RTS Financial","PO Box 840267","Dallas, TX 75284"]' &&
+          wrap(font, "Detention at the receiver was approved by Emily on the phone before unloading began", 10, 120).length > 1
+      );
+      const rateCon = await PDFDocument.create();
+      rateCon.addPage();
+      rateCon.addPage();
+      const png = Uint8Array.from(
+        Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64")
+      );
+      const packet = await renderInvoicePdf(doc, [
+        { mime: "application/pdf", bytes: await rateCon.save() },
+        { mime: "image/png", bytes: png },
+        { mime: "application/pdf", bytes: new TextEncoder().encode("not a pdf") },
+        { mime: "image/webp", bytes: png },
+      ]);
+      check(
+        "the paperwork goes behind the invoice — rate con pages, then the BOL photo — and a bad file is skipped, not fatal",
+        (await PDFDocument.load(packet.bytes)).getPageCount() === 4 && packet.skipped === 2
+      );
+    })()
+  );
+
+  const actions = readFileSync("src/app/invoiceActions.ts", "utf8");
+  check(
+    "making or changing an invoice never writes to a load",
+    !/from\("loads"\)\s*\.(insert|update|upsert|delete)/.test(actions) && actions.includes('.from("invoices")')
+  );
+  check(
+    "the invoice PDF is only for its own driver",
+    /auth\.getUser\(\)/.test(readFileSync("src/app/loads/invoices/[id]/pdf/route.ts", "utf8")) &&
+      readFileSync("src/app/loads/invoices/[id]/pdf/route.ts", "utf8").includes('.eq("user_id", user.id)')
+  );
+  const m022 = readFileSync("supabase-migration-022.sql", "utf8");
+  check(
+    "invoices are cancelled, never deleted, so a number is never reused",
+    /revoke delete on public\.invoices from anon, authenticated/.test(m022) && /unique \(user_id, number\)/.test(m022)
+  );
+  check(
+    "due date and total are worked out by the database, so they always agree",
+    /due_date date generated always as \(invoice_date \+ net_days\) stored/.test(m022) &&
+      /total numeric\(12, 2\) generated always as \(linehaul \+ fuel_surcharge \+ accessorials\) stored/.test(m022)
   );
 }
 

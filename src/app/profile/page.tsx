@@ -13,6 +13,13 @@ import { EmailInCard, type EmailInLogRow } from "./EmailInCard";
 import { aiTier } from "@/lib/aiGuard";
 import { scanLimitsForTier } from "@/lib/scan";
 import { addressFor, freshGmailCode } from "@/lib/emailIn";
+import { InvoiceSettingsCard } from "./InvoiceSettingsCard";
+import {
+  EMPTY_INVOICE_SETTINGS,
+  canInvoice,
+  invoiceSettingsFromRow,
+  type InvoiceSettings,
+} from "@/lib/invoices";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm, type PastLoadsWithoutSplit } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
@@ -36,6 +43,7 @@ export default async function ProfilePage() {
     gmail: { code: string; from: string | null } | null;
     log: EmailInLogRow[];
   } | null = null;
+  let invoiceSettings: { initial: InvoiceSettings; saved: boolean } | null = null;
   if (user) {
     email = user.email ?? "";
     const sub = await fetchSubscription(supabase, user.id);
@@ -137,6 +145,31 @@ export default async function ProfilePage() {
     }
   }
 
+  // Invoice details: for Pro drivers who aren't leased. Missing before
+  // migration 022, and then the card stays away.
+  if (user && userIsPro && canInvoice(initial.authority_type)) {
+    const { data: row, error } = await supabase
+      .from("invoice_settings")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!error) {
+      const saved = invoiceSettingsFromRow(row);
+      invoiceSettings = {
+        saved: Boolean(saved),
+        // A first visit starts from what the driver already told us.
+        initial: saved ?? {
+          ...EMPTY_INVOICE_SETTINGS,
+          company_name: initial.company_name,
+          phone: initial.phone,
+          city: initial.domicile_city,
+          state: initial.domicile_state,
+          email,
+        },
+      };
+    }
+  }
+
   return (
     <AppShell
       width="form"
@@ -154,6 +187,11 @@ export default async function ProfilePage() {
         {emailIn && (
           <div id="email-in" className="mt-4 scroll-mt-20">
             <EmailInCard {...emailIn} />
+          </div>
+        )}
+        {invoiceSettings && (
+          <div id="invoice-details" className="mt-4 scroll-mt-20">
+            <InvoiceSettingsCard {...invoiceSettings} />
           </div>
         )}
         {aiStatus && (

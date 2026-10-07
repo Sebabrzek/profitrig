@@ -62,6 +62,7 @@ import {
 import { findLookalikes, loadChecks, openChecks } from "@/lib/checks";
 import { DismissScanButton, MarkRightButton } from "./AlertButton";
 import { SCAN_DOCUMENT_LABEL, cleanScanReading } from "@/lib/scan";
+import { canInvoice } from "@/lib/invoices";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -342,7 +343,17 @@ export default async function LoadsPage({
         isAdmin: isAdminEmail(user.email),
       }}
     >
-        <PageHeader title="Loads" />
+        <PageHeader
+          title="Loads"
+          action={
+            // Invoices live under Loads; a leased driver's carrier does the billing.
+            canInvoice(settings.authorityType) ? (
+              <Link href="/loads/invoices" className="pr-link pr-hit text-sm font-semibold">
+                Invoices
+              </Link>
+            ) : undefined
+          }
+        />
         {/* Rate cons that came in by email, read and waiting to be saved. */}
         {waiting.length > 0 && (
           <Notice
