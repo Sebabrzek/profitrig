@@ -22,8 +22,9 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `0a59cae` (6 Oct), live: scanning
-  (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
+- Production `main` = `origin/main` = `c3f36e7` (6 Oct), live: Next.js
+  16.3.8 (all 12 advisories cleared), scanning (D1), the monthly AI
+  allowance (D0), in-app alerts (Phase B), partials for
   every Pro driver, the PWA opening on /calculator, the ivory canvas, per
   diem by days on the road, Admin's shared CPM formula, and the read-only
   Admin page per driver with an Email draft. Migrations 017–020 are
@@ -33,12 +34,12 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
   downgrades at period end. It stays off the upgrade page until
   `STRIPE_PRICE_PRO_PLUS` is set in Vercel — Sebastian's call, suggested for
   when scanning ships.
-- **In review: `security/next-16-3-8`** — Next.js 16.2.6 → 16.3.8 (and
-  eslint-config-next), which clears all 12 Next.js advisories, three of them
-  critical. ProfitRig was not exposed to the headline one (a middleware
-  bypass that needs a single `i18n` locale; ProfitRig has no i18n config),
-  and every signed-in page, route and action checks the user itself. Not
-  merged.
+- **In review: `feature/email-in` (D3)** — needs migration 021, then the
+  set-up below (GoDaddy MX, Postmark inbound, `POSTMARK_INBOUND_SECRET`).
+  Not merged.
+- **Postmark** is approved (free tier, 100 emails a month), server
+  "ProfitRig", profitrig.com verified (DKIM + Return-Path at GoDaddy). Move
+  to a paid plan before invoices or email-in see real volume.
 - **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
   the dollar wave, a banknote border and a scroll, and is not settled on a
   direction. Do not raise it until he does. `+ Add a Load` keeps production's
@@ -106,6 +107,7 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Phase B — in-app alerts, "This is right" | `6896f8e` | live (migration 018 applied) |
 | D0 — monthly AI allowance in dollars; Pro Plus plumbing | `9051f0d` | live (migration 019 applied), 322 → 347 checks |
 | D1 — scan a rate con or load ticket into a draft load; PDFs page 1, then page 2 | `e2821cb`, `0a59cae` | live (migration 020 applied), 347 → 380 checks |
+| Security — Next.js 16.2.6 → 16.3.8 | `c3f36e7` | live; not exposed to the headline middleware bypass (needs one `i18n` locale) |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -352,6 +354,42 @@ and scanning (D1) will cost far more per use than a chat question.
 - **Still needed before real drivers:** Julio's ticket photos and 2–3 real
   rate cons, to check the reading on messy originals.
 
+## Email-in (D3) — what was decided, 7 Oct 2026
+
+- **Each driver picks an address**: dennis@in.profitrig.com; if taken,
+  ProfitRig offers dennis2, dennis3… 3–30 letters, numbers, dots, dashes;
+  admin/support/billing/postmaster and the like are reserved. Changing it
+  frees the old one at once. Written by the server only (migration 021).
+- **Anyone may send to it** (Sebastian's call): the driver forwards by hand,
+  sets a Gmail/Outlook rule once, or gives it to dispatch or the broker.
+  Every read becomes a DRAFT on Loads ("N scanned loads to check", Open /
+  Not a load) — never a saved load — so junk can't touch the books; it
+  costs at most the day's scan limit in AI allowance.
+- **What is read**: real PDFs and photos only (by their first bytes, not
+  their name), images under 40 KB skipped as logos, at most 3 per email,
+  the same file never read twice (SHA-256), the same email never handled
+  twice (Postmark MessageID). The shared scanner (`lib/scanRun`) reads it —
+  same allowance, limits and page-1-then-2 rule as the Scan button.
+- **Gmail's forwarding confirmation** is recognised (from @google.com only)
+  and its code — digits only, never a link — is shown on Profile for a week.
+- **Every email is logged** in one plain sentence on Profile ("1 document
+  read…", "No PDF or photo attached…").
+- **Postmark** posts to `/api/email-in` with basic auth; a wrong secret gets
+  403, which also stops Postmark retrying. Not set up yet: 503, and Postmark
+  retries for six hours. A failure that might pass (storage, AI outage) with
+  nothing read: 503 and the log row removed, so the retry runs.
+- **Known limit**: Vercel refuses request bodies over 4.5 MB, so an email
+  whose attachments total more than about 3 MB never arrives. Rate con PDFs
+  are well under; big phone photos go through the Scan button.
+- **Not in this version**: emails with only a link (portals, e-sign), reading
+  Gmail directly (Google's paid security review), replies to the sender,
+  an allow-list of senders.
+- **Set-up** (Sebastian): run migration 021; GoDaddy MX `in` →
+  `inbound.postmarkapp.com` (priority 10); a strong random secret in Vercel
+  as `POSTMARK_INBOUND_SECRET`; Postmark → ProfitRig → Default Inbound Stream
+  → Settings: inbound domain `in.profitrig.com`, webhook
+  `https://postmark:<secret>@www.profitrig.com/api/email-in`.
+
 ## Features asked for, not yet planned (3 Oct 2026)
 
 In Sebastian's rough order of interest. Each needs a decision before it can
@@ -416,11 +454,11 @@ be planned.
   `npm audit` still lists build and lint tooling (eslint, postcss, babel,
   browserslist); none of it runs where visitors can reach it. React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 380 checks in `tests/money.ts` (money math, CSV, calculator,
+- `npm test` = 398 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
   monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
-  Latest applied is **019** (6 Oct 2026); **020** is written, in review.
+  Latest applied is **020** (6 Oct 2026); **021** is written, in review.
   They are checked offline in PGlite before Sebastian runs them.
 - Local preview: `.claude/launch.json` → "profitrig", port 3000. Signed-in
   pages redirect to /login, so local checks only reach signed-out screens; a

@@ -9,6 +9,10 @@ import { fetchAiBudget } from "@/lib/aiBudget";
 import type { AiBudgetStatus } from "@/lib/aiGuard";
 import { proPlusOnSale } from "@/lib/stripe/server";
 import { AiAllowanceCard } from "./AiAllowanceCard";
+import { EmailInCard, type EmailInLogRow } from "./EmailInCard";
+import { aiTier } from "@/lib/aiGuard";
+import { scanLimitsForTier } from "@/lib/scan";
+import { addressFor, freshGmailCode } from "@/lib/emailIn";
 import { EMPTY_DRIVER_PROFILE, type DriverProfile } from "@/lib/profile";
 import { ProfileForm, type PastLoadsWithoutSplit } from "./ProfileForm";
 import { FeedbackCard } from "./FeedbackCard";
@@ -26,6 +30,12 @@ export default async function ProfilePage() {
   let pastLoads: PastLoadsWithoutSplit = { count: 0, from: null, to: null };
   let snapshots: Snapshot[] = [];
   let aiStatus: AiBudgetStatus | null = null;
+  let emailIn: {
+    address: string | null;
+    canUse: boolean;
+    gmail: { code: string; from: string | null } | null;
+    log: EmailInLogRow[];
+  } | null = null;
   if (user) {
     email = user.email ?? "";
     const sub = await fetchSubscription(supabase, user.id);
@@ -34,6 +44,38 @@ export default async function ProfilePage() {
     // rows for them. No meter if that is not possible.
     const admin = createSupabaseAdminClient();
     aiStatus = admin ? await fetchAiBudget(admin, user.id, sub, new Date()) : null;
+
+    // Email-in: their address and what arrived. Both tables are theirs to
+    // read; before migration 021 they are missing and the card stays away.
+    const [addressRes, logRes] = await Promise.all([
+      supabase.from("email_in_addresses").select("local_part").eq("user_id", user.id).maybeSingle(),
+      supabase
+        .from("email_in_messages")
+        .select("id,received_at,from_email,from_name,subject,detail,outcome,gmail_code,gmail_from")
+        .eq("user_id", user.id)
+        .order("received_at", { ascending: false })
+        .limit(10),
+    ]);
+    if (!addressRes.error && !logRes.error) {
+      const rows = logRes.data ?? [];
+      emailIn = {
+        address: addressRes.data ? addressFor(String(addressRes.data.local_part)) : null,
+        canUse: scanLimitsForTier(aiTier(sub, userIsPro)) !== null,
+        gmail: freshGmailCode(rows, new Date()),
+        log: rows.map((m) => ({
+          id: String(m.id),
+          when: new Date(String(m.received_at)).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+          from: String(m.from_name || m.from_email || ""),
+          subject: String(m.subject ?? ""),
+          detail: String(m.detail ?? ""),
+        })),
+      };
+    }
     const { data } = await supabase
       .from("driver_profiles")
       .select("*")
@@ -109,6 +151,11 @@ export default async function ProfilePage() {
           description="Quick info about you and your operation. All optional. Helps us send tips that actually match what you haul."
         />
         <ProfileForm initial={initial} email={email} pastLoads={pastLoads} />
+        {emailIn && (
+          <div id="email-in" className="mt-4 scroll-mt-20">
+            <EmailInCard {...emailIn} />
+          </div>
+        )}
         {aiStatus && (
           <div className="mt-4">
             <AiAllowanceCard status={aiStatus} proPlusOnSale={proPlusOnSale()} />

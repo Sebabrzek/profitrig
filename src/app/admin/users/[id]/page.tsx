@@ -58,6 +58,7 @@ import { CheckList, DataTable, KeyValues } from "./Sections";
 import type { SubscriptionRow } from "@/lib/subscription";
 import { fetchAiBudget } from "@/lib/aiBudget";
 import { AI_TIER_LABEL, formatAiDollars, formatResetDate } from "@/lib/aiGuard";
+import { addressFor } from "@/lib/emailIn";
 
 /**
  * One driver, everything they have entered, READ-ONLY — so Sebastian can sit
@@ -136,6 +137,7 @@ export default async function AdminDriverPage({
     usageRes,
     feedbackRes,
     scansRes,
+    inboxRes,
   ] = await Promise.all([
     fetchDriverSettings(admin, id),
     driverToday(),
@@ -155,7 +157,9 @@ export default async function AdminDriverPage({
     byUser("ai_usage", "status,estimated_cost_usd,created_at"),
     admin.from("feedback").select("id,message,created_at").eq("user_id", id).order("created_at", { ascending: false }),
     // Empty before migration 020.
-    byUser("scans", "id,created_at,status,document_type,extracted,load_id").order("created_at", { ascending: false }).limit(50),
+    byUser("scans", "*").order("created_at", { ascending: false }).limit(50),
+    // Empty before migration 021.
+    byUser("email_in_addresses", "local_part").maybeSingle(),
   ]);
   const [{ data: me }, aiBudget] = await Promise.all([
     admin.from("driver_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
@@ -327,6 +331,10 @@ export default async function AdminDriverPage({
               aiBudget
                 ? `${formatAiDollars(aiBudget.spentUsd)} of ${formatAiDollars(aiBudget.budgetUsd)} (${AI_TIER_LABEL[aiBudget.tier]}) · ${aiBudget.usedPercent}% · resets ${formatResetDate(aiBudget.resetsAt)}`
                 : "—",
+            ],
+            [
+              "Email-in",
+              inboxRes.data ? addressFor(String((inboxRes.data as Row).local_part)) : "—",
             ],
             ["Signed up", day(driver.created_at)],
             ["Last sign-in", day(driver.last_sign_in_at)],
@@ -737,6 +745,7 @@ export default async function AdminDriverPage({
             empty="Nothing scanned."
             columns={[
               { key: "date", label: "Scanned" },
+              { key: "how", label: "From" },
               { key: "what", label: "Read as" },
               { key: "read", label: "What it read" },
               { key: "load", label: "Load" },
@@ -750,6 +759,7 @@ export default async function AdminDriverPage({
               return {
                 _key: String(r.id),
                 date: day(r.created_at as string),
+                how: r.source === "email" ? "Email" : "Scan",
                 what: r.status === "read" ? String(r.document_type ?? "—").replace(/_/g, " ") : String(r.status),
                 read: read || "—",
                 load: r.load_id && byId.get(String(r.load_id)) ? (

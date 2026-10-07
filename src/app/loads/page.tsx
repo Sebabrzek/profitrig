@@ -60,7 +60,8 @@ import {
   tripTotals,
 } from "@/lib/partials";
 import { findLookalikes, loadChecks, openChecks } from "@/lib/checks";
-import { MarkRightButton } from "./AlertButton";
+import { DismissScanButton, MarkRightButton } from "./AlertButton";
+import { SCAN_DOCUMENT_LABEL, cleanScanReading } from "@/lib/scan";
 
 const EMPTY_PROFILE: CostProfile = {
   truck_payment: 0,
@@ -159,7 +160,7 @@ export default async function LoadsPage({
   // share comes from its whole month — even when the week crosses months.
   const monthRange = monthRangeForWeek(weekStart, weekEnd);
 
-  const [costRes, monthLoadsRes, roadExpensesRes] = await Promise.all([
+  const [costRes, monthLoadsRes, roadExpensesRes, waitingRes] = await Promise.all([
     supabase
       .from("cost_profiles")
       .select("*")
@@ -183,8 +184,32 @@ export default async function LoadsPage({
       .lte("spent_on", isoDate(weekEnd))
       .order("spent_on", { ascending: false })
       .order("created_at", { ascending: false }),
+    // Documents emailed in and read, still waiting for the driver to check
+    // and save. Any week; empty before migration 021.
+    supabase
+      .from("scans")
+      .select("id,created_at,extracted")
+      .eq("user_id", user.id)
+      .eq("source", "email")
+      .eq("status", "read")
+      .is("load_id", null)
+      .is("dismissed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
+  const waiting = ((waitingRes.error ? [] : waitingRes.data) ?? []).map((w) => {
+    const r = cleanScanReading(w.extracted, today);
+    return {
+      id: String(w.id),
+      title:
+        r.documentType === "other"
+          ? "Not a load document?"
+          : r.customer || `A ${SCAN_DOCUMENT_LABEL[r.documentType]}`,
+      route: r.origin || r.destination ? `${r.origin ?? "—"} → ${r.destination ?? "—"}` : "",
+      when: new Date(String(w.created_at)).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    };
+  });
   const roadExpenses: RoadExpense[] = (roadExpensesRes.data ?? []).map(
     (r) => ({
       id: r.id,
@@ -318,6 +343,34 @@ export default async function LoadsPage({
       }}
     >
         <PageHeader title="Loads" />
+        {/* Rate cons that came in by email, read and waiting to be saved. */}
+        {waiting.length > 0 && (
+          <Notice
+            title={`${waiting.length === 1 ? "1 scanned load" : `${waiting.length} scanned loads`} to check`}
+            className="mb-4"
+          >
+            <ul className="flex flex-col gap-3">
+              {waiting.map((w) => (
+                <li
+                  key={w.id}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"
+                >
+                  <span>
+                    <span className="font-semibold">{w.title}</span>
+                    {w.route && <span> · {w.route}</span>}
+                    <span className="block text-xs text-muted">Emailed {w.when}</span>
+                  </span>
+                  <span className="flex shrink-0 items-baseline gap-4">
+                    <Link href={`/loads/new?scan=${w.id}`} className="pr-link pr-hit text-sm font-semibold">
+                      Open
+                    </Link>
+                    <DismissScanButton scanId={w.id} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        )}
         {!isConfigured && (
           <Notice title="Set up your cost per mile first" className="mb-4">
             <p>

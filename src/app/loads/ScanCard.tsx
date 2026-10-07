@@ -34,7 +34,12 @@ async function shrinkPhoto(file: File): Promise<Blob> {
  * Scan a rate con or load ticket into the form below. ProfitRig only fills
  * the form in; the driver checks it and saves it themselves.
  */
-export function ScanCard() {
+export function ScanCard({
+  emailAddress,
+}: {
+  /** The driver's email-in address; null when they haven't picked one. */
+  emailAddress?: string | null;
+} = {}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
@@ -107,6 +112,24 @@ export function ScanCard() {
       {reading && (
         <p role="status" className="mt-2 text-sm text-muted">
           This takes about 10 seconds.
+        </p>
+      )}
+      {emailAddress !== undefined && !reading && (
+        <p className="mt-3 text-sm text-muted">
+          {emailAddress ? (
+            <>
+              Or email rate cons to{" "}
+              <span className="pr-figure font-semibold text-foreground">{emailAddress}</span>
+            </>
+          ) : (
+            <>
+              Or{" "}
+              <Link href="/profile#email-in" className="pr-link">
+                get your own address
+              </Link>{" "}
+              and email rate cons in.
+            </>
+          )}
         </p>
       )}
       {error && (

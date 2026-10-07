@@ -157,6 +157,19 @@ import {
   scanReserveUsd,
 } from "../src/lib/scan";
 import { pdfPage } from "../src/lib/pdfPages";
+import {
+  EMAIL_IN_MAX_ATTACHMENTS,
+  checkName,
+  describeOutcome,
+  firstFreeName,
+  freshGmailCode,
+  gmailConfirmation,
+  normalizeName,
+  pickAttachments,
+  recipientName,
+  sniffType,
+  type EmailOutcome,
+} from "../src/lib/emailIn";
 import { PDFDocument } from "pdf-lib";
 import { ScanDraftNotice } from "../src/app/loads/ScanDraftNotice";
 import {
@@ -1982,7 +1995,9 @@ section("Scanning: a document becomes a draft the driver checks, never a saved l
     })()
   );
 
-  const route = readFileSync("src/app/api/scan/route.ts", "utf8");
+  // The reading itself is the shared scanner; the route only checks the request.
+  const route =
+    readFileSync("src/app/api/scan/route.ts", "utf8") + readFileSync("src/lib/scanRun.ts", "utf8");
   check(
     "the AI never sees past page 2 of a PDF, and page 2 only when page 1 needs it",
     route.includes("pdfPage(bytes, 0)") && route.includes("pdfPage(bytes, 1)") &&
@@ -2011,6 +2026,155 @@ section("Scanning: a document becomes a draft the driver checks, never a saved l
   check(
     "the scan API answers in JSON rather than redirecting to the login page",
     readFileSync("src/lib/supabase/middleware.ts", "utf8").includes('pathname.startsWith("/api/scan")')
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+section("Email-in: a rate con emailed to a driver's own address becomes a draft");
+// ─────────────────────────────────────────────────────────────────────
+
+{
+  check(
+    "a typed name becomes an address name: lower case, spaces to dots, nothing else",
+    normalizeName("Dennis") === "dennis" &&
+      normalizeName("  Big D Trucking ") === "big.d.trucking" &&
+      normalizeName("dennis@gmail.com") === "dennis" &&
+      normalizeName("dennis_77!") === "dennis77" &&
+      normalizeName("..dennis--jr..") === "dennis-jr"
+  );
+  check(
+    "names: 3–30 characters, and the reserved ones refused",
+    checkName("Dennis").ok &&
+      !checkName("de").ok &&
+      !checkName("a".repeat(31)).ok &&
+      !checkName("admin").ok &&
+      !checkName("Support").ok &&
+      !checkName("postmaster").ok &&
+      !checkName("!!!").ok
+  );
+  check(
+    "a taken name offers the next number: dennis, then dennis2, dennis3",
+    firstFreeName("dennis", new Set()) === "dennis" &&
+      firstFreeName("dennis", new Set(["dennis"])) === "dennis2" &&
+      firstFreeName("dennis", new Set(["dennis", "dennis2"])) === "dennis3" &&
+      firstFreeName("a".repeat(30), new Set(["a".repeat(30)])) === null
+  );
+
+  check(
+    "a forwarded email reaches the driver by the address it was delivered to",
+    recipientName({ OriginalRecipient: "dennis@in.profitrig.com", ToFull: [{ Email: "dennis.trucking@gmail.com" }] }) === "dennis"
+  );
+  check(
+    "sent straight to it, copied on it, or with a +tag, it still reaches the driver",
+    recipientName({ ToFull: [{ Email: "Dennis+TQL@In.ProfitRig.com" }] }) === "dennis" &&
+      recipientName({ ToFull: [{ Email: "ed@dlewis.com" }], CcFull: [{ Email: "dennis2@in.profitrig.com" }] }) === "dennis2"
+  );
+  check(
+    "a lookalike domain reaches nobody",
+    recipientName({ ToFull: [{ Email: "dennis@in.profitrig.com.evil.com" }] }) === null &&
+      recipientName({ ToFull: [{ Email: "dennis@notin.profitrig.com" }] }) === null &&
+      recipientName({ ToFull: [{ Email: "dennis@profitrig.com" }] }) === null
+  );
+
+  const b64 = (bytes: number[] | Uint8Array, pad = 0) =>
+    Buffer.concat([Buffer.from(bytes), Buffer.alloc(pad)]).toString("base64");
+  const PDF = [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37];
+  const JPG = [0xff, 0xd8, 0xff, 0xe0];
+  const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  check(
+    "a file is what its first bytes say, never what its name or label claims",
+    sniffType(new Uint8Array(PDF)) === "application/pdf" &&
+      sniffType(new Uint8Array(JPG)) === "image/jpeg" &&
+      sniffType(new Uint8Array(PNG)) === "image/png" &&
+      sniffType(new Uint8Array(Buffer.from("RIFF0000WEBPVP8 "))) === "image/webp" &&
+      sniffType(new Uint8Array(Buffer.from("<html>"))) === null
+  );
+  const picked = pickAttachments({
+    Attachments: [
+      { Name: "RateCon.pdf", ContentType: "application/pdf", Content: b64(PDF, 2000) },
+      { Name: "logo.png", ContentType: "image/png", ContentID: "logo@x", Content: b64(PNG, 3000) },
+      { Name: "invoice.pdf", ContentType: "application/pdf", Content: b64(Buffer.from("<html>not a pdf</html>")) },
+      { Name: "IMG_2231.jpg", ContentType: "image/jpeg", Content: b64(JPG, 200_000) },
+      { Name: "page2.pdf", ContentType: "application/octet-stream", Content: b64(PDF, 500) },
+      { Name: "extra.pdf", ContentType: "application/pdf", Content: b64(PDF, 500) },
+    ],
+  });
+  check(
+    "from an email: real PDFs and photos only, logos skipped, at most three",
+    picked.picked.length === EMAIL_IN_MAX_ATTACHMENTS &&
+      picked.picked.map((a) => a.name).join() === "RateCon.pdf,IMG_2231.jpg,page2.pdf" &&
+      picked.picked[2].mime === "application/pdf" &&
+      picked.skipped === 2 &&
+      picked.extra === 1
+  );
+  check("an email with nothing attached has nothing to read", pickAttachments({}).picked.length === 0);
+
+  const gmail = gmailConfirmation({
+    From: "forwarding-noreply@google.com",
+    FromFull: { Email: "forwarding-noreply@google.com" },
+    Subject: "(#183746529) Gmail Forwarding Confirmation - Receive Mail from dennis.trucking@gmail.com",
+    TextBody: "Confirmation code: 183746529",
+  });
+  check(
+    "Gmail's forwarding confirmation is recognised, and its code kept to show",
+    gmail?.code === "183746529" && gmail?.from === "dennis.trucking@gmail.com"
+  );
+  check(
+    "a 'Gmail confirmation' from anyone but Google is ignored",
+    gmailConfirmation({
+      From: "forwarding-noreply@google.com.evil.io",
+      FromFull: { Email: "forwarding-noreply@google.com.evil.io" },
+      Subject: "(#183746529) Gmail Forwarding Confirmation - Receive Mail from x@gmail.com",
+    }) === null && gmailConfirmation({ FromFull: { Email: "broker@tql.com" }, Subject: "Rate confirmation 4471" }) === null
+  );
+  const now = new Date("2026-10-07T12:00:00Z");
+  check(
+    "a Gmail code is shown for a week, newest first",
+    freshGmailCode(
+      [
+        { outcome: "scanned", received_at: "2026-10-07T10:00:00Z" },
+        { outcome: "gmail_confirmation", gmail_code: "222222", gmail_from: "a@gmail.com", received_at: "2026-10-06T10:00:00Z" },
+        { outcome: "gmail_confirmation", gmail_code: "111111", received_at: "2026-10-05T10:00:00Z" },
+      ],
+      now
+    )?.code === "222222" &&
+      freshGmailCode([{ outcome: "gmail_confirmation", gmail_code: "111111", received_at: "2026-09-20T10:00:00Z" }], now) === null
+  );
+  const outcomes: EmailOutcome[] = ["scanned", "duplicate", "no_attachment", "not_on_plan", "over_limit", "gmail_confirmation", "failed"];
+  check(
+    "every email gets one plain sentence, and none mentions dollars",
+    outcomes.every((o) => describeOutcome(o).length > 0 && !describeOutcome(o).includes("$")) &&
+      describeOutcome("scanned", { read: 2, extra: 1 }) ===
+        "2 documents read — waiting on your Loads page. 1 more attachment not read (3 per email)." &&
+      /link/.test(describeOutcome("no_attachment"))
+  );
+
+  const hook = readFileSync("src/app/api/email-in/route.ts", "utf8");
+  check(
+    "only Postmark gets in: the secret is checked before the email is even read, and a bad one is refused for good",
+    hook.indexOf("authorized(request, secret)") > 0 &&
+      hook.indexOf("authorized(request, secret)") < hook.indexOf("request.json()") &&
+      /status: 403/.test(hook) &&
+      hook.includes("timingSafeEqual")
+  );
+  check(
+    "an emailed document is read by the same scanner as the Scan button, and never saved as a load",
+    hook.includes("runScan({") && hook.includes("email: { messageId: logId, sha256: job.sha256 }") &&
+      !hook.includes('.from("loads")')
+  );
+  check(
+    "an email Postmark delivers twice, or a document sent twice, is not read twice",
+    hook.includes('.eq("postmark_message_id", messageId)') && hook.includes('.eq("content_sha256", job.sha256)')
+  );
+  check(
+    "Postmark reaches email-in without a login session",
+    readFileSync("src/lib/supabase/middleware.ts", "utf8").includes('pathname.startsWith("/api/email-in")')
+  );
+  const m021 = readFileSync("supabase-migration-021.sql", "utf8");
+  check(
+    "drivers can read their address and email log but not write them",
+    /revoke insert, update, delete on public\.email_in_addresses from anon, authenticated/.test(m021) &&
+      /revoke insert, update, delete on public\.email_in_messages from anon, authenticated/.test(m021)
   );
 }
 

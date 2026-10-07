@@ -20,6 +20,7 @@ import { MAX_PARTIALS, tripLabel } from "@/lib/partials";
 import { ScanCard } from "../ScanCard";
 import { ScanDraftNotice, type ScanState } from "../ScanDraftNotice";
 import { SCAN_DOCUMENT_LABEL, cleanScanReading, draftFromReading } from "@/lib/scan";
+import { addressFor } from "@/lib/emailIn";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -122,6 +123,15 @@ export default async function NewLoadPage({
       };
     }
   }
+
+  // Their email-in address, to mention under Scan. Before migration 021 the
+  // table is missing and nothing is said.
+  const { data: inbox, error: inboxError } = await supabase
+    .from("email_in_addresses")
+    .select("local_part")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const emailAddress = inboxError ? undefined : inbox ? addressFor(String(inbox.local_part)) : null;
 
   const newLoadDate = primary
     ? new Date(String(primary.load_date) + "T12:00:00")
@@ -244,7 +254,7 @@ export default async function NewLoadPage({
             </Link>
           }
         />
-        {!partialOf && (scan ? <ScanDraftNotice scan={scan} /> : <ScanCard />)}
+        {!partialOf && (scan ? <ScanDraftNotice scan={scan} /> : <ScanCard emailAddress={emailAddress} />)}
         <LoadForm
           // A new scan opens a fresh form, filled in from that document.
           key={scan?.id ?? "new"}
