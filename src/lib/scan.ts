@@ -161,7 +161,7 @@ Fields:
 - rate_as_printed: when pay is given as a rate rather than a total ("$2.65/mi", "$9.50 per ton", "$131/hr"), that rate exactly as printed.
 - commodity: what is hauled, as printed.
 - weight: weight or quantity with its unit, as printed ("42,000 lb", "18.42 tons").
-- unclear: short plain phrases for anything hard to read or ambiguous that the driver should check. Do not list fields that are simply not printed, or how many tickets there are: ProfitRig already says so. Do not mention other pages of the document: ProfitRig reads the next page itself when it needs to.`;
+- unclear: short plain phrases, only for something that could make the date, the pickup or delivery place, the miles or the pay wrong — hard to read, ambiguous, or more than one candidate (several stops, two dates, a rate that may or may not include fuel). Nothing about the freight, weight, equipment, reference numbers or instructions: the driver doesn't need to check those — except the weight when pay is per ton or per pound, since then the weight is the pay. Do not list fields that are simply not printed, or how many tickets there are: ProfitRig already says so. Do not mention other pages of the document: ProfitRig reads the next page itself when it needs to.`;
 
 const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: "null" }] });
 
@@ -311,10 +311,11 @@ export function cleanScanReading(raw: unknown, today: string): ScanReading {
     rateAsPrinted: text(r.rate_as_printed, 60),
     commodity: text(r.commodity, 80),
     weight: text(r.weight, 40),
+    // A few notes get read; a long list gets skipped.
     unclear: (Array.isArray(r.unclear) ? r.unclear : [])
       .map((u) => text(u, 160))
       .filter((u): u is string => u !== null)
-      .slice(0, 8),
+      .slice(0, 4),
   };
 }
 

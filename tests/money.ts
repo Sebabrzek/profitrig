@@ -1763,6 +1763,13 @@ section("Scanning: a document becomes a draft the driver checks, never a saved l
   );
   check("scanning reads with Opus 5.5", SCAN_MODEL === "claude-opus-5-5");
   check(
+    "the driver is only asked to check what can change the money: date, places, miles, pay — at most four notes",
+    /only for something that could make the date, the pickup or delivery place, the miles or the pay wrong/.test(SCAN_SYSTEM_PROMPT) &&
+      /Nothing about the freight, weight, equipment, reference numbers or instructions/.test(SCAN_SYSTEM_PROMPT) &&
+      /except the weight when pay is per ton or per pound/.test(SCAN_SYSTEM_PROMPT) &&
+      cleanScanReading({ unclear: ["a", "b", "c", "d", "e", "f"] }, "2026-10-06").unclear.length === 4
+  );
+  check(
     "only images and PDFs are scanned",
     isScanMimeType("image/jpeg") && isScanMimeType("application/pdf") && !isScanMimeType("image/heic") && !isScanMimeType("text/html")
   );

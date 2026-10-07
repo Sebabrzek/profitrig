@@ -348,6 +348,10 @@ and scanning (D1) will cost far more per use than a chat question.
 - **Originals are kept**, private (Storage bucket `scans`, no policies; the
   server hands the owner or admin a one-minute link), linked to the load
   when it is saved. Deleting a load keeps its scan.
+- **The notes are about money only** (7 Oct, after a C.H. Robinson rate con
+  came back with notes about pallet codes and weight units): the AI flags
+  only what could make the date, a place, the miles or the pay wrong — and
+  the weight only when pay is per ton or pound. At most four notes.
 - **Several tickets in one photo:** only the first is read, and the driver is
   told to scan each one. Turning one photo into several loads waits for
   Julio's real photos.
@@ -454,7 +458,7 @@ be planned.
   `npm audit` still lists build and lint tooling (eslint, postcss, babel,
   browserslist); none of it runs where visitors can reach it. React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 398 checks in `tests/money.ts` (money math, CSV, calculator,
+- `npm test` = 399 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
   monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
