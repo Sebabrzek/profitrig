@@ -22,19 +22,23 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `9051f0d` (6 Oct), live: the monthly
-  AI allowance (D0), in-app alerts (Phase B), partials for every Pro driver,
-  the PWA opening on /calculator, the ivory canvas, per diem by days on the
-  road, Admin's shared CPM formula, and the read-only Admin page per driver
-  with an Email draft. Migrations 017, 018 and 019 are applied.
-  `git log --oneline -3` is the truth; this file is a summary.
+- Production `main` = `origin/main` = `0a59cae` (6 Oct), live: scanning
+  (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
+  every Pro driver, the PWA opening on /calculator, the ivory canvas, per
+  diem by days on the road, Admin's shared CPM formula, and the read-only
+  Admin page per driver with an Email draft. Migrations 017–020 are
+  applied. `git log --oneline -3` is the truth; this file is a summary.
 - **Pro Plus is created in Stripe** ($19.99/mo, its own product) and the
   Customer portal lets plans switch, prorated and charged immediately,
   downgrades at period end. It stays off the upgrade page until
   `STRIPE_PRICE_PRO_PLUS` is set in Vercel — Sebastian's call, suggested for
   when scanning ships.
-- **In review: `feature/scanner` (D1)** — needs migration 020 run by hand
-  before merge. Not merged.
+- **In review: `security/next-16-3-8`** — Next.js 16.2.6 → 16.3.8 (and
+  eslint-config-next), which clears all 12 Next.js advisories, three of them
+  critical. ProfitRig was not exposed to the headline one (a middleware
+  bypass that needs a single `i18n` locale; ProfitRig has no i18n config),
+  and every signed-in page, route and action checks the user itself. Not
+  merged.
 - **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
   the dollar wave, a banknote border and a scroll, and is not settled on a
   direction. Do not raise it until he does. `+ Add a Load` keeps production's
@@ -101,6 +105,7 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Admin: one page per driver, read-only, everything they entered | `7fb8005`, `d96310f`, `db835a5` | live (email only — no texting) |
 | Phase B — in-app alerts, "This is right" | `6896f8e` | live (migration 018 applied) |
 | D0 — monthly AI allowance in dollars; Pro Plus plumbing | `9051f0d` | live (migration 019 applied), 322 → 347 checks |
+| D1 — scan a rate con or load ticket into a draft load; PDFs page 1, then page 2 | `e2821cb`, `0a59cae` | live (migration 020 applied), 347 → 380 checks |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -404,8 +409,12 @@ be planned.
 
 ## Stack, commands, gotchas
 
-- Next.js 16 (App Router, Turbopack) — **read `node_modules/next/dist/docs/`
-  before using Next APIs.** React 19, Tailwind v4, Supabase, Stripe,
+- Next.js 16.3.8 (App Router, Turbopack) — **read
+  `node_modules/next/dist/docs/` before using Next APIs.** The build warns
+  that the `middleware` file convention is now called `proxy`; renaming it
+  (`npx @next/codemod middleware-to-proxy`) is its own small task.
+  `npm audit` still lists build and lint tooling (eslint, postcss, babel,
+  browserslist); none of it runs where visitors can reach it. React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
 - `npm test` = 380 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
@@ -427,10 +436,10 @@ be planned.
   after an element or expression. Write an explicit `{" "}` and check the
   compiled output.
 - Lint findings that predate the design work (compare against `main`, don't
-  fix unasked): set-state-in-effect in Calculator (×2), LoadForm,
-  ProfileBanner, SupportChat; admin impure render; unused `signOutAction`
-  (admin), `categoryMeta` (tax/expenses), `_hasExistingCustomer`
-  (UpgradeCard); unused imports in `app/api/tax/export/route.ts`.
+  fix unasked), as of 6 Oct 2026: set-state-in-effect in Calculator and
+  ProfileBanner; admin impure render; unused `signOutAction` (admin),
+  `categoryMeta` (tax/expenses), `_hasExistingCustomer` (UpgradeCard);
+  unused imports in `app/api/tax/export/route.ts`.
 - The fixed-cost sum exists in four copies: `lib/calculatorTotals.ts`,
   `actions.ts computeTotals`, `lib/loads.ts sumFixedMonthly`, admin per-user
   CPM. Consolidating them is its own task and needs approval.
