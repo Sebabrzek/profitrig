@@ -1,4 +1,5 @@
 import { Wordmark } from "@/components/Wordmark";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { AccountActions } from "./AccountActions";
 import { AskProfitRigButton } from "./AskProfitRigButton";
 import { BottomNav } from "./BottomNav";
@@ -99,7 +100,10 @@ export function AppShell({
       </header>
 
       <main id="main-content" tabIndex={-1} className="pr-shell-main">
-        <div className="pr-shell-column">{children}</div>
+        <div className="pr-shell-column">
+          {signedIn && <AnnouncementBanner />}
+          {children}
+        </div>
       </main>
 
       {signedIn && <BottomNav isPro={isPro} />}

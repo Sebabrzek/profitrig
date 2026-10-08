@@ -291,6 +291,11 @@ ADMIN_EMAILS = ${user.email}`}
           <PageHeader
             title="ProfitRig Admin"
             description="Live data from Supabase. Numbers update on every page refresh."
+            action={
+              <Link href="/admin/messages" className="pr-link pr-hit text-sm font-semibold">
+                Messages
+              </Link>
+            }
           />
           {allowlistEmpty && (
             <Notice tone="error">

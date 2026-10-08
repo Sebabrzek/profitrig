@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchSubscription, isPro } from "@/lib/subscription";
@@ -6,6 +6,7 @@ import { aiTier } from "@/lib/aiGuard";
 import { scanLimitsForTier } from "@/lib/scan";
 import { runScan, type ScanRunOutcome } from "@/lib/scanRun";
 import { todayIsoIn } from "@/lib/loads";
+import { fromPostmark } from "@/lib/postmarkAuth";
 import {
   describeOutcome,
   gmailConfirmation,
@@ -36,28 +37,13 @@ export const maxDuration = 120;
  * a load, and nothing is sent back.
  */
 
-function authorized(request: Request, secret: string): boolean {
-  const header = request.headers.get("authorization") ?? "";
-  if (!header.startsWith("Basic ")) return false;
-  let password = "";
-  try {
-    const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
-    password = decoded.slice(decoded.indexOf(":") + 1);
-  } catch {
-    return false;
-  }
-  const a = Buffer.from(password);
-  const b = Buffer.from(secret);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 const ok = (note: string) => NextResponse.json({ ok: true, note });
 
 export async function POST(request: Request) {
   const secret = process.env.POSTMARK_INBOUND_SECRET;
   // Not set up yet: Postmark keeps the email and retries for six hours.
   if (!secret) return NextResponse.json({ error: "not configured" }, { status: 503 });
-  if (!authorized(request, secret)) {
+  if (!fromPostmark(request, secret)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

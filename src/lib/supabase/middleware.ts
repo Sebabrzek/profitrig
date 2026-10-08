@@ -37,15 +37,19 @@ export async function updateSession(request: NextRequest) {
   // /api/chat runs its own auth check and answers with JSON — it must not be
   // redirected to the HTML login page, or an expired session would stream
   // login-page markup back into the chat widget as an "answer". /api/scan
-  // likewise: the Scan button reads its JSON, as does attaching paperwork to
-  // an invoice (/api/invoices). /api/email-in is Postmark delivering email;
-  // it has no session and proves itself with a secret.
+  // likewise: the Scan button reads its JSON, as do attaching paperwork to an
+  // invoice (/api/invoices) and the in-app banner (/api/announcements).
+  // /api/email-in and /api/email-events are Postmark (email arriving, and
+  // what happened to announcements); they have no session and prove
+  // themselves with a secret.
   const isPublicApi =
     pathname.startsWith("/api/stripe") ||
     pathname.startsWith("/api/chat") ||
     pathname.startsWith("/api/scan") ||
     pathname.startsWith("/api/email-in") ||
-    pathname.startsWith("/api/invoices");
+    pathname.startsWith("/api/email-events") ||
+    pathname.startsWith("/api/invoices") ||
+    pathname.startsWith("/api/announcements");
   // Two public pages: the marketing home, and the calculator itself.
   // Visitors can play with the math; saving prompts an account. /loads,
   // /fuel, /tax, /profile, /admin remain auth-gated below.

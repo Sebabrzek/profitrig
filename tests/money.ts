@@ -2177,10 +2177,10 @@ section("Email-in: a rate con emailed to a driver's own address becomes a draft"
   const hook = readFileSync("src/app/api/email-in/route.ts", "utf8");
   check(
     "only Postmark gets in: the secret is checked before the email is even read, and a bad one is refused for good",
-    hook.indexOf("authorized(request, secret)") > 0 &&
-      hook.indexOf("authorized(request, secret)") < hook.indexOf("request.json()") &&
+    hook.indexOf("fromPostmark(request, secret)") > 0 &&
+      hook.indexOf("fromPostmark(request, secret)") < hook.indexOf("request.json()") &&
       /status: 403/.test(hook) &&
-      hook.includes("timingSafeEqual")
+      readFileSync("src/lib/postmarkAuth.ts", "utf8").includes("timingSafeEqual")
   );
   check(
     "an emailed document is read by the same scanner as the Scan button, and never saved as a load",

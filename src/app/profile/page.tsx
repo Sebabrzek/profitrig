@@ -14,6 +14,8 @@ import { aiTier } from "@/lib/aiGuard";
 import { scanLimitsForTier } from "@/lib/scan";
 import { addressFor, freshGmailCode } from "@/lib/emailIn";
 import { InvoiceSettingsCard } from "./InvoiceSettingsCard";
+import { EmailPreferencesCard } from "./EmailPreferencesCard";
+import { wantsUpdates } from "@/lib/messages";
 import {
   EMPTY_INVOICE_SETTINGS,
   canInvoice,
@@ -44,6 +46,7 @@ export default async function ProfilePage() {
     log: EmailInLogRow[];
   } | null = null;
   let invoiceSettings: { initial: InvoiceSettings; saved: boolean } | null = null;
+  let emailPrefs: { productUpdates: boolean; unsubscribed: boolean } | null = null;
   if (user) {
     email = user.email ?? "";
     const sub = await fetchSubscription(supabase, user.id);
@@ -145,6 +148,26 @@ export default async function ProfilePage() {
     }
   }
 
+  // Their email switch. Missing before migration 023, and then the card
+  // stays away.
+  if (user) {
+    const { data: pref, error } = await supabase
+      .from("email_preferences")
+      .select("product_updates,unsubscribed_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!error) {
+      emailPrefs = {
+        productUpdates: wantsUpdates({
+          pro: userIsPro,
+          marketingOptIn: initial.marketing_opt_in,
+          productUpdates: typeof pref?.product_updates === "boolean" ? pref.product_updates : null,
+        }),
+        unsubscribed: Boolean(pref?.unsubscribed_at),
+      };
+    }
+  }
+
   // Invoice details: for Pro drivers who aren't leased. Missing before
   // migration 022, and then the card stays away.
   if (user && userIsPro && canInvoice(initial.authority_type)) {
@@ -192,6 +215,11 @@ export default async function ProfilePage() {
         {invoiceSettings && (
           <div id="invoice-details" className="mt-4 scroll-mt-20">
             <InvoiceSettingsCard {...invoiceSettings} />
+          </div>
+        )}
+        {emailPrefs && (
+          <div id="emails" className="mt-4 scroll-mt-20">
+            <EmailPreferencesCard {...emailPrefs} />
           </div>
         )}
         {aiStatus && (
