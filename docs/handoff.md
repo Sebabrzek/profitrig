@@ -22,21 +22,26 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `2a1063b` (7 Oct), live: email-in
-  (D3, Postmark set up and tested end to end), Next.js 16.3.8, scanning
-  (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
+- Production `main` = `origin/main` = `ab0cdc4` (8 Oct), live: invoicing
+  step 1, email-in (D3, Postmark set up and tested end to end), Next.js
+  16.3.8, scanning (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
   every Pro driver, the PWA opening on /calculator, the ivory canvas, per
   diem by days on the road, Admin's shared CPM formula, and the read-only
-  Admin page per driver with an Email draft. Migrations 017–021 are
+  Admin page per driver with an Email draft. Migrations 017–022 are
   applied. `git log --oneline -3` is the truth; this file is a summary.
 - **Pro Plus is created in Stripe** ($19.99/mo, its own product) and the
   Customer portal lets plans switch, prorated and charged immediately,
   downgrades at period end. It stays off the upgrade page until
   `STRIPE_PRICE_PRO_PLUS` is set in Vercel — Sebastian's call, suggested for
   when scanning ships.
-- **In review: `feature/invoices` (invoicing step 1)** — needs migration 022
-  run by hand before merge. Not merged. Step 2 (email from ProfitRig) is
-  not built.
+- **In review: `fix/signup-confirm`** — sign-up says "check your email",
+  a confirmation page at /auth/confirm, and a card required for the trial.
+  After merge, Sebastian sets up Supabase SMTP (Postmark) and pastes the
+  branded "Confirm signup" template (`docs/email-templates/`). Not merged.
+- **Parked: `feature/messages` (C1, Admin → Messages)** — local only, one
+  in-progress commit. Left to do: two lint errors in `admin/messages`
+  (draft restore sets state in an effect; `Date.now` in the page), tests
+  for `lib/messages`, handoff notes, then push. Needs migration 023.
 - **Postmark** is approved (free tier, 100 emails a month), server
   "ProfitRig", profitrig.com verified (DKIM + Return-Path at GoDaddy). Move
   to a paid plan before invoices or email-in see real volume.
@@ -109,6 +114,7 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | D1 — scan a rate con or load ticket into a draft load; PDFs page 1, then page 2 | `e2821cb`, `0a59cae` | live (migration 020 applied), 347 → 380 checks |
 | Security — Next.js 16.2.6 → 16.3.8 | `c3f36e7` | live; not exposed to the headline middleware bypass (needs one `i18n` locale) |
 | D3 — email-in; scanner notes about money only | `24d49fd`, `2a1063b` | live (migration 021 applied), 380 → 399 checks; Postmark inbound live |
+| Invoicing step 1 | `ab0cdc4` | live (migration 022 applied), 399 → 421 checks |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -477,9 +483,13 @@ be planned.
 - Admin shows AI spend per driver this month (D0); a per-request view of
   `ai_usage` is not built. Sebastian's own test chat and its usage rows are
   deliberately still in the database.
-- Supabase "Confirm email" is still unverified. Do not enable it before
-  sign-up has a "check your email" step and a callback route — today it has
-  neither, so turning it on would break sign-up.
+- **Supabase "Confirm email" is ON** (found 8 Oct, when a test sign-up
+  landed on the Calculator unconfirmed and got Supabase's generic email).
+  `fix/signup-confirm` adds the "check your email" step, Resend, and
+  /auth/confirm (token_hash links from our template on any device; ?code=
+  links from Supabase's default email in the same browser; old links that
+  land on "/" are forwarded). Supabase's built-in mailer sends only a few
+  emails an hour — custom SMTP through Postmark fixes that.
 
 ## Stack, commands, gotchas
 
@@ -490,7 +500,7 @@ be planned.
   `npm audit` still lists build and lint tooling (eslint, postcss, babel,
   browserslist); none of it runs where visitors can reach it. React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 421 checks in `tests/money.ts` (money math, CSV, calculator,
+- `npm test` = 430 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
   monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.

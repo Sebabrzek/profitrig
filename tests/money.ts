@@ -189,6 +189,7 @@ import {
   summarizeInvoices,
 } from "../src/lib/invoices";
 import { invoiceDay, invoiceLines, invoiceMoney, renderInvoicePdf, wrap, type InvoiceDoc } from "../src/lib/invoicePdf";
+import { confirmType, friendlyAuthError, isUnconfirmed, safeNext } from "../src/lib/authFlow";
 import { ScanDraftNotice } from "../src/app/loads/ScanDraftNotice";
 import {
   fuelEntryPresentation,
@@ -2417,6 +2418,62 @@ section("Invoicing: a load billed to the broker, without ever changing the load"
     "due date and total are worked out by the database, so they always agree",
     /due_date date generated always as \(invoice_date \+ net_days\) stored/.test(m022) &&
       /total numeric\(12, 2\) generated always as \(linehaul \+ fuel_surcharge \+ accessorials\) stored/.test(m022)
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+section("Signing up: a new account waits for its email, and says so");
+// ─────────────────────────────────────────────────────────────────────
+
+{
+  check(
+    "signing in before confirming is recognised, by code or by Supabase's wording",
+    isUnconfirmed({ code: "email_not_confirmed" }) && isUnconfirmed({ message: "Email not confirmed" }) &&
+      !isUnconfirmed({ code: "invalid_credentials" }) && !isUnconfirmed(null)
+  );
+  check(
+    "Supabase's refusals are said in a driver's words",
+    friendlyAuthError({ code: "invalid_credentials", message: "Invalid login credentials" }) === "That email and password don't match." &&
+      friendlyAuthError({ code: "email_not_confirmed" }).startsWith("Confirm your email first") &&
+      friendlyAuthError({ message: "User already registered" }).startsWith("There's already an account") &&
+      friendlyAuthError({ status: 429, message: "x" }).startsWith("Too many tries") &&
+      friendlyAuthError({ message: "Something odd" }) === "Something odd"
+  );
+  check(
+    "a confirmation link only ever lands on one of our own pages",
+    safeNext("/upgrade") === "/upgrade" && safeNext(null) === "/calculator" &&
+      safeNext("https://evil.com") === "/calculator" && safeNext("//evil.com") === "/calculator" &&
+      safeNext("/\\evil.com") === "/calculator"
+  );
+  check(
+    "only real confirmation link types are accepted",
+    confirmType("email") === "email" && confirmType("signup") === "signup" && confirmType("admin") === null && confirmType(null) === null
+  );
+  const actionsSrc = readFileSync("src/app/actions.ts", "utf8");
+  check(
+    "sign-up with no session yet says check your email, instead of sending them on as if signed in",
+    /if \(!data\.session\) \{\s*return \{ checkEmail: email \};/.test(actionsSrc) &&
+      actionsSrc.includes("emailRedirectTo: `${await siteOrigin()}/auth/confirm`")
+  );
+  check(
+    "the 7-day trial takes a card at checkout",
+    actionsSrc.includes('payment_method_collection: "always"') && !actionsSrc.includes('"if_required"')
+  );
+  const confirmSrc = readFileSync("src/app/auth/confirm/route.ts", "utf8");
+  check(
+    "the confirmation page proves the link before signing anyone in, and sends failures to sign-in",
+    confirmSrc.includes("verifyOtp({ type, token_hash: tokenHash })") && confirmSrc.includes("exchangeCodeForSession(code)") &&
+      confirmSrc.includes('redirect("/login?confirm=expired")')
+  );
+  check(
+    "a link from the old email that lands on the home page is passed on to the confirmation page",
+    readFileSync("src/lib/supabase/middleware.ts", "utf8").includes('url.pathname = "/auth/confirm"')
+  );
+  check(
+    "the branded email links to our own confirmation page, by token hash",
+    readFileSync("docs/email-templates/supabase-confirm-signup.html", "utf8").includes(
+      "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email"
+    )
   );
 }
 

@@ -3,8 +3,15 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { friendlyAuthError, isUnconfirmed } from "@/lib/authFlow";
 
-export type AuthState = { error?: string };
+export type AuthState = {
+  error?: string;
+  /** Signed up; the account waits for the link sent to this address. */
+  checkEmail?: string;
+  /** Tried to sign in before confirming: offer to send the link again. */
+  unconfirmed?: string;
+};
 
 export async function signInAction(
   _prev: AuthState,
@@ -21,7 +28,9 @@ export async function signInAction(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: error.message };
+    return isUnconfirmed(error)
+      ? { error: friendlyAuthError(error), unconfirmed: email }
+      : { error: friendlyAuthError(error) };
   }
 
   revalidatePath("/", "layout");
@@ -43,14 +52,48 @@ export async function signUpAction(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    // Where the confirmation link lands: it signs them in, then the Calculator.
+    options: { emailRedirectTo: `${await siteOrigin()}/auth/confirm` },
+  });
 
   if (error) {
-    return { error: error.message };
+    return { error: friendlyAuthError(error) };
+  }
+  // With "Confirm email" on there is no session yet: the account waits for
+  // the link. Say so — never send them on as if they were signed in.
+  if (!data.session) {
+    return { checkEmail: email };
   }
 
   revalidatePath("/", "layout");
   redirect("/calculator");
+}
+
+/**
+ * Send the confirmation link again. The answer is the same whether or not
+ * the address has an account waiting, so it can't be used to find out who
+ * has one.
+ */
+export async function resendConfirmationAction(
+  rawEmail: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return { ok: false, error: "That email address doesn't look right." };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: `${await siteOrigin()}/auth/confirm` },
+  });
+  if (error && (error.status === 429 || /rate limit/i.test(error.message))) {
+    return { ok: false, error: "A link was just sent. Wait a minute before asking for another." };
+  }
+  return { ok: true };
 }
 
 export async function signOutAction() {
@@ -984,7 +1027,10 @@ export async function createCheckoutAction(input: {
     },
     discounts: discounts.length > 0 ? discounts : undefined,
     allow_promotion_codes: discounts.length === 0 ? true : undefined,
-    payment_method_collection: "if_required",
+    // A card is taken to start the 7-day trial (Stripe's default for
+    // subscriptions), and charged only when the trial ends. It used to be
+    // if_required, which a free trial never is — so trials had no card.
+    payment_method_collection: "always",
     client_reference_id: user.id,
     success_url: `${origin}/loads?upgraded=1`,
     cancel_url: `${origin}/upgrade?canceled=1`,

@@ -13,7 +13,12 @@ import { Wordmark } from "@/components/Wordmark";
  * the system, and the engraved illustration deliberately stays away from
  * forms.
  */
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ confirm?: string }>;
+}) {
+  const { confirm } = await searchParams;
   return (
     <main className="min-h-screen bg-[var(--pr-bg)] lg:grid lg:grid-cols-[minmax(0,440px)_1fr]">
       <aside className="hidden lg:flex flex-col justify-between bg-[var(--pr-surface-dark)] text-white p-10">
@@ -39,7 +44,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-6 lg:hidden">
             <Wordmark size="md" />
           </div>
-          <LoginForm />
+          <LoginForm expiredLink={confirm === "expired"} />
         </div>
       </div>
     </main>
