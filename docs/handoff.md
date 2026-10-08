@@ -22,8 +22,9 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 
 ## Repository state (6 Oct 2026)
 
-- Production `main` = `origin/main` = `ab0cdc4` (8 Oct), live: invoicing
-  step 1, email-in (D3, Postmark set up and tested end to end), Next.js
+- Production `main` = `origin/main` = `aff698d` (8 Oct), live: the
+  sign-up fix ("check your email", /auth/confirm, card for the trial),
+  invoicing step 1, email-in (D3, Postmark set up and tested end to end), Next.js
   16.3.8, scanning (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
   every Pro driver, the PWA opening on /calculator, the ivory canvas, per
   diem by days on the road, Admin's shared CPM formula, and the read-only
@@ -34,14 +35,14 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
   downgrades at period end. It stays off the upgrade page until
   `STRIPE_PRICE_PRO_PLUS` is set in Vercel — Sebastian's call, suggested for
   when scanning ships.
-- **In review: `fix/signup-confirm`** — sign-up says "check your email",
-  a confirmation page at /auth/confirm, and a card required for the trial.
-  After merge, Sebastian sets up Supabase SMTP (Postmark) and pastes the
-  branded "Confirm signup" template (`docs/email-templates/`). Not merged.
-- **Parked: `feature/messages` (C1, Admin → Messages)** — local only, one
-  in-progress commit. Left to do: two lint errors in `admin/messages`
-  (draft restore sets state in an effect; `Date.now` in the page), tests
-  for `lib/messages`, handoff notes, then push. Needs migration 023.
+- **Sign-up set-up (Sebastian, after aff698d):** Supabase URL Configuration
+  (Site URL https://www.profitrig.com, Redirect URLs
+  https://www.profitrig.com/**), custom SMTP through Postmark
+  (smtp.postmarkapp.com:587, the Server API token as user and password,
+  noreply@profitrig.com as "ProfitRig"), and the "Confirm signup" template
+  from `docs/email-templates/supabase-confirm-signup.html`.
+- **In review: `feature/messages` (C1, Admin → Messages)** — needs
+  migration 023, then the set-up in the Messages section below. Not merged.
 - **Postmark** is approved (free tier, 100 emails a month), server
   "ProfitRig", profitrig.com verified (DKIM + Return-Path at GoDaddy). Move
   to a paid plan before invoices or email-in see real volume.
@@ -432,6 +433,45 @@ and scanning (D1) will cost far more per use than a chat question.
   "Company via ProfitRig", replies to the driver, copy to the driver),
   bounces shown. Needs Postmark's paid plan and a server token in Vercel.
 
+## Messages (C1) — what was decided, 8 Oct 2026
+
+- **Admin → Messages** (`/admin/messages`, linked from Admin): write an
+  announcement once; email it to an audience and/or show it as an in-app
+  banner. Preview, "Send test to me", then a confirm step. History shows
+  recipients, delivered, bounced, skipped, unsubscribed, failed. Drafts are
+  kept in the browser ("Restore last draft"). "Start from: October update"
+  loads the update written on 7 Oct.
+- **Who gets email** (`lib/messages` `wantsUpdates`): Pro drivers by default
+  (it's about the service they pay for); free users only if they ticked
+  "Send me ProfitRig emails"; anyone's own switch wins. Profile → "Emails
+  from ProfitRig" is that switch. Audiences: everyone who gets updates, Pro,
+  free opted-in, own authority, leased, Pro with no load in 14 days.
+  Recipients are always worked out on the server.
+- **Sending is Postmark's broadcast stream** (env `POSTMARK_SERVER_TOKEN`,
+  stream id `POSTMARK_BROADCAST_STREAM`, default "broadcast"), kept apart
+  from transactional mail. From "Sebastian at ProfitRig
+  <updates@profitrig.com>", replies to Sebastian. **Unsubscribes are
+  Postmark-managed** (`{{{ pm:unsubscribe }}}` + its one-click headers;
+  self-managed needs Postmark's approval). Postmark reports deliveries,
+  bounces, spam complaints and unsubscribes to `/api/email-events` (same
+  basic-auth secret as email-in); an unsubscribe or complaint turns the
+  driver's updates off. Turning them back on in Profile asks Postmark to
+  reactivate (never for a spam complaint).
+- **Every email carries the mailing address** set in Sender settings — the
+  law requires it on bulk email; sending is blocked without it.
+- **In-app banner**: one short line (≤ 280) for N days, for every signed-in
+  driver, fetched after the page shows; closing it closes it on every
+  device. Admin can take one down.
+- **Not yet**: scheduling (needs a cron — comes with the weekly email, C2),
+  the weekly "Your week" email (C2), open/click tracking.
+- **Set-up after merge**: migration 023; Postmark → ProfitRig → Create
+  message stream → Broadcasts, id "broadcast"; its Webhooks → add
+  https://postmark:SECRET@www.profitrig.com/api/email-events with Delivery,
+  Bounce, Spam complaint, Subscription change; `POSTMARK_SERVER_TOKEN` in
+  Vercel; Postmark's paid plan before sending to everyone; a note to
+  Postmark that we now send opted-in announcements; Sender settings in
+  Admin → Messages.
+
 ## Features asked for, not yet planned (3 Oct 2026)
 
 In Sebastian's rough order of interest. Each needs a decision before it can
@@ -500,11 +540,11 @@ be planned.
   `npm audit` still lists build and lint tooling (eslint, postcss, babel,
   browserslist); none of it runs where visitors can reach it. React 19, Tailwind v4, Supabase, Stripe,
   Anthropic SDK, Vercel deploying `main` of `github.com/Sebabrzek/profitrig`.
-- `npm test` = 430 checks in `tests/money.ts` (money math, CSV, calculator,
+- `npm test` = 448 checks in `tests/money.ts` (money math, CSV, calculator,
   nav, formatters, partials, alerts, the Ask ProfitRig guardrails, the
   monthly AI allowance and scanning).
 - Migrations: `supabase-migration-NNN.sql` at the repo root, run by hand.
-  Latest applied is **021** (7 Oct 2026); **022** is written, in review.
+  Latest applied is **022** (8 Oct 2026); **023** is written, in review.
   They are checked offline in PGlite before Sebastian runs them.
 - Local preview: `.claude/launch.json` → "profitrig", port 3000. Signed-in
   pages redirect to /login, so local checks only reach signed-out screens; a

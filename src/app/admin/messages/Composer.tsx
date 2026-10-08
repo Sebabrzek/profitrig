@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Card, CardHeader } from "@/components/ui/Surfaces";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
@@ -54,26 +54,27 @@ export function Composer({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  // A draft survives a reload in this browser — a convenience, nothing more.
-  useEffect(() => {
+  // A draft is kept in this browser as it's typed, and brought back on
+  // request — a convenience, nothing more.
+  const keep = (next: { subject?: string; body?: string; audience?: Audience }) => {
     try {
-      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "null");
-      if (d && typeof d === "object") {
-        setSubject(String(d.subject ?? ""));
-        setBody(String(d.body ?? ""));
-        if (AUDIENCES.includes(d.audience)) setAudience(d.audience);
-      }
-    } catch {
-      // nothing saved
-    }
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, body, audience }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, body, audience, ...next }));
     } catch {
       // private window
     }
-  }, [subject, body, audience]);
+  };
+  function restoreDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "null");
+      if (!d || typeof d !== "object" || (!d.subject && !d.body)) return setNote("No saved draft in this browser.");
+      setSubject(String(d.subject ?? ""));
+      setBody(String(d.body ?? ""));
+      if (AUDIENCES.includes(d.audience)) setAudience(d.audience);
+      setNote(null);
+    } catch {
+      setNote("No saved draft in this browser.");
+    }
+  }
 
   const html = useMemo(
     () => emailHtml({ bodyHtml: renderBody(personalize(body, previewName)), mailingAddress: mailingAddress || "Your mailing address" }),
@@ -95,21 +96,29 @@ export function Composer({
       <CardHeader
         title="New message"
         description="Write it once: email it to an audience, show it as a banner in the app, or both."
-        aside={
-          presets.length > 0 ? (
-            <span className="flex flex-wrap gap-2">
-              {presets.map((p) => (
-                <button key={p.label} type="button" className="pr-link text-sm" onClick={() => applyPreset(p)}>
-                  Start from: {p.label}
-                </button>
-              ))}
-            </span>
-          ) : undefined
-        }
+        className="mb-2"
       />
+      <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1">
+        {presets.map((p) => (
+          <button key={p.label} type="button" className="pr-link text-sm" onClick={() => applyPreset(p)}>
+            Start from: {p.label}
+          </button>
+        ))}
+        <button type="button" className="pr-link text-sm" onClick={restoreDraft}>
+          Restore last draft
+        </button>
+      </p>
       <div className="grid gap-4">
         <Field label="Subject">
-          <TextInput id="msg-subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} />
+          <TextInput
+            id="msg-subject"
+            value={subject}
+            onChange={(e) => {
+              setSubject(e.target.value);
+              keep({ subject: e.target.value });
+            }}
+            maxLength={150}
+          />
         </Field>
         <Field
           label="Message"
@@ -119,13 +128,23 @@ export function Composer({
             id="msg-body"
             className="pr-control min-h-[16rem] font-[var(--font-inter)]"
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              setBody(e.target.value);
+              keep({ body: e.target.value });
+            }}
             maxLength={20000}
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Who gets it">
-            <SelectInput id="msg-audience" value={audience} onChange={(e) => setAudience(e.target.value as Audience)}>
+            <SelectInput
+              id="msg-audience"
+              value={audience}
+              onChange={(e) => {
+                setAudience(e.target.value as Audience);
+                keep({ audience: e.target.value as Audience });
+              }}
+            >
               {AUDIENCES.map((a) => (
                 <option key={a} value={a}>
                   {AUDIENCE_LABEL[a]} ({counts[a] ?? 0})

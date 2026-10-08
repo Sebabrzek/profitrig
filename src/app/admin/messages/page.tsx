@@ -7,7 +7,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
 import { todayIsoIn } from "@/lib/loads";
-import { AUDIENCE_LABEL, DEFAULT_FROM_NAME, audienceCounts, checkMessageSettings, type Audience } from "@/lib/messages";
+import {
+  AUDIENCE_LABEL,
+  DEFAULT_FROM_NAME,
+  audienceCounts,
+  checkMessageSettings,
+  isShowing,
+  type Audience,
+} from "@/lib/messages";
 import { postmarkConfig } from "@/lib/postmark";
 import { Composer, EndBannerButton, SenderSettingsForm } from "./Composer";
 import { PRESETS } from "./presets";
@@ -80,10 +87,7 @@ export default async function MessagesPage() {
     if (r.unsubscribed_at) s.unsubscribed = (s.unsubscribed ?? 0) + 1;
     stats.set(String(r.campaign_id), s);
   }
-  const now = Date.now();
-  const showing = (bannersRes.data ?? []).filter(
-    (b) => new Date(String(b.starts_at)).getTime() <= now && new Date(String(b.ends_at)).getTime() > now
-  );
+  const showing = (bannersRes.data ?? []).filter((b) => isShowing(b, new Date()));
 
   return (
     <AppShell width="standard" account={account}>

@@ -124,15 +124,35 @@ const boldOnly = (s: string) => escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, "<stro
  * nothing a driver's name or a pasted snippet contains can become markup.
  */
 export function renderBody(text: string): string {
+  const isItem = (l: string) => /^\s*[-•]\s+/.test(l);
   const blocks = text.replace(/\r/g, "").trim().split(/\n{2,}/);
   return blocks
     .map((block) => {
-      const lines = block.split("\n").map((l) => l.trimEnd());
-      if (lines.every((l) => /^\s*[-•]\s+/.test(l))) {
-        const items = lines.map((l) => `<li style="margin:0 0 6px;">${inline(l.replace(/^\s*[-•]\s+/, ""))}</li>`);
-        return `<ul style="margin:0 0 16px;padding-left:22px;">${items.join("")}</ul>`;
+      // Runs of "- " lines become a list wherever they sit; the lines
+      // around them stay a paragraph.
+      const out: string[] = [];
+      let run: string[] = [];
+      let listRun = false;
+      const flush = () => {
+        if (run.length === 0) return;
+        out.push(
+          listRun
+            ? `<ul style="margin:0 0 16px;padding-left:22px;">${run
+                .map((l) => `<li style="margin:0 0 6px;">${inline(l.replace(/^\s*[-•]\s+/, ""))}</li>`)
+                .join("")}</ul>`
+            : `<p style="margin:0 0 16px;">${run.map(inline).join("<br>")}</p>`
+        );
+        run = [];
+      };
+      for (const line of block.split("\n").map((l) => l.trimEnd())) {
+        if (isItem(line) !== listRun) {
+          flush();
+          listRun = isItem(line);
+        }
+        run.push(line);
       }
-      return `<p style="margin:0 0 16px;">${lines.map(inline).join("<br>")}</p>`;
+      flush();
+      return out.join("");
     })
     .join("");
 }
@@ -153,7 +173,9 @@ export function renderText(text: string): string {
  */
 export function emailHtml({ bodyHtml, mailingAddress }: { bodyHtml: string; mailingAddress: string }): string {
   const address = escapeHtml(mailingAddress).replace(/\n/g, "<br>");
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#f9f5e9;">
+  // The character set is declared in the email itself: some mail apps ignore
+  // the header, and then an arrow or a "·" comes out garbled.
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#f9f5e9;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9f5e9;"><tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e2d8;border-radius:14px;">
 <tr><td style="padding:24px 28px 8px;font-family:Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;color:#173c2b;letter-spacing:-0.01em;">ProfitRig</td></tr>
@@ -206,6 +228,12 @@ export function defaultBanner(body: string): string {
   const first = renderText(personalize(body, "")).split(/\n{2,}/)[0] ?? "";
   const flat = first.replace(/^\s*hi\s+there\s*[,—-]?\s*/i, "").replace(/\s+/g, " ").trim();
   return flat.length <= MAX_BANNER ? flat : `${flat.slice(0, MAX_BANNER - 1).trimEnd()}…`;
+}
+
+/** Whether a banner is showing at a moment. */
+export function isShowing(b: { starts_at: unknown; ends_at: unknown }, at: Date): boolean {
+  const t = at.getTime();
+  return new Date(String(b.starts_at)).getTime() <= t && new Date(String(b.ends_at)).getTime() > t;
 }
 
 export type CampaignInput = {

@@ -190,6 +190,24 @@ import {
 } from "../src/lib/invoices";
 import { invoiceDay, invoiceLines, invoiceMoney, renderInvoicePdf, wrap, type InvoiceDoc } from "../src/lib/invoicePdf";
 import { confirmType, friendlyAuthError, isUnconfirmed, safeNext } from "../src/lib/authFlow";
+import {
+  FROM_ADDRESS,
+  audienceCounts,
+  batches,
+  buildMessage,
+  checkCampaign,
+  checkMessageSettings,
+  defaultBanner,
+  emailHtml,
+  emailText,
+  inAudience,
+  isShowing,
+  personalize,
+  renderBody,
+  renderText,
+  wantsUpdates,
+  type Person,
+} from "../src/lib/messages";
 import { ScanDraftNotice } from "../src/app/loads/ScanDraftNotice";
 import {
   fuelEntryPresentation,
@@ -2474,6 +2492,141 @@ section("Signing up: a new account waits for its email, and says so");
     readFileSync("docs/email-templates/supabase-confirm-signup.html", "utf8").includes(
       "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email"
     )
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+section("Messages: announcements reach who wants them, and nobody who opted out");
+// ─────────────────────────────────────────────────────────────────────
+
+{
+  check(
+    "Pro drivers get updates by default, free users only if they ticked 'Send me ProfitRig emails', and a driver's own switch wins",
+    wantsUpdates({ pro: true, marketingOptIn: false, productUpdates: null }) &&
+      !wantsUpdates({ pro: false, marketingOptIn: false, productUpdates: null }) &&
+      wantsUpdates({ pro: false, marketingOptIn: true, productUpdates: null }) &&
+      !wantsUpdates({ pro: true, marketingOptIn: true, productUpdates: false }) &&
+      wantsUpdates({ pro: false, marketingOptIn: false, productUpdates: true })
+  );
+  const person = (over: Partial<Person>): Person => ({
+    userId: "u", email: "d@example.com", firstName: "Dennis", pro: true, marketingOptIn: false,
+    authorityType: "own_mc", productUpdates: null, lastLoadDate: "2026-10-06", ...over,
+  });
+  const today = "2026-10-08";
+  const people = [
+    person({ userId: "1" }),
+    person({ userId: "2", authorityType: "leased", lastLoadDate: "2026-09-01" }),
+    person({ userId: "3", pro: false, marketingOptIn: true, lastLoadDate: null }),
+    person({ userId: "4", pro: false }),
+    person({ userId: "5", productUpdates: false }),
+    person({ userId: "6", email: "" }),
+  ];
+  const counts = audienceCounts(people, today);
+  check(
+    "audiences count only people who get updates — never the unsubscribed, never anyone without an email",
+    counts.all === 3 && counts.pro === 2 && counts.free === 1 && counts.own_authority === 2 && counts.leased === 1 && counts.inactive === 1 &&
+      !inAudience(people[4], "all", today) && !inAudience(people[5], "all", today) && !inAudience(people[3], "free", today)
+  );
+  check(
+    "inactive means a Pro driver with no load logged in 14 days",
+    inAudience(person({ lastLoadDate: "2026-09-24" }), "inactive", today) &&
+      !inAudience(person({ lastLoadDate: "2026-09-25" }), "inactive", today) &&
+      inAudience(person({ lastLoadDate: null }), "inactive", today) &&
+      !inAudience(person({ pro: false, marketingOptIn: true, lastLoadDate: null }), "inactive", today)
+  );
+  check(
+    "{{first_name}} becomes the driver's name, or 'there'",
+    personalize("Hi {{first_name}},", "Dennis") === "Hi Dennis," && personalize("Hi {{ First_Name }},", "  ") === "Hi there,"
+  );
+  const html = renderBody(personalize("Hi {{first_name}},\n\n**New:** scan a rate con.\n- one\n- two\n\nSee https://www.profitrig.com/loads and [Profile](https://www.profitrig.com/profile).\njavascript:alert(1)", "<b>Dennis</b>"));
+  check(
+    "the message becomes safe email HTML: paragraphs, bold, lists and https links only",
+    html.includes("<p style=\"margin:0 0 16px;\">Hi &lt;b&gt;Dennis&lt;/b&gt;,</p>") &&
+      html.includes("<strong>New:</strong>") &&
+      html.includes("<ul") && html.includes(">one</li>") &&
+      html.includes('href="https://www.profitrig.com/loads"') && html.includes(">Profile</a>") &&
+      !html.includes('href="javascript') && !html.includes("<b>Dennis</b>")
+  );
+  check(
+    "and as plain text, links spelled out",
+    renderText("See [Profile](https://www.profitrig.com/profile), **now**.") === "See Profile (https://www.profitrig.com/profile), now."
+  );
+  const page = emailHtml({ bodyHtml: "<p>x</p>", mailingAddress: "PO Box 1\nPalos Park, IL 60464" });
+  check(
+    "every announcement carries Postmark's unsubscribe link and the mailing address",
+    page.includes('href="{{{ pm:unsubscribe }}}"') && page.includes("PO Box 1<br>Palos Park, IL 60464") &&
+      page.includes('<meta charset="utf-8">') &&
+      emailText({ bodyText: "x", mailingAddress: "PO Box 1" }).includes("Unsubscribe: {{{ pm:unsubscribe }}}")
+  );
+  const msg = buildMessage(
+    { id: "c1", subject: "New for you, {{first_name}}", body: "Hi {{first_name}}" },
+    { userId: "u1", email: "d@example.com", firstName: "Dennis" },
+    { from_name: 'Sebastian "at" <ProfitRig>', reply_to: "seba@example.com", mailing_address: "PO Box 1" },
+    "broadcast"
+  );
+  check(
+    "one Postmark message per driver: from updates@profitrig.com, replies to Sebastian, on the broadcast stream",
+    msg.From === `Sebastian at ProfitRig <${FROM_ADDRESS}>` && msg.ReplyTo === "seba@example.com" && msg.To === "d@example.com" &&
+      msg.Subject === "New for you, Dennis" && msg.MessageStream === "broadcast" && msg.Metadata.campaign_id === "c1" &&
+      msg.TrackOpens === false && msg.HtmlBody.includes("Hi Dennis")
+  );
+  check("Postmark gets at most 500 a call", JSON.stringify(batches(Array.from({ length: 1201 }, (_, i) => i)).map((b) => b.length)) === "[500,500,201]");
+  check(
+    "the banner starts from the message's first paragraph, short",
+    defaultBanner("Hi {{first_name}}, three new things this month.\n\nMore below.") === "three new things this month." &&
+      defaultBanner("x".repeat(400)).length === 280
+  );
+  check(
+    "a send is checked first: subject, message, audience, and banner text when there's a banner",
+    checkCampaign({ subject: "S", body: "B", audience: "all" }).ok &&
+      !checkCampaign({ subject: "", body: "B", audience: "all" }).ok &&
+      !checkCampaign({ subject: "S", body: "", audience: "all" }).ok &&
+      !checkCampaign({ subject: "S", body: "B", audience: "everyone" }).ok &&
+      checkCampaign({ subject: "S", body: "", audience: "all", sendEmail: false, showInApp: true, bannerText: "Hi", bannerDays: 7 }).ok &&
+      !checkCampaign({ subject: "S", body: "B", audience: "all", sendEmail: false, showInApp: false }).ok &&
+      !checkCampaign({ subject: "S", body: "B", audience: "all", showInApp: true, bannerText: "" }).ok &&
+      !checkCampaign({ subject: "S", body: "B", audience: "all", showInApp: true, bannerText: "x", bannerDays: 90 }).ok
+  );
+  check(
+    "no email goes out without the mailing address the law requires",
+    !checkMessageSettings({ from_name: "S", mailing_address: "" }).ok &&
+      !checkMessageSettings({ from_name: "S", mailing_address: "PO Box 1", reply_to: "nope" }).ok &&
+      checkMessageSettings({ from_name: "S", mailing_address: "PO Box 1" }).ok
+  );
+  const at = new Date("2026-10-08T12:00:00Z");
+  check(
+    "a banner shows between its two dates",
+    isShowing({ starts_at: "2026-10-01T00:00:00Z", ends_at: "2026-10-15T00:00:00Z" }, at) &&
+      !isShowing({ starts_at: "2026-10-01T00:00:00Z", ends_at: "2026-10-08T11:00:00Z" }, at)
+  );
+
+  const sendSrc = readFileSync("src/app/admin/messages/actions.ts", "utf8");
+  check(
+    "who gets an announcement is worked out on the server, never taken from the browser",
+    sendSrc.includes("(await loadPeople(ctx.admin)).filter((p) => inAudience(p, c.audience, today))") &&
+      /isAdminEmail\(user\.email\)/.test(sendSrc)
+  );
+  const events = readFileSync("src/app/api/email-events/route.ts", "utf8");
+  check(
+    "only Postmark can report back, and an unsubscribe or spam complaint stops all future announcements",
+    events.indexOf("fromPostmark(request, secret)") < events.indexOf("request.json()") &&
+      events.includes("product_updates: false") && events.includes('case "SubscriptionChange"') && events.includes('case "SpamComplaint"')
+  );
+  check(
+    "Postmark and the banner reach their endpoints without being sent to the login page",
+    readFileSync("src/lib/supabase/middleware.ts", "utf8").includes('pathname.startsWith("/api/email-events")') &&
+      readFileSync("src/lib/supabase/middleware.ts", "utf8").includes('pathname.startsWith("/api/announcements")')
+  );
+  check(
+    "the banner shows only to signed-in drivers",
+    readFileSync("src/components/shell/AppShell.tsx", "utf8").includes("{signedIn && <AnnouncementBanner />}")
+  );
+  const m023 = readFileSync("supabase-migration-023.sql", "utf8");
+  check(
+    "drivers can't read campaigns, who they went to, or the sender settings",
+    /revoke all on public\.campaigns from anon, authenticated/.test(m023) &&
+      /revoke all on public\.campaign_recipients from anon, authenticated/.test(m023) &&
+      /revoke all on public\.message_settings from anon, authenticated/.test(m023)
   );
 }
 
