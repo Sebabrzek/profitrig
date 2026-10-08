@@ -30,6 +30,18 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+
+  // A confirmation link from Supabase's default email lands on the home page
+  // (the Site URL) carrying ?code= or ?token_hash=. Send it on to the page
+  // that signs the driver in, with everything it carried.
+  if (
+    pathname === "/" &&
+    (request.nextUrl.searchParams.has("code") || request.nextUrl.searchParams.has("token_hash"))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/confirm";
+    return NextResponse.redirect(url);
+  }
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/auth");
   // Stripe webhook is signature-verified and must stay reachable without
