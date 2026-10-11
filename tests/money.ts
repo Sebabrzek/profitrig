@@ -112,7 +112,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LoadLedger, LoadRecord, PartialRecord, TripLine } from "../src/app/loads/LoadRecord";
 import { RecordDeleteButton } from "../src/components/ui/Records";
 import { AskProfitRigButton } from "../src/components/shell/AskProfitRigButton";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   AI_BUDGET_NOTICE_AT_PERCENT,
   AI_MONTHLY_BUDGET_USD,
@@ -191,7 +191,9 @@ import {
 import { invoiceDay, invoiceLines, invoiceMoney, renderInvoicePdf, wrap, type InvoiceDoc } from "../src/lib/invoicePdf";
 import { confirmType, friendlyAuthError, isUnconfirmed, safeNext } from "../src/lib/authFlow";
 import {
+  EMAIL_SITE,
   FROM_ADDRESS,
+  alreadyGot,
   audienceCounts,
   batches,
   buildMessage,
@@ -202,6 +204,7 @@ import {
   emailText,
   inAudience,
   isShowing,
+  needsConfirmLink,
   personalize,
   renderBody,
   renderText,
@@ -2501,38 +2504,63 @@ section("Messages: announcements reach who wants them, and nobody who opted out"
 
 {
   check(
-    "Pro drivers get updates by default, free users only if they ticked 'Send me ProfitRig emails', and a driver's own switch wins",
-    wantsUpdates({ pro: true, marketingOptIn: false, productUpdates: null }) &&
-      !wantsUpdates({ pro: false, marketingOptIn: false, productUpdates: null }) &&
-      wantsUpdates({ pro: false, marketingOptIn: true, productUpdates: null }) &&
-      !wantsUpdates({ pro: true, marketingOptIn: true, productUpdates: false }) &&
-      wantsUpdates({ pro: false, marketingOptIn: false, productUpdates: true })
+    "everyone gets updates unless they said no — and a no always wins",
+    wantsUpdates({ productUpdates: null }) && wantsUpdates({ productUpdates: true }) && !wantsUpdates({ productUpdates: false })
   );
   const person = (over: Partial<Person>): Person => ({
-    userId: "u", email: "d@example.com", firstName: "Dennis", pro: true, marketingOptIn: false,
+    userId: "u", email: "d@example.com", firstName: "Dennis", pro: true, confirmed: true,
     authorityType: "own_mc", productUpdates: null, lastLoadDate: "2026-10-06", ...over,
   });
   const today = "2026-10-08";
   const people = [
     person({ userId: "1" }),
     person({ userId: "2", authorityType: "leased", lastLoadDate: "2026-09-01" }),
-    person({ userId: "3", pro: false, marketingOptIn: true, lastLoadDate: null }),
+    person({ userId: "3", pro: false, lastLoadDate: null }),
     person({ userId: "4", pro: false }),
     person({ userId: "5", productUpdates: false }),
     person({ userId: "6", email: "" }),
+    person({ userId: "7", confirmed: false }),
   ];
   const counts = audienceCounts(people, today);
   check(
-    "audiences count only people who get updates — never the unsubscribed, never anyone without an email",
-    counts.all === 3 && counts.pro === 2 && counts.free === 1 && counts.own_authority === 2 && counts.leased === 1 && counts.inactive === 1 &&
-      !inAudience(people[4], "all", today) && !inAudience(people[5], "all", today) && !inAudience(people[3], "free", today)
+    "audiences count everyone confirmed — never the unsubscribed, never anyone without an email, never an unconfirmed address",
+    counts.all === 4 && counts.pro === 2 && counts.free === 2 && counts.own_authority === 3 && counts.leased === 1 && counts.inactive === 1 &&
+      !inAudience(people[4], "all", today) && !inAudience(people[5], "all", today) && !inAudience(people[6], "all", today) &&
+      inAudience(people[3], "free", today),
+    JSON.stringify(counts)
+  );
+  const got = alreadyGot(
+    [
+      { campaign_id: "c1", user_id: "1", status: "delivered" },
+      { campaign_id: "c1", user_id: "2", status: "sent" },
+      { campaign_id: "c1", user_id: "3", status: "failed" },
+      { campaign_id: "c1", user_id: "4", status: "bounced" },
+      { campaign_id: "c0", user_id: "4", status: "delivered" },
+    ],
+    "c1"
+  );
+  const skipCounts = audienceCounts(people, today, got);
+  check(
+    "the next announcement can skip whoever the last one reached — a failed or bounced send didn't reach them",
+    got.has("1") && got.has("2") && !got.has("3") && !got.has("4") && skipCounts.all === 2 && skipCounts.pro === 0 && skipCounts.free === 2,
+    JSON.stringify(skipCounts)
+  );
+  const nowConfirm = new Date("2026-10-11T12:00:00Z");
+  check(
+    "a fresh sign-up link goes to someone who never confirmed — at most once a day — and never to someone who did",
+    needsConfirmLink({ email: "a@example.com", email_confirmed_at: null, confirmation_sent_at: "2026-06-01T10:00:00Z" }, nowConfirm) &&
+      needsConfirmLink({ email: "a@example.com" }, nowConfirm) &&
+      !needsConfirmLink({ email: "a@example.com", confirmation_sent_at: "2026-10-11T02:00:00Z" }, nowConfirm) &&
+      needsConfirmLink({ email: "a@example.com", confirmation_sent_at: "2026-10-10T11:59:00Z" }, nowConfirm) &&
+      !needsConfirmLink({ email: "a@example.com", email_confirmed_at: "2026-06-02T10:00:00Z" }, nowConfirm) &&
+      !needsConfirmLink({ email: "", confirmation_sent_at: null }, nowConfirm)
   );
   check(
     "inactive means a Pro driver with no load logged in 14 days",
     inAudience(person({ lastLoadDate: "2026-09-24" }), "inactive", today) &&
       !inAudience(person({ lastLoadDate: "2026-09-25" }), "inactive", today) &&
       inAudience(person({ lastLoadDate: null }), "inactive", today) &&
-      !inAudience(person({ pro: false, marketingOptIn: true, lastLoadDate: null }), "inactive", today)
+      !inAudience(person({ pro: false, lastLoadDate: null }), "inactive", today)
   );
   check(
     "{{first_name}} becomes the driver's name, or 'there'",
@@ -2557,6 +2585,21 @@ section("Messages: announcements reach who wants them, and nobody who opted out"
     page.includes('href="{{{ pm:unsubscribe }}}"') && page.includes("PO Box 1<br>Palos Park, IL 60464") &&
       page.includes('<meta charset="utf-8">') &&
       emailText({ bodyText: "x", mailingAddress: "PO Box 1" }).includes("Unsubscribe: {{{ pm:unsubscribe }}}")
+  );
+  const pictures = ["brand/email/profitrig-lockup-reversed-480.png", "brand/email/truck-1040.jpg"];
+  check(
+    "the email wears the approved logo and truck, from full addresses a mail app can load, and the pictures exist",
+    EMAIL_SITE === "https://www.profitrig.com" &&
+      pictures.every((f) => page.includes(`src="${EMAIL_SITE}/${f}"`) && existsSync(`public/${f}`)) &&
+      page.includes('alt="ProfitRig"') && page.includes("background:#16a34a") &&
+      emailHtml({ bodyHtml: "", mailingAddress: "x", assetBase: "" }).includes('src="/brand/email/truck-1040.jpg"')
+  );
+  const confirmTpl = readFileSync("docs/email-templates/supabase-confirm-signup.html", "utf8");
+  check(
+    "the sign-up email: same frame, a link that works on any device, and no 'just' for someone who signed up in June",
+    confirmTpl.includes('href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email"') &&
+      pictures.every((f) => confirmTpl.includes(`{{ .SiteURL }}/${f}`)) &&
+      !/just (created|signed)/i.test(confirmTpl) && confirmTpl.includes("WHAT'S INSIDE")
   );
   const msg = buildMessage(
     { id: "c1", subject: "New for you, {{first_name}}", body: "Hi {{first_name}}" },
@@ -2603,8 +2646,19 @@ section("Messages: announcements reach who wants them, and nobody who opted out"
   const sendSrc = readFileSync("src/app/admin/messages/actions.ts", "utf8");
   check(
     "who gets an announcement is worked out on the server, never taken from the browser",
-    sendSrc.includes("(await loadPeople(ctx.admin)).filter((p) => inAudience(p, c.audience, today))") &&
+    sendSrc.includes("(await loadPeople(ctx.admin)).filter((p) => inAudience(p, c.audience, today) && !skip.has(p.userId))") &&
       /isAdminEmail\(user\.email\)/.test(sendSrc)
+  );
+  const linksSrc = sendSrc.slice(sendSrc.indexOf("export async function sendConfirmLinksAction"));
+  check(
+    "fresh sign-up links: admins only, only people who never confirmed, at most once a day each",
+    linksSrc.indexOf("requireAdmin()") > 0 && linksSrc.indexOf("requireAdmin()") < linksSrc.indexOf("listUsers") &&
+      linksSrc.includes("needsConfirmLink(u, now)") && linksSrc.includes('type: "signup"')
+  );
+  check(
+    "Profile has one switch for ProfitRig's news, not two",
+    !readFileSync("src/app/profile/ProfileForm.tsx", "utf8").includes("Send me ProfitRig emails") &&
+      readFileSync("src/app/profile/page.tsx", "utf8").includes("<EmailPreferencesCard")
   );
   const events = readFileSync("src/app/api/email-events/route.ts", "utf8");
   check(

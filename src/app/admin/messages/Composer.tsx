@@ -16,7 +16,7 @@ import {
   renderBody,
   type Audience,
 } from "@/lib/messages";
-import { endAnnouncementAction, saveMessageSettingsAction, sendCampaignAction, sendTestAction } from "./actions";
+import { endAnnouncementAction, saveMessageSettingsAction, sendCampaignAction, sendConfirmLinksAction, sendTestAction } from "./actions";
 
 export type Preset = { label: string; subject: string; body: string; banner: string };
 
@@ -29,12 +29,17 @@ const DRAFT_KEY = "pr.admin.compose.v1";
  */
 export function Composer({
   counts,
+  countsSkipping,
+  lastCampaign,
   ready,
   previewName,
   mailingAddress,
   presets,
 }: {
   counts: Record<Audience, number>;
+  /** The same, leaving out whoever the last announcement already reached. */
+  countsSkipping: Record<Audience, number>;
+  lastCampaign: { id: string; subject: string } | null;
   /** Postmark token and sender settings are in place. */
   ready: boolean;
   previewName: string;
@@ -44,6 +49,7 @@ export function Composer({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState<Audience>("all");
+  const [skipLast, setSkipLast] = useState(true);
   const [sendEmail, setSendEmail] = useState(true);
   const [showInApp, setShowInApp] = useState(false);
   const [bannerText, setBannerText] = useState("");
@@ -76,12 +82,30 @@ export function Composer({
     }
   }
 
+  // The preview loads the pictures from this site, so it works before they
+  // reach production; the real email always points at profitrig.com.
   const html = useMemo(
-    () => emailHtml({ bodyHtml: renderBody(personalize(body, previewName)), mailingAddress: mailingAddress || "Your mailing address" }),
+    () =>
+      emailHtml({
+        bodyHtml: renderBody(personalize(body, previewName)),
+        mailingAddress: mailingAddress || "Your mailing address",
+        assetBase: "",
+      }),
     [body, previewName, mailingAddress]
   );
-  const count = counts[audience] ?? 0;
-  const input = { subject, body, audience, sendEmail, showInApp, bannerText, bannerDays: Number(bannerDays) };
+  const skipping = Boolean(lastCampaign) && skipLast;
+  const shown = skipping ? countsSkipping : counts;
+  const count = shown[audience] ?? 0;
+  const input = {
+    subject,
+    body,
+    audience,
+    sendEmail,
+    showInApp,
+    bannerText,
+    bannerDays: Number(bannerDays),
+    skipCampaignId: skipping ? lastCampaign!.id : null,
+  };
 
   function applyPreset(p: Preset) {
     setSubject(p.subject);
@@ -147,10 +171,18 @@ export function Composer({
             >
               {AUDIENCES.map((a) => (
                 <option key={a} value={a}>
-                  {AUDIENCE_LABEL[a]} ({counts[a] ?? 0})
+                  {AUDIENCE_LABEL[a]} ({shown[a] ?? 0})
                 </option>
               ))}
             </SelectInput>
+            {lastCampaign && sendEmail && (
+              <label className="mt-2 flex items-start gap-2 text-sm">
+                <input id="msg-skip-last" type="checkbox" className="mt-1" checked={skipLast} onChange={(e) => setSkipLast(e.target.checked)} />
+                <span>
+                  Skip anyone who already got &ldquo;{lastCampaign.subject}&rdquo;
+                </span>
+              </label>
+            )}
           </Field>
           <div className="flex flex-col justify-end gap-2 text-sm">
             <label className="flex items-center gap-2">
@@ -233,7 +265,9 @@ export function Composer({
         ) : (
           <Notice title="Ready to send?">
             <p>
-              {sendEmail ? `Email "${subject || "(no subject)"}" to ${count} driver${count === 1 ? "" : "s"} (${AUDIENCE_LABEL[audience]}).` : ""}
+              {sendEmail
+                ? `Email "${subject || "(no subject)"}" to ${count} driver${count === 1 ? "" : "s"} (${AUDIENCE_LABEL[audience]}${skipping ? ", leaving out anyone who got the last one" : ""}).`
+                : ""}
               {showInApp ? ` Show the banner to every signed-in driver for ${bannerDays} days.` : ""} This can&apos;t be undone.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
@@ -275,6 +309,73 @@ export function Composer({
           <p className="text-xs text-muted">Sending is off until the setup above is done. You can still preview and show a banner.</p>
         )}
       </div>
+    </Card>
+  );
+}
+
+/**
+ * People who signed up but never confirmed their email have never been in
+ * the app. One button sends each of them a fresh sign-up link — at most once
+ * a day per person — instead of news they can't use yet.
+ */
+export function ConfirmLinksCard({ unconfirmed, due }: { unconfirmed: number; due: number }) {
+  const [confirming, setConfirming] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const people = (n: number) => `${n} ${n === 1 ? "person" : "people"}`;
+  return (
+    <Card>
+      <CardHeader
+        title={`${people(unconfirmed)} never confirmed their email`}
+        description="They signed up but never got in, so they don't get announcements. Send them a fresh sign-up link instead: one tap confirms their email and opens ProfitRig."
+      />
+      {error && <Notice tone="error" className="mb-3">{error}</Notice>}
+      {note && <Notice className="mb-3">{note}</Notice>}
+      {due === 0 ? (
+        <p className="text-sm text-muted">Everyone here was sent a link in the last day. You can send again tomorrow.</p>
+      ) : !confirming ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="dark" onClick={() => { setError(null); setNote(null); setConfirming(true); }}>
+            Send {people(due)} a new link…
+          </Button>
+          {due < unconfirmed && <span className="text-sm text-muted">{unconfirmed - due} got one in the last day.</span>}
+        </div>
+      ) : (
+        <Notice title="Send the links?">
+          <p>
+            {people(due)} will get ProfitRig&apos;s &ldquo;Confirm your email&rdquo; email, with a fresh link. Make sure the new
+            email design is pasted into Supabase first.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button
+              variant="primary"
+              pending={pending}
+              onClick={() =>
+                start(async () => {
+                  const r = await sendConfirmLinksAction();
+                  setConfirming(false);
+                  if (!r.ok) return setError(r.error);
+                  setNote(
+                    [
+                      `Sent ${r.sent}.`,
+                      r.waiting ? `${r.waiting} waiting — Supabase's hourly email limit was reached. Send again in an hour.` : "",
+                      r.failed ? `${r.failed} couldn't be sent.` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  );
+                })
+              }
+            >
+              Yes, send them
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirming(false)}>
+              Not yet
+            </Button>
+          </div>
+        </Notice>
+      )}
     </Card>
   );
 }

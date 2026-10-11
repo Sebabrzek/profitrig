@@ -5,13 +5,13 @@ import type { Person } from "@/lib/messages";
 
 /**
  * Everyone with an account, as the Messages tab needs them: email, first
- * name, plan, the "Send me ProfitRig emails" box, how they're paid, their
+ * name, plan, whether they confirmed their email, how they're paid, their
  * own email switch, and when they last logged a load. Service role only.
  */
 export async function loadPeople(admin: SupabaseClient): Promise<Person[]> {
   const [{ data: usersData }, profiles, subs, prefs, loads] = await Promise.all([
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-    admin.from("driver_profiles").select("user_id,first_name,marketing_opt_in,authority_type"),
+    admin.from("driver_profiles").select("user_id,first_name,authority_type"),
     admin.from("subscriptions").select("*"),
     admin.from("email_preferences").select("user_id,product_updates"),
     admin.from("loads").select("user_id,load_date").order("load_date", { ascending: false }),
@@ -32,7 +32,7 @@ export async function loadPeople(admin: SupabaseClient): Promise<Person[]> {
       email: u.email ?? "",
       firstName: String(p?.first_name ?? ""),
       pro: isPro(subBy.get(u.id) ?? null),
-      marketingOptIn: Boolean(p?.marketing_opt_in),
+      confirmed: Boolean(u.email_confirmed_at),
       authorityType: String(p?.authority_type ?? ""),
       productUpdates: pref && typeof pref.product_updates === "boolean" ? pref.product_updates : null,
       lastLoadDate: lastLoad.get(u.id) ?? null,

@@ -1,6 +1,6 @@
 # ProfitRig — handoff
 
-Updated 6 Oct 2026. **Read this first in any new session.**
+Updated 11 Oct 2026. **Read this first in any new session.**
 
 ## Start of a new session: do not code
 
@@ -20,16 +20,33 @@ live. Every screen, signed in and signed out, is now on the system. What
 follows is Sebastian's call, and the business work is the carrier-pay order
 at the bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (6 Oct 2026)
+## Repository state (11 Oct 2026)
 
-- Production `main` = `origin/main` = `aff698d` (8 Oct), live: the
-  sign-up fix ("check your email", /auth/confirm, card for the trial),
-  invoicing step 1, email-in (D3, Postmark set up and tested end to end), Next.js
-  16.3.8, scanning (D1), the monthly AI allowance (D0), in-app alerts (Phase B), partials for
-  every Pro driver, the PWA opening on /calculator, the ivory canvas, per
-  diem by days on the road, Admin's shared CPM formula, and the read-only
-  Admin page per driver with an Email draft. Migrations 017–022 are
-  applied. `git log --oneline -3` is the truth; this file is a summary.
+- Production `main` = `origin/main` = `78b579d` (8 Oct), live: Admin →
+  Messages (C1), the sign-up fix ("check your email", /auth/confirm, card for
+  the trial), invoicing step 1, email-in (D3, Postmark set up and tested end to
+  end), Next.js 16.3.8, scanning (D1), the monthly AI allowance (D0), in-app
+  alerts (Phase B), partials for every Pro driver, the PWA opening on
+  /calculator, the ivory canvas, per diem by days on the road, Admin's shared
+  CPM formula, and the read-only Admin page per driver with an Email draft.
+  Migrations 017–023 are applied. `git log --oneline -3` is the truth; this
+  file is a summary.
+- **In review: `feature/updates-for-everyone`** — product updates for
+  everyone confirmed unless they said no, fresh sign-up links for the 20 who
+  never confirmed, "skip anyone who already got the last one", and both
+  emails in the new branding. No migration. See "Updates for everyone" below.
+- **The October update went out 9 Oct** to the 10 drivers who got updates
+  then (10 sent, 0 failed).
+- **Official address: team@profitrig.com.** profitrig.com is a secondary
+  domain in Sebastian's Google Workspace (truckingbusiness.com); team@ is an
+  alias on his own account, Gmail "Send mail as" is set, and it is the
+  reply-to in Admin → Messages → Sender settings. Google's MX and SPF records
+  for profitrig.com are at GoDaddy; in.profitrig.com (email-in) is separate
+  and untouched. Google DKIM for profitrig.com is NOT set up yet (Apps →
+  Gmail → Authenticate email) — only affects mail he sends from Gmail.
+- **Sign-ups:** 50, of whom 30 confirmed and 20 never did (1 Jun – 8 Oct;
+  none has a name or a load — they never got in). Admin's own Messages page
+  shows the live count.
 - **Pro Plus is created in Stripe** ($19.99/mo, its own product) and the
   Customer portal lets plans switch, prorated and charged immediately,
   downgrades at period end. It stays off the upgrade page until
@@ -41,11 +58,11 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
   (smtp.postmarkapp.com:587, the Server API token as user and password,
   noreply@profitrig.com as "ProfitRig"), and the "Confirm signup" template
   from `docs/email-templates/supabase-confirm-signup.html`.
-- **In review: `feature/messages` (C1, Admin → Messages)** — needs
-  migration 023, then the set-up in the Messages section below. Not merged.
 - **Postmark** is approved (free tier, 100 emails a month), server
-  "ProfitRig", profitrig.com verified (DKIM + Return-Path at GoDaddy). Move
-  to a paid plan before invoices or email-in see real volume.
+  "ProfitRig", profitrig.com verified (DKIM + Return-Path at GoDaddy), a
+  Broadcasts stream (id `broadcast`) with its webhook verified, and Sebastian
+  told Postmark support about announcements. Move to a paid plan before the
+  weekly email, invoices by email, or more volume.
 - **The money button is PAUSED.** Sebastian has rejected the crossed lathe,
   the dollar wave, a banknote border and a scroll, and is not settled on a
   direction. Do not raise it until he does. `+ Add a Load` keeps production's
@@ -116,6 +133,9 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Security — Next.js 16.2.6 → 16.3.8 | `c3f36e7` | live; not exposed to the headline middleware bypass (needs one `i18n` locale) |
 | D3 — email-in; scanner notes about money only | `24d49fd`, `2a1063b` | live (migration 021 applied), 380 → 399 checks; Postmark inbound live |
 | Invoicing step 1 | `ab0cdc4` | live (migration 022 applied), 399 → 421 checks |
+| Sign-up fix — "check your email", /auth/confirm, card for the trial | `aff698d` | live |
+| C1 — Admin → Messages: announcements by email and in the app | `78b579d` | live (migration 023 applied), 421 → 448 checks |
+| Updates for everyone; fresh sign-up links; emails in the new branding | — | on `feature/updates-for-everyone`, in review, 448 → 454 checks |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -441,12 +461,11 @@ and scanning (D1) will cost far more per use than a chat question.
   recipients, delivered, bounced, skipped, unsubscribed, failed. Drafts are
   kept in the browser ("Restore last draft"). "Start from: October update"
   loads the update written on 7 Oct.
-- **Who gets email** (`lib/messages` `wantsUpdates`): Pro drivers by default
-  (it's about the service they pay for); free users only if they ticked
-  "Send me ProfitRig emails"; anyone's own switch wins. Profile → "Emails
-  from ProfitRig" is that switch. Audiences: everyone who gets updates, Pro,
-  free opted-in, own authority, leased, Pro with no load in 14 days.
-  Recipients are always worked out on the server.
+- **Who gets email** (`lib/messages` `wantsUpdates`): changed 11 Oct — see
+  "Updates for everyone" below. Profile → "Emails from ProfitRig" is the
+  driver's switch. Audiences: everyone who gets updates, Pro, free, own
+  authority, leased, Pro with no load in 14 days. Recipients are always
+  worked out on the server.
 - **Sending is Postmark's broadcast stream** (env `POSTMARK_SERVER_TOKEN`,
   stream id `POSTMARK_BROADCAST_STREAM`, default "broadcast"), kept apart
   from transactional mail. From "Sebastian at ProfitRig
@@ -471,6 +490,50 @@ and scanning (D1) will cost far more per use than a chat question.
   Vercel; Postmark's paid plan before sending to everyone; a note to
   Postmark that we now send opted-in announcements; Sender settings in
   Admin → Messages.
+
+## Updates for everyone — what was decided, 11 Oct 2026
+
+Sebastian wanted every driver to hear about new features, and found that
+the drivers who signed up while Supabase's own unbranded email was in use
+mostly never confirmed, so never got in.
+
+- **Everyone confirmed gets updates unless they said no.** No answer means
+  yes (`wantsUpdates`). An unsubscribe, a spam complaint, or the Profile
+  switch turned off is a no that always wins and is never undone for them.
+  It is a rule in code — no data was changed. The old "Send me ProfitRig
+  emails" box on Profile is gone (the `marketing_opt_in` column stays,
+  unused); Profile → "Emails from ProfitRig" is the one switch, on by
+  default. The sign-up card says new-feature emails come, and where to turn
+  them off. Admin's tile and column show "Get updates" by the same rule.
+- **Unconfirmed sign-ups never get announcements** — they've never been in
+  the app, and an unconfirmed address may be a typo (bounces hurt the
+  Postmark account that also sends sign-up emails). Admin → Messages shows
+  how many there are and **"Send them a new link"**: Supabase's "Confirm
+  signup" email, resent through Postmark, at most once a day per person
+  (`needsConfirmLink`, using Supabase's `confirmation_sent_at`). Supabase's
+  hourly email limit stops a run politely; the rest go next time.
+- **No double sends:** the composer's "Skip anyone who already got [the last
+  emailed announcement]" (on by default) leaves out whoever it was sent or
+  delivered to; a failed or bounced send doesn't count.
+- **The new branding in both emails** (`emailFrame`): the approved reversed
+  lockup on a Rig Green band, the homepage's engraved truck on the paper
+  canvas, the content on white, a Profit Green button, the tagline in the
+  footer. The pictures (`public/brand/email/`) are the approved artwork with
+  the background filled in — made with sharp from
+  `public/brand/profitrig-horizontal-reversed.svg` (480 px, on #173c2b) and
+  `public/brand/hero4-truck-1400.webp` (1040 px JPEG, on #f9f5e9) — so
+  dark-mode mail apps can't hide them. Mail apps can't load our fonts; text
+  falls back to Helvetica/Arial. Admin's preview loads the pictures from
+  the site it runs on; real emails always use www.profitrig.com.
+- **The sign-up email** (`docs/email-templates/supabase-confirm-signup.html`)
+  has the same frame, wording that suits someone who signed up in June
+  (never "just"), and a "What's inside" list. New subject: "Confirm your
+  email to get into ProfitRig".
+- **Set-up after merge (Sebastian):** paste the new template and subject into
+  Supabase → Authentication → Email Templates → Confirm signup; then Admin →
+  Messages → "Send them a new link"; then the October update to everyone
+  else, with "Skip anyone who already got…" ticked. About 40 emails — inside
+  Postmark's free 100 this month.
 
 ## Features asked for, not yet planned (3 Oct 2026)
 

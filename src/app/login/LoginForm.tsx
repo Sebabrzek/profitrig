@@ -116,7 +116,8 @@ export function LoginForm({ expiredLink = false }: { expiredLink?: boolean }) {
         {mode === "signup" && (
           <p className="text-xs text-muted text-center leading-snug">
             By signing up you create a free ProfitRig account. Your numbers
-            stay private to you.
+            stay private to you. We&apos;ll email you when ProfitRig gets new
+            features; turn that off anytime in Profile.
           </p>
         )}
       </form>

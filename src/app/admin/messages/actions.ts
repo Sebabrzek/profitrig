@@ -6,10 +6,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
 import { todayIsoIn } from "@/lib/loads";
 import {
+  EMAIL_SITE,
+  alreadyGot,
   buildMessage,
   checkCampaign,
   checkMessageSettings,
   inAudience,
+  needsConfirmLink,
   type MessageSettings,
 } from "@/lib/messages";
 import { isSuppressed, postmarkConfig, sendBatch } from "@/lib/postmark";
@@ -77,7 +80,8 @@ export async function sendTestAction(raw: Record<string, unknown>): Promise<Resu
 /**
  * Send an announcement to an audience, and/or show it as an in-app banner.
  * Who gets it is worked out here, never taken from the browser, and nobody
- * who opted out is ever included.
+ * who opted out is ever included. With `skipCampaignId`, anyone that earlier
+ * announcement reached is left out, so nobody gets the same news twice.
  */
 export async function sendCampaignAction(
   raw: Record<string, unknown>
@@ -100,8 +104,18 @@ export async function sendCampaignAction(
     const settings: MessageSettings | null = await readySettings(ctx.admin);
     if (!settings) return { ok: false, error: "Fill in Sender settings first — the mailing address is required." };
     const today = todayIsoIn("America/Chicago");
-    const recipients = (await loadPeople(ctx.admin)).filter((p) => inAudience(p, c.audience, today));
-    if (recipients.length === 0) return { ok: false, error: "Nobody in that audience gets updates." };
+    let skip = new Set<string>();
+    const skipId = typeof raw?.skipCampaignId === "string" ? raw.skipCampaignId : "";
+    if (/^[0-9a-f-]{36}$/i.test(skipId)) {
+      const { data: got, error: gotError } = await ctx.admin
+        .from("campaign_recipients")
+        .select("campaign_id,user_id,status")
+        .eq("campaign_id", skipId);
+      if (gotError) return { ok: false, error: "Couldn't check who already got the last one. Try again." };
+      skip = alreadyGot(got ?? [], skipId);
+    }
+    const recipients = (await loadPeople(ctx.admin)).filter((p) => inAudience(p, c.audience, today) && !skip.has(p.userId));
+    if (recipients.length === 0) return { ok: false, error: "Nobody in that audience is left to send to." };
 
     const { data: campaign, error } = await ctx.admin
       .from("campaigns")
@@ -164,4 +178,40 @@ export async function endAnnouncementAction(id: string): Promise<Result> {
   if (error) return { ok: false, error: "Couldn't take it down. Try again." };
   revalidatePath("/admin/messages");
   return { ok: true };
+}
+
+/**
+ * A fresh sign-up link for everyone who signed up but never confirmed their
+ * email — Supabase's "Confirm signup" email, ProfitRig's own design, sent
+ * through Postmark. One tap confirms them and opens the app. Nobody gets more
+ * than one a day (needsConfirmLink), and Supabase's hourly email limit stops
+ * the run politely: whoever didn't get one yet gets it next time.
+ */
+export async function sendConfirmLinksAction(): Promise<Result<{ sent: number; waiting: number; failed: number }>> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { ok: false, error: "Admins only." };
+  const { data, error } = await ctx.admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) return { ok: false, error: "Couldn't read the sign-ups. Try again." };
+  const now = new Date();
+  const due = (data?.users ?? []).filter((u) => needsConfirmLink(u, now));
+  if (due.length === 0) return { ok: false, error: "Nobody is waiting for a link right now." };
+
+  let sent = 0;
+  let failed = 0;
+  let limited = false;
+  // A few at a time: Supabase sends each one while we wait.
+  for (let i = 0; i < due.length && !limited; i += 4) {
+    const results = await Promise.all(
+      due.slice(i, i + 4).map((u) =>
+        ctx.admin.auth.resend({ type: "signup", email: u.email!, options: { emailRedirectTo: `${EMAIL_SITE}/auth/confirm` } })
+      )
+    );
+    for (const { error: e } of results) {
+      if (!e) sent++;
+      else if (e.status === 429 || /rate limit/i.test(e.message)) limited = true;
+      else failed++;
+    }
+  }
+  revalidatePath("/admin/messages");
+  return { ok: true, sent, waiting: due.length - sent - failed, failed };
 }

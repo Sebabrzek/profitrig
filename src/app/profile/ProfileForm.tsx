@@ -392,27 +392,6 @@ export function ProfileForm({
         </div>
       </Card>
 
-      <Card>
-        <CardHeader title="Stay in touch" />
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            className="mt-1 h-5 w-5 rounded border-border accent-[var(--pr-rig-green)]"
-            checked={p.marketing_opt_in}
-            onChange={(e) =>
-              setP((s) => ({ ...s, marketing_opt_in: e.target.checked }))
-            }
-          />
-          <span className="text-sm">
-            <span className="font-semibold">Send me ProfitRig emails</span>
-            <br />
-            <span className="text-muted">
-              Tips, rate updates, and occasional offers. Unsubscribe anytime.
-            </span>
-          </span>
-        </label>
-      </Card>
-
       <ActionBar
         tone={saved === "ok" ? "success" : saved ? "error" : "default"}
         status={

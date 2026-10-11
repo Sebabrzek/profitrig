@@ -1,41 +1,76 @@
 <!--
   Supabase → Authentication → Email Templates → "Confirm signup"
-  Subject: Confirm your ProfitRig account
+  Subject: Confirm your email to get into ProfitRig
 
   Paste everything below this comment into the message body. The link goes
   to ProfitRig's own /auth/confirm page, which signs the driver in on any
-  device and opens the Calculator. Only change it after the code that adds
-  /auth/confirm is live.
+  device and opens the Calculator.
+
+  The same email goes to a brand-new sign-up and to someone who signed up
+  weeks ago and never confirmed (Admin → Messages → "Send them a new link"),
+  so the wording never says "just".
+
+  The frame matches every ProfitRig email (emailFrame in src/lib/messages.ts):
+  the approved logo on Rig Green, the engraved truck on the paper canvas, and
+  a Profit Green button. The pictures load from {{ .SiteURL }}/brand/email/,
+  so paste this only after those files are live on www.profitrig.com.
 -->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9f5e9;">
   <tr>
     <td align="center" style="padding:24px 12px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e5e2d8;border-radius:14px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e2d8;border-radius:14px;border-collapse:separate;">
         <tr>
-          <td style="padding:24px 28px 4px;font-family:Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;color:#173c2b;">ProfitRig</td>
+          <td bgcolor="#173c2b" style="background:#173c2b;padding:20px 28px;border-radius:13px 13px 0 0;">
+            <img src="{{ .SiteURL }}/brand/email/profitrig-lockup-reversed-480.png" width="240" alt="ProfitRig" style="display:block;width:240px;max-width:100%;height:auto;border:0;color:#f6f7f4;font-family:Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;">
+          </td>
         </tr>
         <tr>
-          <td style="padding:12px 28px 4px;font-family:Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;line-height:1.25;color:#173c2b;">Confirm your email to finish signing up</td>
+          <td bgcolor="#f9f5e9" style="background:#f9f5e9;padding:12px 20px 0;">
+            <img src="{{ .SiteURL }}/brand/email/truck-1040.jpg" width="520" alt="" style="display:block;width:100%;max-width:520px;height:auto;border:0;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 28px 4px;font-family:Helvetica,Arial,sans-serif;font-size:24px;font-weight:800;line-height:1.25;color:#173c2b;">
+            Confirm your email and you're in
+          </td>
         </tr>
         <tr>
           <td style="padding:8px 28px 20px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#1f2937;">
-            You just created a ProfitRig account for {{ .Email }}. Tap the button and you're in.
+            You signed up for ProfitRig with {{ .Email }}. Tap the button to confirm it's you, and ProfitRig opens.
           </td>
         </tr>
         <tr>
-          <td style="padding:0 28px 24px;">
-            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email" style="display:inline-block;background:#173c2b;color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:700;font-size:16px;text-decoration:none;padding:13px 22px;border-radius:10px;">Confirm my email</a>
+          <td style="padding:0 28px 28px;">
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email" style="display:inline-block;background:#16a34a;color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:700;font-size:17px;text-decoration:none;padding:13px 22px;border-radius:10px;">Confirm and open ProfitRig</a>
           </td>
         </tr>
         <tr>
-          <td style="padding:0 28px 24px;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#667085;">
+          <td style="padding:20px 28px 8px;border-top:1px solid #e5e2d8;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.12em;color:#173c2b;">
+            WHAT'S INSIDE
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:4px 28px 8px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1f2937;">
+            <ul style="margin:0 0 12px;padding-left:22px;">
+              <li style="margin:0 0 8px;"><strong>Your real cost per mile</strong>, and the lowest rate you can haul for without losing money.</li>
+              <li style="margin:0 0 8px;"><strong>Profit on every load</strong>, after fuel, tolls and your share of the monthly bills.</li>
+              <li style="margin:0 0 8px;"><strong>Scan a rate con</strong>, or forward it by email, and ProfitRig fills in the load for you to check.</li>
+              <li style="margin:0 0 8px;"><strong>Invoice a broker</strong> in a minute, with the rate con and BOL attached.</li>
+              <li style="margin:0 0 8px;"><strong>Ask ProfitRig</strong>, your AI guide, when a number doesn't make sense. Plain English, any time.</li>
+            </ul>
+            The calculator is free. Pro adds loads, scanning and invoices, and you can try it free for 7 days.
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px 24px;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#667085;">
+            Button not working? Go to profitrig.com/login, sign in, and tap Resend for a new link.<br>
             Didn't sign up? Ignore this email and nothing happens.
           </td>
         </tr>
       </table>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
         <tr>
-          <td style="padding:14px 28px;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.08em;color:#173c2b;">KNOW YOUR NUMBERS. TAKE CONTROL.</td>
+          <td style="padding:16px 28px;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.12em;color:#173c2b;">KNOW YOUR NUMBERS. TAKE CONTROL.</td>
         </tr>
       </table>
     </td>

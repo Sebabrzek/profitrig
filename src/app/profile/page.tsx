@@ -159,8 +159,6 @@ export default async function ProfilePage() {
     if (!error) {
       emailPrefs = {
         productUpdates: wantsUpdates({
-          pro: userIsPro,
-          marketingOptIn: initial.marketing_opt_in,
           productUpdates: typeof pref?.product_updates === "boolean" ? pref.product_updates : null,
         }),
         unsubscribed: Boolean(pref?.unsubscribed_at),

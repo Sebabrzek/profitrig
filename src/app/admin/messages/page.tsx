@@ -10,13 +10,15 @@ import { todayIsoIn } from "@/lib/loads";
 import {
   AUDIENCE_LABEL,
   DEFAULT_FROM_NAME,
+  alreadyGot,
   audienceCounts,
   checkMessageSettings,
   isShowing,
+  needsConfirmLink,
   type Audience,
 } from "@/lib/messages";
 import { postmarkConfig } from "@/lib/postmark";
-import { Composer, EndBannerButton, SenderSettingsForm } from "./Composer";
+import { Composer, ConfirmLinksCard, EndBannerButton, SenderSettingsForm } from "./Composer";
 import { PRESETS } from "./presets";
 import { loadPeople } from "./people";
 
@@ -40,13 +42,14 @@ export default async function MessagesPage() {
   const admin = createSupabaseAdminClient();
   if (!admin) notFound();
 
-  const [settingsRes, campaignsRes, recipientsRes, bannersRes, people, meRes] = await Promise.all([
+  const [settingsRes, campaignsRes, recipientsRes, bannersRes, people, meRes, usersRes] = await Promise.all([
     admin.from("message_settings").select("*").eq("id", 1).maybeSingle(),
     admin.from("campaigns").select("*").order("created_at", { ascending: false }).limit(20),
-    admin.from("campaign_recipients").select("campaign_id,status,unsubscribed_at").limit(10000),
+    admin.from("campaign_recipients").select("campaign_id,user_id,status,unsubscribed_at").limit(10000),
     admin.from("announcements").select("*").order("created_at", { ascending: false }).limit(10),
     loadPeople(admin),
     admin.from("driver_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
+    admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
   const account = { email: user.email ?? "", isPro: true, isAdmin: true };
   const header = (
@@ -78,7 +81,19 @@ export default async function MessagesPage() {
   const settingsOk = checkMessageSettings(settings).ok && Boolean(settingsRes.data);
   const config = postmarkConfig();
   const ready = settingsOk && Boolean(config);
-  const counts = audienceCounts(people, todayIsoIn("America/Chicago"));
+  const today = todayIsoIn("America/Chicago");
+  const counts = audienceCounts(people, today);
+  // The newest announcement that went out by email: the next one can skip
+  // whoever it already reached.
+  const last = (campaignsRes.data ?? []).find((c) => c.status === "sent");
+  const lastCampaign = last ? { id: String(last.id), subject: String(last.subject) } : null;
+  const countsSkipping = lastCampaign
+    ? audienceCounts(people, today, alreadyGot(recipientsRes.data ?? [], lastCampaign.id))
+    : counts;
+
+  // Sign-ups that never confirmed their email, and who can get a link now.
+  const unconfirmed = (usersRes.data?.users ?? []).filter((u) => u.email && !u.email_confirmed_at);
+  const linkDue = unconfirmed.filter((u) => needsConfirmLink(u, new Date())).length;
 
   const stats = new Map<string, Record<string, number>>();
   for (const r of recipientsRes.data ?? []) {
@@ -107,8 +122,12 @@ export default async function MessagesPage() {
           </Card>
         )}
 
+        {unconfirmed.length > 0 && <ConfirmLinksCard unconfirmed={unconfirmed.length} due={linkDue} />}
+
         <Composer
           counts={counts}
+          countsSkipping={countsSkipping}
+          lastCampaign={lastCampaign}
           ready={ready}
           previewName={String(meRes.data?.first_name ?? "") || "Dennis"}
           mailingAddress={settings.mailing_address}

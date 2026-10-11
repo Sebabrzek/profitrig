@@ -14,13 +14,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail, adminEmails } from "@/lib/admin";
 import { isPro, type SubscriptionRow } from "@/lib/subscription";
 import { fetchMonthSpend } from "@/lib/aiBudget";
+import { wantsUpdates } from "@/lib/messages";
 import {
   AI_MONTHLY_BUDGET_USD,
   AI_TIER_LABEL,
   aiTier,
   formatAiDollars,
 } from "@/lib/aiGuard";
-import { signOutAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -161,6 +161,7 @@ ADMIN_EMAILS = ${user.email}`}
     chatRes,
     subsRes,
     monthSpend,
+    prefsRes,
   ] = await Promise.all([
     admin.from("driver_profiles").select("*"),
     admin
@@ -190,6 +191,8 @@ ADMIN_EMAILS = ${user.email}`}
     admin.from("subscriptions").select("*"),
     // What each driver's AI has cost this month. Null if unreadable.
     fetchMonthSpend(admin, new Date()),
+    // Who switched ProfitRig's news off (migration 023).
+    admin.from("email_preferences").select("user_id,product_updates"),
   ]);
 
   const profiles: DriverProfileRow[] = profilesRes.data ?? [];
@@ -243,7 +246,7 @@ ADMIN_EMAILS = ${user.email}`}
     loadCountByUser.set(uid, (loadCountByUser.get(uid) ?? 0) + 1);
   }
 
-  const now = Date.now();
+  const now = new Date().getTime();
   const day = 24 * 60 * 60 * 1000;
   const last7 = users.filter(
     (u) => now - new Date(u.created_at).getTime() < 7 * day
@@ -257,7 +260,14 @@ ADMIN_EMAILS = ${user.email}`}
   const profileFilled = profiles.filter(
     (p) => (p.first_name?.trim() ?? "") && (p.phone?.trim() ?? "")
   ).length;
-  const optIn = profiles.filter((p) => p.marketing_opt_in === true).length;
+  // Everyone confirmed gets ProfitRig's news unless they switched it off —
+  // the same rule as Admin → Messages (wantsUpdates).
+  const updatesOff = new Set(
+    (prefsRes.data ?? []).filter((r) => r.product_updates === false).map((r) => String(r.user_id))
+  );
+  const getsUpdates = (u: { id: string; email_confirmed_at?: string | null }) =>
+    Boolean(u.email_confirmed_at) && wantsUpdates({ productUpdates: updatesOff.has(u.id) ? false : null });
+  const updatesOn = users.filter(getsUpdates).length;
 
   // Distributions
   function tallyKey(key: keyof DriverProfileRow) {
@@ -323,9 +333,9 @@ ADMIN_EMAILS = ${user.email}`}
           />
           <StatTile
             figure={false}
-            label="Marketing opt-in"
-            value={String(optIn)}
-            context={`of ${profiles.length} profiles`}
+            label="Get updates"
+            value={String(updatesOn)}
+            context={`of ${confirmed} confirmed`}
           />
         </section>
 
@@ -392,7 +402,7 @@ ADMIN_EMAILS = ${user.email}`}
                   <th scope="col" className="pr-record-label py-2 pr-4 text-right"># Loads</th>
                   <th scope="col" className="pr-record-label py-2 pr-4 text-right">AI mo.</th>
                   <th scope="col" className="pr-record-label py-2 pr-4">Last save</th>
-                  <th scope="col" className="pr-record-label py-2 pr-4">Opt-in</th>
+                  <th scope="col" className="pr-record-label py-2 pr-4">Updates</th>
                   <th scope="col" className="pr-record-label py-2">Conf.</th>
                 </tr>
               </thead>
@@ -460,7 +470,7 @@ ADMIN_EMAILS = ${user.email}`}
                         {cpm?.updatedAt ? formatDate(cpm.updatedAt) : "—"}
                       </td>
                       <td className="py-2.5 pr-4">
-                        {p?.marketing_opt_in ? (
+                        {getsUpdates(u) ? (
                           <>
                             <span aria-hidden="true">✓</span>
                             <span className="sr-only">Yes</span>
