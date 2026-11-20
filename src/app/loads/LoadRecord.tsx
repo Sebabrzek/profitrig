@@ -2,9 +2,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { LossTag } from "@/components/ui/Records";
 import { Chip } from "@/components/ui/Chip";
+import type { PayCheck } from "@/lib/breakEven";
 import {
   loadRecordFigures,
   partialRecordFigures,
+  payCheckFigures,
   tripLineFigures,
   type LoadRecordEconomics,
   type TripLineTotals,
@@ -46,6 +48,7 @@ export function LoadRecord({
   destination,
   economics,
   flagged = false,
+  check = null,
 }: {
   /** Unique per record; builds the ids that name the link. */
   id: string;
@@ -57,8 +60,11 @@ export function LoadRecord({
   economics: LoadRecordEconomics;
   /** An alert on this load is still open (lib/checks). */
   flagged?: boolean;
+  /** What the load had to pay to break even and to hit target (lib/breakEven). */
+  check?: PayCheck | null;
 }) {
   const f = loadRecordFigures(economics);
+  const c = check ? payCheckFigures(check) : null;
   const k = `load-${id}`;
   const hasRoute = Boolean(origin || destination);
   const tone =
@@ -129,6 +135,8 @@ export function LoadRecord({
               <LossTag />
             </p>
           )}
+          {c && <p className="pr-load-context">Break-even {c.breakEven}</p>}
+          {c?.target && <p className="pr-load-context">Target {c.target}</p>}
         </div>
 
         {/* A phone's operating detail: the trip, then the rates. */}

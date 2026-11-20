@@ -173,6 +173,7 @@ export default async function CalculatorPage() {
         realCPMFromLoads={realCPMFromLoads}
         isAuthed={Boolean(user)}
         hasSavedProfile={hasSavedProfile}
+        carrierPct={driverProfile?.carrier_pct ?? 0}
       />
     </AppShell>
   );

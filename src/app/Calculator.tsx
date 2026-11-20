@@ -27,6 +27,7 @@ import {
   WorkColumn,
 } from "@/components/shell/AnswerLayout";
 import { VisitorPitch } from "@/components/VisitorPitch";
+import { CheckALoad } from "./CheckALoad";
 import {
   VISITOR_PROFILE_KEY,
   loadVisitorProfile,
@@ -87,6 +88,7 @@ export function Calculator({
   realCPMFromLoads = null,
   isAuthed = true,
   hasSavedProfile = true,
+  carrierPct = 0,
 }: {
   initial: CostProfile;
   profileComplete: boolean;
@@ -94,6 +96,8 @@ export function Calculator({
   realCPMFromLoads?: number | null;
   isAuthed?: boolean;
   hasSavedProfile?: boolean;
+  /** The % a carrier keeps, from Profile — 0 for an independent or a visitor. */
+  carrierPct?: number;
 }) {
   const router = useRouter();
   const [p, setP] = useState<CostProfile>(initial);
@@ -113,6 +117,10 @@ export function Calculator({
   useEffect(() => {
     if (isAuthed && hasSavedProfile) return;
     const stored = loadVisitorProfile();
+    // Browser storage exists only after the page is on screen, so the saved
+    // numbers can only be read here; a lazy initial state would differ from
+    // the server's render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored) setP((s) => ({ ...s, ...stored }));
   }, [isAuthed, hasSavedProfile]);
 
@@ -265,6 +273,13 @@ export function Calculator({
           )}
         </ReadingGrid>
       </InstrumentPanel>
+      {totals.totalCPM > 0 && (
+        <CheckALoad
+          costPerMile={totals.totalCPM}
+          desiredProfitPerMile={p.desired_profit_per_mile}
+          carrierPct={carrierPct}
+        />
+      )}
 
       </AnswerColumn>
       <WorkColumn>

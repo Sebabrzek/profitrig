@@ -23,13 +23,15 @@ import {
   partialExtraMiles,
   tripTotals,
 } from "@/lib/partials";
-import { partialRecordFigures } from "@/lib/records";
+import { partialRecordFigures, payCheckFigures } from "@/lib/records";
+import { payCheck } from "@/lib/breakEven";
 import type { CostProfile } from "../actions";
 import { deleteLoadAction, saveLoadAction } from "../actions";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
 import {
   InstrumentPanel,
   PanelNote,
+  PanelVerdict,
   Reading,
   ReadingGrid,
 } from "@/components/instruments/Instruments";
@@ -254,6 +256,20 @@ export function LoadForm({
     [load, costProfile, otherMonthMiles, monthFirstDay]
   );
 
+  // Is this load worth it? What it must pay to break even and to hit the
+  // driver's target (lib/breakEven) — not for a partial, whose figures are
+  // what it adds to a trip.
+  const check = isPartialForm
+    ? null
+    : payCheck({
+        cost: e.totalCost,
+        miles: e.totalMiles,
+        desiredProfitPerMile: costProfile.desired_profit_per_mile,
+        carrierPct: e.carrierPct,
+        pays: e.loadPay,
+      });
+  const checkFigures = check ? payCheckFigures(check) : null;
+
   const setField = <K extends keyof Load>(k: K) => (v: Load[K]) =>
     setLoad((s) => ({ ...s, [k]: v }));
 
@@ -381,6 +397,33 @@ export function LoadForm({
           />
           <Reading label="Cost" value={formatMoney(e.totalCost)} />
         </ReadingGrid>
+        {check && checkFigures && (
+          <>
+            <ReadingGrid wideColumns={2}>
+              <Reading
+                label="Break-even"
+                value={checkFigures.breakEven}
+                context={
+                  e.carrierPct > 0 ? (
+                    <>the least it can pay, before the carrier&apos;s {Number(e.carrierPct.toFixed(2))}%</>
+                  ) : (
+                    <>the least it can pay</>
+                  )
+                }
+              />
+              {checkFigures.target && (
+                <Reading
+                  label="Your target"
+                  value={checkFigures.target}
+                  context={<>cost + {formatRate(costProfile.desired_profit_per_mile)} / mi profit</>}
+                />
+              )}
+            </ReadingGrid>
+            <PanelVerdict>
+              {checkFigures.verdict ?? "Type what the load pays to see if it's worth it."}
+            </PanelVerdict>
+          </>
+        )}
         {isPartialForm ? (
           <PanelNote>
             What this partial added on top of the load it rode with — its pay,

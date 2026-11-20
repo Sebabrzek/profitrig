@@ -12,9 +12,12 @@ import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { formatMoney, formatRate, outcomeOf } from "@/lib/format";
 import {
   InstrumentPanel,
+  PanelVerdict,
   Reading,
   ReadingGrid,
 } from "@/components/instruments/Instruments";
+import { payCheck, weekRateCheck } from "@/lib/breakEven";
+import { weekRateFigures } from "@/lib/records";
 import {
   AnswerColumn,
   AnswerLayout,
@@ -289,6 +292,21 @@ export default async function LoadsPage({
   );
   const isConfigured = profileIsConfigured(profile);
 
+  // Break-even and target (lib/breakEven): for each load, what it had to
+  // pay; for the week, per mile against its average rate.
+  const checkOf = (e: { totalCost: number; totalMiles: number; carrierPct: number; loadPay: number }) =>
+    isConfigured
+      ? payCheck({
+          cost: e.totalCost,
+          miles: e.totalMiles,
+          desiredProfitPerMile: profile.desired_profit_per_mile,
+          carrierPct: e.carrierPct,
+          pays: e.loadPay,
+        })
+      : null;
+  const weekCheck = isConfigured ? weekRateCheck(totals, profile.desired_profit_per_mile) : null;
+  const weekCheckFigures = weekCheck ? weekRateFigures(weekCheck) : null;
+
   // Alerts: loads worth a second look, in the same words Admin shows
   // (lib/checks). The duplicate check reads the whole month, so a load saved
   // twice across a week boundary is still caught. An alert the driver has
@@ -537,6 +555,27 @@ export default async function LoadsPage({
               context={<>cost {formatRate(totals.cpm)}</>}
             />
           </ReadingGrid>
+          {weekCheckFigures && (
+            <>
+              <ReadingGrid wideColumns={2}>
+                <Reading
+                  label="Break-even rate"
+                  value={weekCheckFigures.breakEven}
+                  unit="/ mi"
+                  context={<>this week&apos;s cost per mile</>}
+                />
+                {weekCheckFigures.target && (
+                  <Reading
+                    label="Target rate"
+                    value={weekCheckFigures.target}
+                    unit="/ mi"
+                    context={<>cost + {formatRate(profile.desired_profit_per_mile)} profit</>}
+                  />
+                )}
+              </ReadingGrid>
+              <PanelVerdict>{weekCheckFigures.verdict}</PanelVerdict>
+            </>
+          )}
         </InstrumentPanel>
 
         {/* Why this week's fixed-cost share is what it is */}
@@ -681,6 +720,7 @@ export default async function LoadsPage({
                       destination={load.destination}
                       economics={economicsOf(load)}
                       flagged={flaggedIds.has(String(load.id))}
+                      check={checkOf(economicsOf(load))}
                     />
                   )}
                   {trip.partials.map(partialRecord)}

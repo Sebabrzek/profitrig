@@ -216,10 +216,14 @@ import {
   fuelEntryPresentation,
   loadRecordFigures,
   partialRecordFigures,
+  payCheckFigures,
+  perMileGap,
   roadExpenseDeleteLabel,
   tripLineFigures,
+  weekRateFigures,
   type LoadRecordEconomics,
 } from "../src/lib/records";
+import { payCheck, weekRateCheck } from "../src/lib/breakEven";
 import {
   MAX_PARTIALS,
   asPartial,
@@ -3593,6 +3597,135 @@ section("Alerts reach the driver, and \"this is right\" silences only what it sa
     })
   );
   check("an unflagged load's markup is exactly as before", !plainHtml.includes("Worth a look") && !plainHtml.includes("-flag"));
+}
+
+// ─────────────────────────────────────────────────────────────────────
+section("Break-even and target: is this load worth it?");
+// ─────────────────────────────────────────────────────────────────────
+
+{
+  const indie = payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 1600 })!;
+  const fi = payCheckFigures(indie);
+  check(
+    "break-even is the load's cost; target adds the profit per mile on every mile",
+    indie.breakEven === 1420 && Math.abs(indie.target - 1780) < 1e-9 && indie.hasTarget &&
+      indie.verdict === "under_target" && Math.abs(indie.gap - 180) < 1e-9 &&
+      fi.breakEven === "$1,420" && fi.target === "$1,780" &&
+      fi.verdict === "Pays $1,600 — covers your costs, $180 under your target.",
+    JSON.stringify(fi)
+  );
+  const over = payCheckFigures(payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 1900 })!);
+  const exact = payCheckFigures(payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 1780 })!);
+  const short = payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 1300 })!;
+  check(
+    "the verdict: meets the target, right on it, or short of break-even — in words",
+    over.verdict === "Pays $1,900 — meets your target, with $120 to spare." && over.outcome === "profit" &&
+      exact.verdict === "Pays $1,780 — right on your target." &&
+      short.verdict === "loses" && payCheckFigures(short).verdict === "Pays $1,300 — $120 short of break-even. This load loses money." &&
+      payCheckFigures(short).outcome === "loss",
+    `${over.verdict} | ${exact.verdict}`
+  );
+  const leased = payCheck({ cost: 1200, miles: 1000, desiredProfitPerMile: 0.5, carrierPct: 20, pays: 2000 })!;
+  check(
+    "for a leased driver both are what the LOAD must pay, so the share after the carrier's 20% covers it",
+    Math.abs(leased.breakEven - 1500) < 1e-9 && Math.abs(leased.target - 2125) < 1e-9 &&
+      leased.verdict === "under_target" && Math.abs(leased.gap - 125) < 1e-9 &&
+      payCheck({ cost: 1200, miles: 1000, desiredProfitPerMile: 0.5, carrierPct: 20, pays: 1400 })!.verdict === "loses" &&
+      payCheck({ cost: 1200, miles: 1000, desiredProfitPerMile: 0.5, carrierPct: 20, pays: 1500 })!.verdict === "under_target"
+  );
+  const noGoal = payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0, carrierPct: 0, pays: 1600 })!;
+  check(
+    "no profit per mile set: no target, just whether it covers costs",
+    !noGoal.hasTarget && noGoal.verdict === "covers_costs" && payCheckFigures(noGoal).target === null &&
+      payCheckFigures(noGoal).verdict === "Pays $1,600 — covers your costs, with $180 to spare." &&
+      payCheckFigures(payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0, carrierPct: 0, pays: 1420 })!).verdict ===
+        "Pays $1,420 — exactly break-even."
+  );
+  check(
+    "nothing to judge: no pay typed yet gives no verdict; no miles, or a carrier keeping everything, gives no check",
+    payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 0 })!.verdict === null &&
+      payCheckFigures(payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 0 })!).verdict === null &&
+      payCheck({ cost: 0, miles: 0, desiredProfitPerMile: 0.4, carrierPct: 0, pays: 1600 }) === null &&
+      payCheck({ cost: 1420, miles: 900, desiredProfitPerMile: 0.4, carrierPct: 100, pays: 1600 }) === null
+  );
+
+  // The real test: against ProfitRig's own load math. Paying exactly the
+  // break-even makes the load's profit $0; paying exactly the target makes
+  // it the profit per mile × miles — independent and leased alike.
+  const agrees = [null, 20, 12.5].every((pct) => {
+    const base = load({ carrier_pct: pct, fuel_actual: 612.4, tolls_actual: 38 });
+    const e = computeLoadEconomics(base, profile);
+    const c = payCheck({ cost: e.totalCost, miles: e.totalMiles, desiredProfitPerMile: profile.desired_profit_per_mile, carrierPct: e.carrierPct, pays: e.loadPay })!;
+    const atBreakEven = computeLoadEconomics({ ...base, linehaul_pay: c.breakEven }, profile);
+    const atTarget = computeLoadEconomics({ ...base, linehaul_pay: c.target }, profile);
+    return (
+      Math.round(atBreakEven.profit * 100) === 0 &&
+      Math.round((atTarget.profit - profile.desired_profit_per_mile * e.totalMiles) * 100) === 0 &&
+      // ...and the verdict agrees with the profit the load shows.
+      (c.verdict === "loses") === (Math.round(e.profit * 100) < 0)
+    );
+  });
+  check("paying the break-even makes the load's own profit $0, and paying the target makes it the profit per mile × miles", agrees);
+
+  const calc0 = computeCalculatorTotals(profile);
+  const quick = payCheck({ cost: calc0.totalCPM * 980, miles: 980, desiredProfitPerMile: profile.desired_profit_per_mile, carrierPct: 0, pays: 2400 })!;
+  check(
+    "Check a load on the Calculator: target ÷ miles is exactly the Calculator's minimum target rate",
+    Math.abs(quick.target / 980 - calc0.requiredRate) < 1e-9 && Math.abs(quick.breakEven / 980 - calc0.totalCPM) < 1e-9
+  );
+
+  const wk = weekRateCheck({ totalMiles: 2400, rpm: 2.05, cpm: 1.78 }, 0.45)!;
+  const wf = weekRateFigures(wk);
+  check(
+    "a week, per mile: break-even is its cost per mile, target adds the profit per mile, against its average rate",
+    wf.breakEven === "$1.78" && wf.target === "$2.23" && wk.verdict === "under_target" &&
+      wf.verdict === "You averaged $2.05 / mi — 18¢ a mile under your target.",
+    wf.verdict
+  );
+  check(
+    "a week's verdict, every way it can go",
+    weekRateFigures(weekRateCheck({ totalMiles: 2400, rpm: 1.7, cpm: 1.78 }, 0.45)!).verdict === "You averaged $1.70 / mi — 8¢ a mile below break-even." &&
+      weekRateFigures(weekRateCheck({ totalMiles: 2400, rpm: 3.4, cpm: 1.78 }, 0.45)!).verdict === "You averaged $3.40 / mi — $1.17 a mile over your target." &&
+      weekRateFigures(weekRateCheck({ totalMiles: 2400, rpm: 2.23, cpm: 1.78 }, 0.45)!).verdict === "You averaged $2.23 / mi — right on your target." &&
+      weekRateFigures(weekRateCheck({ totalMiles: 2400, rpm: 2.0, cpm: 1.78 }, 0)!).verdict === "You averaged $2.00 / mi — 22¢ a mile over break-even." &&
+      weekRateCheck({ totalMiles: 0, rpm: 0, cpm: 0 }, 0.45) === null
+  );
+  check("a per-mile gap is said the way drivers say it", perMileGap(0.18) === "18¢" && perMileGap(1.05) === "$1.05" && perMileGap(-0.07) === "7¢");
+
+  const withCheck = renderToStaticMarkup(
+    React.createElement(LoadRecord, {
+      id: "B1", href: "/loads/B1", dateLabel: "Wed, Sep 16", broker: "CH Robinson", origin: "", destination: "",
+      economics: econ(), check: payCheck({ cost: 2252.67, miles: 490, desiredProfitPerMile: 0.5, carrierPct: 0, pays: 3240 }),
+    })
+  );
+  const without = (check?: null) =>
+    renderToStaticMarkup(
+      React.createElement(LoadRecord, {
+        id: "B1", href: "/loads/B1", dateLabel: "Wed, Sep 16", broker: "CH Robinson", origin: "", destination: "",
+        economics: econ(), ...(check === null ? { check: null } : {}),
+      })
+    );
+  check(
+    "each load in the list says its break-even and target under the profit; without them it's exactly as before",
+    withCheck.includes(">Break-even $2,252.67<") && withCheck.includes(">Target $2,497.67<") &&
+      without() === without(null) && !without().includes("Break-even")
+  );
+
+  const loadsSrc = readFileSync("src/app/loads/page.tsx", "utf8");
+  const formSrc = readFileSync("src/app/loads/LoadForm.tsx", "utf8");
+  check(
+    "the list and the form judge a load by the cost and pay they already show; a partial gets no verdict",
+    loadsSrc.includes("check={checkOf(economicsOf(load))}") &&
+      /payCheck\(\{\s*cost: e\.totalCost,\s*miles: e\.totalMiles,[\s\S]*?pays: e\.loadPay,/.test(formSrc) &&
+      formSrc.includes("const check = isPartialForm\n    ? null")
+  );
+  const hero = readFileSync("src/components/marketing/Hero.tsx", "utf8");
+  check(
+    "the homepage says plainly what ProfitRig is, keeps the tagline, and names the AI guide",
+    /Simple bookkeeping for <span className="whitespace-nowrap">owner-operators<\/span>/.test(hero) &&
+      /Know your numbers\.\s*<br \/>\s*Take control\./.test(hero) &&
+      hero.includes("Ask ProfitRig, your AI guide")
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ import { ClosingCta } from "@/components/marketing/ClosingCta";
 export const metadata: Metadata = {
   title: "ProfitRig — Know your numbers. Take control.",
   description:
-    "ProfitRig shows an owner-operator what a mile really costs, what a load really paid, and what is left at the end of the week. Free rate-per-mile calculator, no account needed.",
+    "Simple bookkeeping for owner-operators. ProfitRig shows what a mile really costs, what a load really paid, and what is left at the end of the week, with an AI guide to explain it in plain English. Free rate-per-mile calculator, no account needed.",
 };
 
 export default function HomePage() {

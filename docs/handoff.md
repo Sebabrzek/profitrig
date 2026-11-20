@@ -1,6 +1,6 @@
 # ProfitRig — handoff
 
-Updated 11 Oct 2026. **Read this first in any new session.**
+Updated 20 Nov 2026. **Read this first in any new session.**
 
 ## Start of a new session: do not code
 
@@ -20,23 +20,23 @@ live. Every screen, signed in and signed out, is now on the system. What
 follows is Sebastian's call, and the business work is the carrier-pay order
 at the bottom of this file. **Nothing starts until he says "Go Build".**
 
-## Repository state (11 Oct 2026)
+## Repository state (20 Nov 2026)
 
-- Production `main` = `origin/main` = `78b579d` (8 Oct), live: Admin →
-  Messages (C1), the sign-up fix ("check your email", /auth/confirm, card for
-  the trial), invoicing step 1, email-in (D3, Postmark set up and tested end to
-  end), Next.js 16.3.8, scanning (D1), the monthly AI allowance (D0), in-app
-  alerts (Phase B), partials for every Pro driver, the PWA opening on
-  /calculator, the ivory canvas, per diem by days on the road, Admin's shared
-  CPM formula, and the read-only Admin page per driver with an Email draft.
-  Migrations 017–023 are applied. `git log --oneline -3` is the truth; this
-  file is a summary.
-- **In review: `feature/updates-for-everyone`** — product updates for
-  everyone confirmed unless they said no, fresh sign-up links for the 20 who
-  never confirmed, "skip anyone who already got the last one", and both
-  emails in the new branding. No migration. See "Updates for everyone" below.
-- **The October update went out 9 Oct** to the 10 drivers who got updates
-  then (10 sent, 0 failed).
+- Production `main` = `origin/main`, live: break-even and target on every
+  load and week, "Check a load" on the Calculator and the homepage's plain
+  statement (plan #1 part A, 20 Nov); updates for everyone, fresh sign-up
+  links and the emails in the new branding (`4609d9f`, 11 Oct); Admin →
+  Messages (C1); the sign-up fix; invoicing step 1; email-in (D3); scanning
+  (D1); the monthly AI allowance (D0); in-app alerts (Phase B); partials for
+  every Pro driver; and everything before. Migrations 017–023 are applied.
+  `git log --oneline -3` is the truth; this file is a summary.
+- **Next: plan #1 part B** — the repair & tire reserve and the honest
+  cost-per-mile card. See "Break-even and target" below.
+- **The October update went out** 9 Oct to 10 drivers and 11 Oct to the
+  other 20 confirmed (19 delivered, 1 bounced); the 20 unconfirmed got fresh
+  sign-up links 11 Oct (2 confirmed within a day). Announcements are sent as
+  **"Ziggy at ProfitRig"** and signed Ziggy (Sebastian's choice); the
+  October preset in `presets.ts` still ends "Sebastian".
 - **Official address: team@profitrig.com.** profitrig.com is a secondary
   domain in Sebastian's Google Workspace (truckingbusiness.com); team@ is an
   alias on his own account, Gmail "Send mail as" is set, and it is the
@@ -135,7 +135,8 @@ at the bottom of this file. **Nothing starts until he says "Go Build".**
 | Invoicing step 1 | `ab0cdc4` | live (migration 022 applied), 399 → 421 checks |
 | Sign-up fix — "check your email", /auth/confirm, card for the trial | `aff698d` | live |
 | C1 — Admin → Messages: announcements by email and in the app | `78b579d` | live (migration 023 applied), 421 → 448 checks |
-| Updates for everyone; fresh sign-up links; emails in the new branding | — | on `feature/updates-for-everyone`, in review, 448 → 454 checks |
+| Updates for everyone; fresh sign-up links; emails in the new branding | `4609d9f` | live, 448 → 454 checks |
+| Plan #1 part A — break-even and target on loads and weeks; Check a load; homepage statement | see `git log` | live, 454 → 467 checks |
 | Phase B — in-app alerts, "this is right" | — | on `feature/in-app-alerts`, **not merged** (migration 018), 307 → 322 checks |
 
 ## Locked design decisions
@@ -468,8 +469,9 @@ and scanning (D1) will cost far more per use than a chat question.
   worked out on the server.
 - **Sending is Postmark's broadcast stream** (env `POSTMARK_SERVER_TOKEN`,
   stream id `POSTMARK_BROADCAST_STREAM`, default "broadcast"), kept apart
-  from transactional mail. From "Sebastian at ProfitRig
-  <updates@profitrig.com>", replies to Sebastian. **Unsubscribes are
+  from transactional mail. From "<sender name> <updates@profitrig.com>"
+  (set in Sender settings — "Ziggy at ProfitRig" since 11 Oct), replies to
+  team@profitrig.com. **Unsubscribes are
   Postmark-managed** (`{{{ pm:unsubscribe }}}` + its one-click headers;
   self-managed needs Postmark's approval). Postmark reports deliveries,
   bounces, spam complaints and unsubscribes to `/api/email-events` (same
@@ -534,6 +536,52 @@ mostly never confirmed, so never got in.
   Messages → "Send them a new link"; then the October update to everyone
   else, with "Skip anyone who already got…" ticked. About 40 emails — inside
   Postmark's free 100 this month.
+
+## Break-even and target (plan #1) — what was decided, 20 Nov 2026
+
+"Is this load worth it?" — the Cassidy moment from the ad campaign: a broker
+slides over a rate con, the driver checks it, and hands it back.
+
+**Part A (live).** `lib/breakEven.ts`, words in `lib/records.ts`.
+- **Break-even** is exactly the cost ProfitRig already shows for the load
+  (computeLoadEconomics `totalCost`). **Target** adds the Calculator's
+  profit per mile on every mile, loaded and deadhead, as the Calculator's
+  minimum target rate does. Both are said as what the LOAD must pay — for a
+  leased driver grossed up by the carrier's % — so they compare with the rate
+  con. Tested against the load math: paying the break-even makes the load's
+  profit $0; paying the target makes it profit-per-mile × miles.
+- **Load form** (new, edit, scanned rate con; not partials): Break-even and
+  Your target readings and a verdict line — "Pays $1,600 — covers your
+  costs, $180 under your target." **Loads list:** break-even and target under
+  each load's profit (not partials or trip lines). **Week:** break-even rate
+  (the week's cost per mile, incl. other expenses) and target rate next to
+  the average rate, with a verdict line.
+- **Check a load** (free, Calculator answer column, shown once the cost per
+  mile is above $0): miles and pay in, nothing saved, at the Calculator's
+  own cost per mile (override included) and the Profile carrier %.
+- **Homepage:** eyebrow "Simple bookkeeping for owner-operators" (replaces
+  "American Iron × Financial Precision"); the tagline stays the headline;
+  under it "Not a numbers person? Ask ProfitRig, your AI guide, walks you
+  through it in plain English." Ask ProfitRig explains the app and trucking
+  money; it does NOT read the driver's own numbers — never claim it does.
+- Nothing about an existing number changed.
+
+**Part B (next, needs Go Build).**
+- **Repair & tire reserve.** Found 20 Nov from a member's question: every
+  load deducts maintenance + tires per mile, but nothing tracks that as a
+  reserve, and a shop bill under Loads → "Other expenses this week" →
+  Repair comes off the week's profit AGAIN (double count). Under Tax →
+  Expenses it only reaches the tax report. Members were told to use Tax →
+  Expenses for now. Decided: set aside = miles × (maintenance + tires per
+  mile); spent = Tax expenses in Repairs & maintenance and Tires plus road
+  expenses "Repair"; left = the difference; repairs are paid from the
+  reserve, not taken off the week again. When spending outruns the reserve,
+  the week stays steady and a warning offers a higher per-mile rate (once
+  there are enough miles). An optional starting balance.
+- **The "From your loads" cost-per-mile card:** the last 90 days, says why it
+  moved ("you drove 8,100 mi a month, not 10,000"), and fixes the input that
+  drifted instead of freezing a manual number; existing manual numbers stay
+  until the driver resets them.
 
 ## Features asked for, not yet planned (3 Oct 2026)
 

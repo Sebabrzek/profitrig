@@ -8,6 +8,7 @@
  */
 import { formatMoney, formatRate, outcomeOf } from "./format";
 import type { FuelEntry } from "./fuel";
+import type { PayCheck, WeekRateCheck } from "./breakEven";
 
 /** 20 → "20%", 17.5 → "17.5%" — the same label the Loads page uses. */
 function pctLabel(n: number): string {
@@ -121,4 +122,72 @@ export function roadExpenseDeleteLabel(
   dateLabel: string
 ): string {
   return `Delete ${category}, ${formatMoney(amount)}, ${dateLabel}`;
+}
+
+/**
+ * A load's break-even and target, as words (lib/breakEven). Amounts are what
+ * the LOAD must pay; the verdict starts from what it pays, so a driver reads
+ * it the way they'd talk to a broker: "Pays $1,600 — covers your costs,
+ * $180 under your target."
+ */
+export function payCheckFigures(c: PayCheck) {
+  const gap = formatMoney(c.gap);
+  const pays = `Pays ${formatMoney(c.pays)}`;
+  let verdict: string | null = null;
+  switch (c.verdict) {
+    case "meets_target":
+      verdict = c.gap > 0.004 ? `${pays} — meets your target, with ${gap} to spare.` : `${pays} — right on your target.`;
+      break;
+    case "under_target":
+      verdict = `${pays} — covers your costs, ${gap} under your target.`;
+      break;
+    case "covers_costs":
+      verdict = c.gap > 0.004 ? `${pays} — covers your costs, with ${gap} to spare.` : `${pays} — exactly break-even.`;
+      break;
+    case "loses":
+      verdict = `${pays} — ${gap} short of break-even. This load loses money.`;
+      break;
+  }
+  return {
+    breakEven: formatMoney(c.breakEven),
+    /** Null when the driver has no profit per mile set: target = break-even. */
+    target: c.hasTarget ? formatMoney(c.target) : null,
+    verdict,
+    /** For the verdict's tone: a loss is said as one (with words, not only colour). */
+    outcome: c.verdict === "loses" ? ("loss" as const) : c.verdict === "meets_target" ? ("profit" as const) : undefined,
+  };
+}
+
+/** A per-mile gap the way drivers say it: "18¢" under a dollar, "$1.05" from one up. */
+export function perMileGap(n: number): string {
+  const c = Math.round(Math.abs(n) * 100) || 0;
+  return c < 100 ? `${c}¢` : formatRate(Math.abs(n));
+}
+
+/** A week's break-even and target per mile, and how its average rate did. */
+export function weekRateFigures(w: WeekRateCheck) {
+  const avg = `You averaged ${formatRate(w.rate, { unit: "mi" })}`;
+  const gap = `${perMileGap(w.gap)} a mile`;
+  const exact = w.gap < 0.005;
+  let verdict: string;
+  switch (w.verdict) {
+    case "meets_target":
+      verdict = exact ? `${avg} — right on your target.` : `${avg} — ${gap} over your target.`;
+      break;
+    case "under_target":
+      verdict = `${avg} — ${gap} under your target.`;
+      break;
+    case "covers_costs":
+      verdict = exact ? `${avg} — exactly break-even.` : `${avg} — ${gap} over break-even.`;
+      break;
+    case "loses":
+      verdict = `${avg} — ${gap} below break-even.`;
+      break;
+  }
+  return {
+    breakEven: formatRate(w.breakEven),
+    target: w.hasTarget ? formatRate(w.target) : null,
+    verdict,
+    outcome: w.verdict === "loses" ? ("loss" as const) : w.verdict === "meets_target" ? ("profit" as const) : undefined,
+  };
 }

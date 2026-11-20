@@ -41,6 +41,19 @@ export function PanelNote({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The one-sentence answer under the readings: "Pays $1,600 — covers your
+ * costs, $180 under your target." Brighter than a PanelNote because it is
+ * the answer; a loss says so in its words, never by colour alone.
+ */
+export function PanelVerdict({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-4 text-[15px] font-semibold leading-snug text-[var(--pr-reading-value)]">
+      {children}
+    </p>
+  );
+}
+
 export function ReadingGrid({
   children,
   wideColumns = 3,

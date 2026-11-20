@@ -41,7 +41,9 @@ export function Hero() {
       <div className="pr-hero-stage">
         <div className="pr-hero-words">
           <div className="pr-hero-words-inner">
-            <p className="pr-mk-eyebrow">American Iron × Financial Precision</p>
+            <p className="pr-mk-eyebrow">
+              Simple bookkeeping for <span className="whitespace-nowrap">owner-operators</span>
+            </p>
             <h1 className="pr-mk-h1 mt-3 text-[var(--pr-rig-green)]">
               Know your numbers.
               <br />
@@ -89,6 +91,10 @@ export function Hero() {
         <p className="pr-mk-lead pr-hero-note max-w-[34rem] text-[var(--pr-mk-paper-muted)]">
           What a mile really costs, what a load really paid, and what is left
           at the end of the week.
+        </p>
+        <p className="pr-mk-lead pr-hero-note mt-3 max-w-[34rem] text-[var(--pr-mk-paper-muted)]">
+          Not a numbers person? Ask ProfitRig, your AI guide, walks you
+          through it in plain English.
         </p>
         <div className="pr-hero-actions">
           <ButtonLink href="/login" variant="primary" className="sm:w-auto">
